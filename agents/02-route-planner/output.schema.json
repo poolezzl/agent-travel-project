@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/02-route-planner/output.schema.json",
+  "title": "RoutePlannerOutput",
+  "description": "路线规划 Agent 的输出契约：排序后的点位序列与逐段路线。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "trace_id", "request_id", "generated_at", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "partial", "degraded", "failed"],
+      "description": "ok=完整；degraded=通勤时长走了估算降级"
+    },
+    "message": { "type": "string", "description": "降级/失败时的人类可读说明" },
+    "error_code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "degraded_fields": { "type": "array", "items": { "type": "string" } },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordered_points", "segments"],
+      "properties": {
+        "is_estimated": {
+          "type": "boolean",
+          "description": "true=部分通勤时长来自直线估算（读缓存失败时的降级）"
+        },
+        "ordered_points": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "排序后的 point_id 序列"
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from_point_id", "to_point_id", "transport", "distance_m", "duration_min", "source_record_id", "retrieved_at", "is_estimated"],
+            "properties": {
+              "from_point_id": { "type": "string" },
+              "to_point_id": { "type": "string" },
+              "transport": { "type": "string", "enum": ["步行", "公交", "地铁", "打车"] },
+              "distance_m": { "type": "integer", "minimum": 0 },
+              "duration_min": { "type": "integer", "minimum": 0, "description": "该段通勤时长（分钟）" },
+              "is_estimated": { "type": "boolean", "description": "该段是否估算" },
+              "source_record_id": { "type": "string" },
+              "retrieved_at": { "type": "string", "format": "date-time" },
+              "valid_until": { "type": ["string", "null"], "format": "date-time" }
+            }
+          }
+        },
+        "total_duration_min": { "type": "integer", "minimum": 0, "description": "通勤总时长" }
+      }
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] }, "then": { "required": ["error_code", "message"] }, "else": { "required": ["route"] } },
+    { "if": { "properties": { "status": { "enum": ["partial", "degraded"] } }, "required": ["status"] }, "then": { "required": ["message", "degraded_fields"], "properties": { "degraded_fields": { "minItems": 1 } } } }
+  ]
+}

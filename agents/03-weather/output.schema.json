@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/03-weather/output.schema.json",
+  "title": "WeatherOutput",
+  "description": "气象服务 Agent 的输出契约：逐日天气、出行建议、备选方案。预报窗口由适配器实际能力决定。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "trace_id", "request_id", "generated_at", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "partial", "degraded", "failed"],
+      "description": "failed=天气服务暂不可用"
+    },
+    "message": { "type": "string", "description": "降级/失败时说明，如「天气服务暂不可用」" },
+    "error_code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "degraded_fields": { "type": "array", "items": { "type": "string" } },
+    "daily": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 60,
+      "items": { "$ref": "#/definitions/daily_entry" },
+      "description": "逐日天气，按日期升序。降级时可为空。"
+    },
+    "travel_advice": {
+      "type": "string",
+      "description": "综合出行建议（含天气敏感点可行性），如「周六有雨，不适合爬山」"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date"],
+        "properties": {
+          "date": { "$ref": "#/definitions/date" },
+          "reason": { "type": "string", "description": "为何是备选" },
+          "condition": { "type": "string", "enum": ["晴", "多云", "阴", "雨", "雪"] }
+        }
+      },
+      "description": "天气敏感点的备选日期方案"
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] }, "then": { "required": ["error_code", "message"] }, "else": { "required": ["daily"] } },
+    { "if": { "properties": { "status": { "enum": ["partial", "degraded"] } }, "required": ["status"] }, "then": { "required": ["message", "degraded_fields"], "properties": { "degraded_fields": { "minItems": 1 } } } }
+  ],
+  "definitions": {
+    "daily_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "temp_min", "temp_max", "precip_prob", "condition", "data_type", "source_record_id", "retrieved_at", "valid_until"],
+      "properties": {
+        "date": { "$ref": "#/definitions/date" },
+        "temp_min": { "type": "integer", "minimum": -90, "maximum": 60, "description": "最低气温（℃）" },
+        "temp_max": { "type": "integer", "minimum": -90, "maximum": 60, "description": "最高气温（℃）" },
+        "precip_prob": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "预报降水概率 0-1；气候统计无可靠值时为 null" },
+        "condition": { "type": "string", "enum": ["晴", "多云", "阴", "雨", "雪"] },
+        "data_type": {
+          "type": "string",
+          "enum": ["forecast", "climate_statistics"],
+          "description": "forecast=供应商预报窗口内；climate_statistics=窗口外统计参考"
+        },
+        "source_record_id": { "type": "string", "minLength": 1 },
+        "retrieved_at": { "type": "string", "format": "date-time" },
+        "valid_until": { "type": ["string", "null"], "format": "date-time" },
+        "advice": { "type": "string", "description": "穿衣建议（用户询问着装时填充，不推荐品牌）" }
+      }
+    },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+  }
+}

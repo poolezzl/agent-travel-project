@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/04-attractions/output.schema.json",
+  "title": "AttractionsOutput",
+  "description": "景点资讯 Agent 的输出契约：每个景点的资讯卡。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "trace_id", "request_id", "generated_at", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "partial", "degraded", "failed"]
+    },
+    "message": { "type": "string", "description": "降级/失败时说明" },
+    "error_code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "degraded_fields": { "type": "array", "items": { "type": "string" } },
+    "cards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["point_id", "name", "source", "retrieved_at"],
+        "properties": {
+          "point_id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "description": "景点名" },
+          "source": {
+            "type": "string",
+            "enum": ["knowledge_base", "unknown"],
+            "description": "knowledge_base=本地知识库有记录；unknown=无记录（降级空卡片）"
+          },
+          "knowledge_id": { "type": "string" },
+          "chunk_ids": { "type": "array", "items": { "type": "string" } },
+          "retrieved_at": { "type": "string", "format": "date-time" },
+          "valid_until": { "type": ["string", "null"], "format": "date-time" },
+          "freshness_status": { "type": "string", "enum": ["fresh", "stale", "unknown"] },
+          "highlights": { "type": "array", "items": { "type": "string" }, "description": "玩法/亮点" },
+          "recommended_duration_min": { "type": "integer", "minimum": 0, "description": "建议游玩时长（分钟）" },
+          "best_time": { "type": "string", "description": "知识库记录的最佳时段" },
+          "avoid_tips": { "type": "array", "items": { "type": "string" }, "description": "避坑提示" },
+          "popularity": { "type": "integer", "minimum": 1, "maximum": 5, "description": "热度 1-5" }
+        }
+      },
+      "description": "每个输入景点对应一张资讯卡；无记录则返回 source=unknown 的空卡片"
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] }, "then": { "required": ["error_code", "message"] }, "else": { "required": ["cards"] } },
+    { "if": { "properties": { "status": { "enum": ["partial", "degraded"] } }, "required": ["status"] }, "then": { "required": ["message", "degraded_fields"], "properties": { "degraded_fields": { "minItems": 1 } } } }
+  ]
+}

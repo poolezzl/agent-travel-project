@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/07-revision/output.schema.json",
+  "title": "RevisionOutput",
+  "description": "交互修正 Agent 的输出契约：影响范围、最小改动方案、变更摘要。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "trace_id", "request_id", "generated_at", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "partial", "degraded", "failed"],
+      "description": "failed=无法定位修改范围，需用户澄清"
+    },
+    "message": { "type": "string", "description": "降级/失败或澄清时说明" },
+    "error_code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "degraded_fields": { "type": "array", "items": { "type": "string" } },
+    "intent": { "type": "string", "enum": ["query", "change", "ambiguous"] },
+    "base_version_id": { "type": "string", "minLength": 1 },
+    "clarification_question": { "type": "string" },
+    "answer": { "type": "string", "description": "query 意图的只读回答" },
+    "impact_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "affected_days": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "description": "受影响的日期（YYYY-MM-DD）"
+        },
+        "affected_agents": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["route", "weather", "attractions", "dining", "reservation"] },
+          "description": "需要重跑的 Agent"
+        },
+        "must_replan": { "type": "boolean", "description": "是否需重跑子 Agent 重新规划" }
+      },
+      "description": "影响范围定位"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "target"],
+        "properties": {
+          "type": { "type": "string", "enum": ["add", "remove", "replace", "reorder"], "description": "改动类型" },
+          "target": { "type": "string", "description": "改动对象" },
+          "from": { "type": "string", "description": "替换前值" },
+          "to": { "type": "string", "description": "替换后值" },
+          "needs_confirm": {
+            "type": "boolean",
+            "description": "true=波及必去景点，需先问用户再改"
+          }
+        }
+      },
+      "description": "最小改动方案（每条一个原子改动）"
+    },
+    "summary": { "type": "string", "description": "变更摘要，供用户确认" }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] }, "then": { "required": ["error_code", "message"] }, "else": { "required": ["intent"] } },
+    { "if": { "properties": { "intent": { "const": "query" } }, "required": ["intent"] }, "then": { "required": ["answer"] } },
+    { "if": { "properties": { "intent": { "const": "change" } }, "required": ["intent"] }, "then": { "required": ["base_version_id", "impact_scope", "changes", "summary"] } },
+    { "if": { "properties": { "intent": { "const": "ambiguous" } }, "required": ["intent"] }, "then": { "required": ["clarification_question"] } },
+    { "if": { "properties": { "status": { "enum": ["partial", "degraded"] } }, "required": ["status"] }, "then": { "required": ["message", "degraded_fields"], "properties": { "degraded_fields": { "minItems": 1 } } } }
+  ]
+}

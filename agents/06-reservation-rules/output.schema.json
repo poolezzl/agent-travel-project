@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/06-reservation-rules/output.schema.json",
+  "title": "ReservationRulesOutput",
+  "description": "预约规则 Agent 的输出契约：预约信息卡与预约时间线。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "trace_id", "request_id", "generated_at", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "trace_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "partial", "degraded", "failed"]
+    },
+    "message": { "type": "string", "description": "降级时说明，如「暂未收录预约信息」" },
+    "error_code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+    "degraded_fields": { "type": "array", "items": { "type": "string" } },
+    "reservations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["point_id", "point", "policy_id", "require_reservation", "effective_from", "timezone", "last_verified", "stale"],
+        "properties": {
+          "point_id": { "type": "string", "minLength": 1 },
+          "point": { "type": "string", "description": "景点名" },
+          "policy_id": { "type": "string", "description": "规则库策略 ID（人工/半自动维护）" },
+          "require_reservation": { "type": "boolean", "description": "是否需要预约" },
+          "book_window_days": { "type": "integer", "minimum": 0, "description": "提前预约天数" },
+          "channel": { "type": "string", "description": "预约渠道，如「微信公众号」「官网」" },
+          "ticket_type": { "type": "string", "description": "票种" },
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "default": "CNY" },
+          "ticket_price_minor": { "type": "integer", "minimum": 0, "description": "票价（最小货币单位）" },
+          "free_policy": { "type": "string", "description": "免票政策，如「60岁以上免票」「1.2m以下儿童免票」" },
+          "effective_from": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "effective_to": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "timezone": { "type": "string", "default": "Asia/Shanghai" },
+          "last_verified": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "最后核验日期（YYYY-MM-DD），超过 30 天阈值时提示用户以官方为准" },
+          "stale": { "type": "boolean" },
+          "tips": { "type": "array", "items": { "type": "string" }, "description": "预约提示" }
+        }
+      },
+      "description": "每个景点的预约信息卡"
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["point_id", "policy_id", "action", "timezone", "remind"],
+        "properties": {
+          "point_id": { "type": "string" },
+          "policy_id": { "type": "string" },
+          "point": { "type": "string" },
+          "action": { "type": "string", "description": "提醒动作，如「提前7天预约」" },
+          "due_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "到期日期" },
+          "timezone": { "type": "string" },
+          "remind": { "type": "boolean", "description": "是否生成提醒任务" }
+        }
+      },
+      "description": "预约提醒时间线"
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] }, "then": { "required": ["error_code", "message"] }, "else": { "required": ["reservations"] } },
+    { "if": { "properties": { "status": { "enum": ["partial", "degraded"] } }, "required": ["status"] }, "then": { "required": ["message", "degraded_fields"], "properties": { "degraded_fields": { "minItems": 1 } } } }
+  ]
+}
