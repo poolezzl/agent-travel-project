@@ -1,0 +1,8 @@
+{
+  "config": {
+    // Chinese tables intentionally use long rows throughout the project.
+    "MD013": false,
+    // Preserve the repository's established compact table separator style.
+    "MD060": false
+  }
+}
