@@ -18,12 +18,22 @@
 
 ```
 zhihuilvyou/
+├── backend/                                   # Java 业务后端（S03 初始化）
+├── agent-service/                             # Python Agent 服务（S03 初始化）
+├── frontend/                                  # Vue 前端（S03 初始化）
+├── contracts/                                 # 跨服务契约（S02 冻结）
+├── tests/                                     # 跨模块测试与评估入口
+├── deploy/                                    # 环境与部署脚本（后续步骤实现）
 ├── README.md                                    # 本文件
 ├── docs/                                        # 正式文档
 │   ├── 01-需求与整体设计.md
 │   ├── 02-开发决策基线.md
 │   ├── 03-多智能体系统规范.md
 │   ├── 04-逐步开发提示词.md
+│   ├── 需求追踪矩阵.md
+│   ├── 需求澄清与决策清单.md
+│   ├── architecture/                            # S01 起维护架构与 ADR
+│   ├── progress/                                # 各步骤 Gate 证据
 │   └── roles/                                   # 公共规范与 R1-R8 角色规范
 └── agents/                                      # 7 个 Agent 的机器契约与 Prompt
     ├── 01-orchestrator/                         # 总控调度 Agent
