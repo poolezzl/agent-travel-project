@@ -1,58 +1,85 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "agents/01-orchestrator/input.schema.json",
-  "title": "OrchestratorInput",
-  "description": "总控调度 Agent 的输入契约：用户完整需求（唯一对外的入口）。",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["user_request"],
+  "definitions": {
+    "time": {
+      "type": "string",
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    }
+  },
   "properties": {
-    "user_request": {
-      "type": "string",
-      "minLength": 1,
-      "description": "用户完整需求，自由文本。总控负责从中抽取城市/日期/偏好并拆解任务。"
-    },
-    "session_id": {
-      "type": "string",
-      "description": "会话ID，多轮修正时关联上下文。可选。"
-    },
-    "cities": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "type": "string", "minLength": 1 },
-      "description": "游玩城市列表（结构化输入时提供），支持多城市串联。可选，未提供则由总控从 user_request 解析。"
-    },
-    "date_range": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["start", "end"],
-      "properties": {
-        "start": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "起始日期" },
-        "end": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "结束日期" }
-      },
-      "description": "起止日期。可选，未提供则由总控从 user_request 解析。"
-    },
-    "must_visit_spots": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 },
-      "description": "必去景点列表（硬约束）。可选。"
-    },
-    "preference_tags": {
-      "type": "array",
-      "maxItems": 50,
-      "items": { "type": "string" },
-      "description": "可选的用户偏好标签，如「亲子」「慢节奏」「美食」。"
-    },
     "transport_preference": {
       "type": "string",
-      "enum": ["步行", "公交", "地铁", "打车", "混合"],
-      "description": "交通方式偏好，默认混合。可选。"
+      "enum": [
+        "步行",
+        "公交",
+        "地铁",
+        "打车",
+        "混合"
+      ]
+    },
+    "must_visit_spots": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "user_request": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "preference_tags": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "maxItems": 50
     },
     "plan_count": {
       "type": "integer",
-      "enum": [1, 2, 3],
-      "default": 1,
-      "description": "方案数量（1~3 套）。可选，默认1。"
+      "enum": [
+        1,
+        2,
+        3
+      ]
+    },
+    "date_range": {
+      "properties": {
+        "start": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      },
+      "type": "object",
+      "required": [
+        "start",
+        "end"
+      ]
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "cities": {
+      "minItems": 1,
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
     }
-  }
+  },
+  "type": "object",
+  "required": [
+    "user_request"
+  ],
+  "title": "OrchestratorInput",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/01-orchestrator/input.schema.json"
 }

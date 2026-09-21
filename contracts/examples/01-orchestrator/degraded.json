@@ -1,0 +1,16 @@
+{
+  "schema_version": "agent-contract-v1",
+  "task_id": "task-demo",
+  "trace_id": "trace-demo",
+  "request_id": "req-01-degraded",
+  "generated_at": "2026-09-21T08:00:00Z",
+  "status": "degraded",
+  "source_metadata": [],
+  "plan": {
+    "days": []
+  },
+  "message": "Some provider-backed fields are unavailable",
+  "degraded_fields": [
+    "provider_fields"
+  ]
+}

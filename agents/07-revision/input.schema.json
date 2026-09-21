@@ -1,46 +1,41 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "agents/07-revision/input.schema.json",
-  "title": "RevisionInput",
-  "description": "交互修正 Agent 的输入契约：当前行程 + 修改指令。",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["base_version_id", "current_plan", "revision_request"],
-  "properties": {
-    "base_version_id": { "type": "string", "minLength": 1, "description": "修改所基于的不可变版本 ID" },
-    "current_plan": {
-      "$ref": "#/definitions/plan",
-      "description": "当前行程方案（结构同 orchestrator-output 的 plan），多轮修正的基准版本。"
-    },
-    "revision_request": {
+  "definitions": {
+    "time": {
       "type": "string",
-      "minLength": 1,
-      "description": "用户修改指令，如「把第三天下午换成博物馆」"
+      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
     },
-    "locked_paths": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "用户锁定或受保护字段的 JSON Pointer/领域路径"
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
     }
   },
-  "definitions": {
-    "plan": {
-      "type": "object",
-      "description": "行程方案，结构同 orchestrator-output.plan",
-      "additionalProperties": true,
-      "required": ["days"],
-      "properties": {
-        "days": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-              "segments": { "type": "array" }
-            }
-          }
-        }
-      }
+  "properties": {
+    "base_version_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "current_plan": {
+      "type": "object"
+    },
+    "locked_paths": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "revision_request": {
+      "minLength": 1,
+      "type": "string"
     }
-  }
+  },
+  "type": "object",
+  "required": [
+    "base_version_id",
+    "current_plan",
+    "revision_request"
+  ],
+  "title": "RevisionInput",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agents/07-revision/input.schema.json"
 }
