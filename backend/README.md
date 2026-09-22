@@ -79,6 +79,26 @@ mvn -f backend\pom.xml spring-boot:run
 
 Successful startup against that empty database is the Flyway empty-database
 check. Stop the process and start it again to verify repeat startup behavior.
+For a reproducible local check, set the connection variables in the current
+PowerShell process without committing the password, then run:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "local"
+$env:MYSQL_HOST = "127.0.0.1"
+$env:MYSQL_PORT = "3306"
+$env:MYSQL_DATABASE = "s03_empty_validation_<timestamp>"
+$env:MYSQL_USERNAME = "root"
+$env:MYSQL_PASSWORD = "<local-only-password>"
+mvn -f backend\pom.xml spring-boot:run '-Dspring-boot.run.arguments=--server.port=18081'
+Invoke-WebRequest -UseBasicParsing http://localhost:18081/actuator/health
+```
+
+The expected empty-database result is an HTTP 200 health response with
+`databaseMode=mysql` and `db.status=UP`. With no versioned migration scripts,
+Flyway creates only `flyway_schema_history`; it contains zero migration rows
+and no business table is created. Stop the process, run the same command again,
+and repeat the health/database checks to verify repeat startup. Do not put a
+real password in this README, shell history, logs, or a commit.
 
 ## Build and verification
 
