@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - "backend/**"
+      - "deploy/docker-compose.s03.yml"
+      - "scripts/s03_mysql_verify.ps1"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "deploy/docker-compose.s03.yml"
+      - "scripts/s03_mysql_verify.ps1"
       - ".github/workflows/backend.yml"
 
 permissions:
@@ -32,11 +36,15 @@ jobs:
         run: mvn --batch-mode verify
       - name: Check resolved dependencies
         run: mvn --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=text
+      - name: Verify isolated MySQL 8 empty database with local profile
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/s03_mysql_verify.ps1
       - name: Scan backend for committed secret literals
         working-directory: .
         shell: bash
         run: |
-          if git grep -n -I -E '(password|api[_-]?key|token|secret)[[:space:]]*:[[:space:]]*["'"'][^$<{][^"'"']*["'"']' -- backend; then
-            echo "Potential committed secret literal found under backend/"
+          if git grep -n -I -E '(password|api[_-]?key|token|secret)[[:space:]]*:[[:space:]]*["'"'][^$<{][^"'"']*["'"']' -- backend deploy scripts .github/workflows/backend.yml; then
+            echo "Potential committed secret literal found in S03 validation assets"
             exit 1
           fi

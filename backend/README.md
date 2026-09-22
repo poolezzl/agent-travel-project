@@ -100,6 +100,36 @@ and no business table is created. Stop the process, run the same command again,
 and repeat the health/database checks to verify repeat startup. Do not put a
 real password in this README, shell history, logs, or a commit.
 
+## Reproducible S03 environment
+
+The S03-only Docker Compose file is
+`deploy/docker-compose.s03.yml`. It uses the fixed `mysql:8.4.8` image, a
+temporary database and validator account, and a Docker named volume rather than
+any personal local database directory. Credentials are required through the
+current process environment and are not stored in the Compose file:
+
+```powershell
+$env:S03_MYSQL_ROOT_PASSWORD = "<temporary-root-password>"
+$env:S03_MYSQL_PASSWORD = "<temporary-validator-password>"
+$env:S03_MYSQL_DATABASE = "s03_empty_validation_local"
+$env:S03_MYSQL_USER = "s03_validator"
+$env:S03_MYSQL_PORT = "13306"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\s03_mysql_verify.ps1
+```
+
+The verification script waits for the MySQL health check, runs the backend with
+the `local` profile, checks `/actuator/health`, verifies that the only table is
+`flyway_schema_history` with zero rows, repeats the startup and checks the same
+conditions again. It exits non-zero on any failed assertion and always attempts
+to stop the backend and run `docker compose down -v --remove-orphans`.
+
+The backend workflow runs Maven `verify` and then this same isolated Compose
+verification on a clean runner. The CI entry point is
+`.github/workflows/backend.yml`; CI supplies temporary runtime variables and
+does not use the `mock` profile for D-04. The current status remains
+`代码完成，待独立环境复验`; neither D-04 nor the full S03 Gate is marked as
+passed here.
+
 ## Build and verification
 
 Run from the repository root:
@@ -116,7 +146,8 @@ and verifies that the Flyway migration directory has no versioned scripts.
 
 The backend-only CI entry point is
 `.github/workflows/backend.yml`. It runs Java 21, Maven `verify`, a dependency
-tree check, and a committed-secret scan scoped to `backend/`.
+tree check, isolated MySQL/Flyway empty-database verification, and a
+committed-secret scan scoped to the S03 validation assets.
 
 ## S03 boundary
 
