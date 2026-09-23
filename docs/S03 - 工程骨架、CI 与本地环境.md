@@ -6,7 +6,7 @@
 | 阶段 | M0 |
 | 前置依赖 | S02 已完成，证据见 [progress/S02.md](progress/S02.md) |
 | 主责 | R5（backend）、R4（agent-service）、R6（frontend） |
-| 当前状态 | **进行中**：R5 backend 已导入并有独立 MySQL/Flyway 复验；R6 frontend 已补齐；R4 agent-service 未出现在当前基线，完整 S03 Gate 阻塞 |
+| 当前状态 | **进行中**：R5 backend、R4 agent-service、R6 frontend 工程文件均已合入；R5/R6 有历史验证证据，完整 S03 Gate 等待统一 CI、三端干净环境构建/测试/启动和共享本地依赖复验 |
 | 范围 | 仅工程骨架、配置、测试基础、CI 和本地依赖；不实现业务逻辑 |
 
 ## 1. S03 概述、依赖关系、角色分工与验收标准
@@ -32,22 +32,22 @@ S02 Schema/OpenAPI 已冻结
 | 角色 | S03 主责 | 本文档确认的当前状态 |
 |---|---|---|
 | R5 | Spring Boot/Maven 工程、MySQL/Flyway、profile、健康检查、后端测试和后端 CI | 已由 `origin/dev-r5` 导入当前 `dev-r6`；R6 不改写其文件 |
-| R4 | FastAPI/LangGraph/Pydantic v2 工程、Python 锁定依赖、ruff/格式化、pytest、Mock profile 和健康检查 | **PENDING-S03-R4-001**：当前可见的 `origin/dev-r4` 无该工程，`agent-service/` 只有 S00 占位 README |
+| R4 | FastAPI/LangGraph/Pydantic v2 工程、Python 锁定依赖、ruff/格式化、pytest、Mock profile 和健康检查 | 已合入 `dev-r6`；待统一 CI、Python 运行态和三端 Gate 复验 |
 | R6 | Vue 3/Vite/TypeScript/Pinia/Vue Router/Element Plus 工程、ESLint/Prettier、Vitest、Mock profile 和前端 CI | 本次新增/补齐 |
-| 协作项 | MySQL/Redis/Chroma 本地依赖、跨栈 CI、完整启动说明和 Gate 证据 | R6 提供配置与文档；R4 缺口使全量 Gate 保持阻塞 |
+| 协作项 | MySQL/Redis/Chroma 本地依赖、跨栈 CI、完整启动说明和 Gate 证据 | 配置和文档已提供；待统一 CI 与三端运行态复验 |
 
 ### 1.3 验收标准与当前结论
 
 | 验收项 | 标准 | 当前结论 |
 |---|---|---|
-| 三端工程 | Java、Python、Vue 均可锁定依赖、构建、测试、启动和健康检查 | **阻塞**：Java、Vue 已有工程；Python 工程缺失 |
-| 格式化/lint/单测 | 三端均有可执行入口 | **部分完成**：Vue 完成；Python 缺失；R5 后端有编译/测试/Enforcer，但尚无独立格式化/lint 插件 |
-| profile/Mock | 三端默认和 Mock 行为显式、无真实密钥依赖 | **部分完成**：backend/frontend 已有；agent-service 缺失 |
-| 本地依赖 | Compose 只启动 MySQL、Redis、Chroma，并有不依赖 Docker 的说明 | 配置已提供；本机无 Docker，Compose 运行态待有 Docker 环境验证 |
-| CI | Java/Python/前端构建与单测、Schema/OpenAPI、Flyway 空库、密钥、依赖安全扫描 | 定义已提供；Python job 显式失败并报告 PENDING，不伪装成绿色 |
-| 新环境路径 | 阅读 README 后按一套路径全部构建并启动 | **尚未满足**：R4 工程缺失；当前仅可完整执行 R5+R6 路径 |
+| 三端工程 | Java、Python、Vue 均可锁定依赖、构建、测试、启动和健康检查 | **静态资产已齐；完整三端运行态和统一 CI 待复验** |
+| 格式化/lint/单测 | 三端均有可执行入口 | **入口已定义**：Vue/Agent Service 有 lint/format/test；Backend 已配置 Spotless/Enforcer，待 Maven 实测 |
+| profile/Mock | 三端默认和 Mock 行为显式、无真实密钥依赖 | **静态配置已齐**；三端运行态待复验 |
+| 本地依赖 | Compose 只启动 MySQL、Redis、Chroma，并有不依赖 Docker 的说明 | 配置已提供；本机运行态待有 Docker 或等效裸机环境验证 |
+| CI | Java/Python/前端构建与单测、Schema/OpenAPI、Flyway 空库、密钥、依赖安全扫描 | 工作流已定义并统一 lockfile；尚待完整运行记录 |
+| 新环境路径 | 阅读 README 后按一套路径全部构建并启动 | **静态路径已补齐；仍需干净环境实测** |
 
-因此，本文档是完整的 S03 设计和运行入口，但不能作为“完整 S03 已通过”的证据。全量 Gate 只能在 R4 提供工程并由三端在干净环境实测后关闭。
+因此，本文档是完整的 S03 设计和运行入口，但不能作为“完整 S03 已通过”的证据。全量 Gate 需在三端依赖可用的干净环境中完成统一 CI 和运行态复验后关闭。
 
 ## 2. 三端工程骨架现状
 
@@ -71,19 +71,18 @@ R5 已完成并由独立提交保留的主要文件：
 
 上述文件由 R5 负责，本次 R6 未修改。详细命令和独立复验结果以 [backend/README.md](../backend/README.md) 及 R5 进度证据为准。
 
-### 2.2 R4 当前缺失：agent-service
+### 2.2 R4 已合入：agent-service
 
-当前 `agent-service/` 只有 S00 创建的 `README.md`，不存在以下 S03 必需资产：
+当前 `agent-service/` 已具备 S03 所需资产：
 
-- `pyproject.toml` 和锁定依赖文件；
-- FastAPI 应用入口和健康检查；
-- LangGraph/Pydantic v2 基础包结构；
-- local/mock 配置；
-- ruff/格式检查入口；
-- pytest 测试；
-- Python CI 可执行入口。
+- `pyproject.toml` 和 `requirements.lock.txt`；
+- `app/main.py` FastAPI 应用入口；
+- `app/core/config.py` 的 mock/real 配置；
+- `app/api/health.py` 健康检查；
+- Ruff、MyPy、compileall、pytest 和 pip check 质量门禁；
+- Agent Service 专项 CI 和跨栈 CI 入口。
 
-R6 不代写这些文件，也不把占位目录描述为已完成。跨栈 CI 的 `agent-service` job 会先检查上述前置文件；缺失时以非零状态输出 `PENDING`，以便完整 S03 Gate 保持真实阻塞。
+R4 工程不实现业务 Agent、LLM Gateway、供应商调用或 MySQL 访问；这些属于后续步骤或其他服务边界。完整 S03 Gate 仍需在干净环境运行 Python 构建、测试、依赖审计和健康检查。
 
 ### 2.3 R6 本次新增/补全：frontend
 
@@ -107,16 +106,18 @@ R6 还新增：
 ### 3.2 格式化、lint、单测与依赖锁定
 
 - Maven Enforcer 固定 Java `[21,22)` 和 Maven `[3.9.6,)`。
+- Spotless 在 Maven `validate` 阶段执行 Java 格式检查；`spotless:check` 可作为独立入口。
 - Spring Boot Parent/BOM、显式父版本和插件版本提供依赖管理；Maven 没有类似 `package-lock.json` 的完整解析锁文件。
 - 当前测试覆盖 Mock context、Actuator 健康、Mock 禁用 DataSource/Flyway、不可用 MySQL 失败和空迁移目录。
-- 构建命令：
+- 构建和质量命令：
 
   ```powershell
+  mvn -f backend\pom.xml spotless:check
   mvn -f backend\pom.xml test
   mvn -f backend\pom.xml verify
   ```
 
-- **已知缺口**：R5 当前 `pom.xml` 未配置 Spotless、Checkstyle 或同类独立格式化/lint 插件。R6 遵守边界不修改 R5 配置；此项需 R5 补齐或由负责人明确接受现状后才能关闭三端统一 lint 验收。
+- **格式化/lint 已知项**：R5 已配置 Spotless 独立格式检查；需在 Maven/Java 21 环境实际运行确认。
 
 ### 3.3 配置分层、profile/Mock 与健康检查
 
@@ -148,11 +149,11 @@ R4 提交后应至少具备：
 ```text
 agent-service/
 ├── pyproject.toml
-├── <依赖锁定文件>
-├── src/<package>/
+├── requirements.lock.txt
+├── app/
 │   ├── main.py               # FastAPI 入口
-│   ├── config.py             # local/mock 配置
-│   └── health.py             # 不泄露凭据的健康检查
+│   ├── core/config.py        # mock/real 配置
+│   └── api/health.py         # 不泄露凭据的健康检查
 └── tests/
 ```
 
@@ -163,13 +164,13 @@ agent-service/
 - `pytest -q`；
 - 依赖版本和锁定文件可用于干净环境复现；
 - Mock profile 不调用真实 LLM、地图、天气、MySQL 或业务 API；
-- `pip-audit -r requirements.txt` 需要 R4 提供涵盖运行时、ruff 和 pytest 的锁定版本；当前跨栈 CI 使用 `requirements.txt` + `pyproject.toml`（`pip install -r requirements.txt` 和 `pip install --no-deps -e .`），R4 若选用 uv/Poetry 需在合入时对齐该 CI 入口，而不是把安装失败记为通过。
+- `pip-audit -r requirements.lock.txt` 使用 R4 提供的运行时和质量工具锁定版本；跨栈 CI 和 Agent Service CI 均使用同一 lockfile。
 - Python 只能按 S02 OpenAPI 获取上下文/回写步骤结果，不得配置业务 MySQL 凭据；
 - 健康检查只报告服务/profile/依赖状态，不输出 Key、Prompt、用户数据或供应商响应。
 
 ### 4.2 当前状态
 
-**PENDING-S03-R4-001**：上述文件尚未出现在当前 `dev-r6` 或可见 `origin/dev-r4`。因此以下命令目前不可执行：Python 安装、ruff、pytest、FastAPI 启动和 Agent 健康检查。R4 合入后必须更新本文、`docs/progress/S03-R6.md` 或统一 S03 证据，并在干净环境重跑跨栈 CI。
+R4 Agent Service 文件已经合入当前 `dev-r6`。Python 构建、质量门禁、依赖审计和 FastAPI 健康检查入口均已定义；本轮只做静态修复，完整三端运行态仍需在具备 Python 依赖的干净环境实测并更新统一 Gate 证据。
 
 ## 5. frontend：Vue 3 / Vite / TypeScript / Pinia / Element Plus
 
@@ -338,12 +339,12 @@ docker compose -f deploy\docker-compose.s03-local.yml down -v
 |---|---|---|
 | Java 构建与单测 | `backend` / Maven `verify` | 已定义；R5 有历史实测证据 |
 | Flyway 空库 | `backend` / `s03_mysql_verify.ps1` | 已定义；R5 D-04 独立复验通过 |
-| Python 构建与单测 | `agent-service` / manifest、安装、ruff、pytest | **阻塞**：R4 工程文件缺失，job 明确失败 |
-| 前端构建与单测 | `frontend` / npm ci、lint、format、Vitest、两种 build | 已定义，本地已实测 |
+| Python 构建与单测 | `agent-service` / manifest、lockfile 安装、Python build、ruff、pytest、pip-audit | 已定义；待干净 Runner 运行记录 |
+| 前端构建与单测 | `frontend` / npm ci、lint、format、Vitest、两种 build | 已定义，历史本地实测 |
 | JSON Schema | `contracts` / `validate_s02_contracts.py` | 已定义 |
 | OpenAPI | `contracts` / `openapi-spec-validator` | 已定义 |
 | 密钥扫描 | `security` / 高置信私钥和云凭据模式 | 已定义；不输出密钥值 |
-| 依赖安全扫描 | npm audit（含开发依赖）、OWASP Dependency-Check、Python pip-audit（R4 合入后） | 前端本地审计 0 漏洞；Java/Python 需在 CI 真正执行 |
+| 依赖安全扫描 | npm audit（含开发依赖）、OWASP Dependency-Check、Python pip-audit（lockfile） | 入口已定义；待统一 CI 实测 |
 
 流水线故意不使用 `continue-on-error` 隐藏 Python 缺口。只有所有 job 均绿色且有对应运行记录，才可声称 S03 CI 通过。
 
@@ -405,26 +406,27 @@ docker compose -f deploy\docker-compose.s03-local.yml down -v
    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\s03_mysql_verify.ps1
    ```
 
-### 8.2 完整三端路径的当前阻塞
+### 8.2 完整三端路径的当前状态
 
-第 8.1 节不能启动 Python Agent 服务，因为当前没有 R4 工程或命令。R4 合入后必须追加并实测以下步骤，而不能由本文猜测具体包名/启动命令：
+第 8.1 节已覆盖 R5 Backend 和 R6 Frontend；R4 Agent Service 追加以下步骤：
 
-1. 按 R4 提供的锁文件安装 Python 依赖；
-2. 执行 `ruff format --check .`、`ruff check .` 和 `pytest -q`；
-3. 使用明确的 Mock profile 启动 FastAPI；
-4. 检查 Agent Service 健康接口；
-5. 重跑 `.github/workflows/s03-cross-stack.yml`，要求所有 job 绿色；
-6. 更新统一 S03 Gate 证据。
+1. 按 `agent-service/requirements.lock.txt` 安装锁定依赖；
+2. 执行 `python -m build agent-service`；
+3. 执行 `ruff format --check .`、`ruff check .`、`mypy app`、`pytest -q`、`compileall` 和 `pip-audit -r requirements.lock.txt`；
+4. 使用 `python -m app.main` 以 Mock profile 启动 FastAPI；
+5. 检查 `/health` 返回服务、profile 和 `dependencies.external_services=disabled`；
+6. 重跑 `.github/workflows/s03-cross-stack.yml`，要求所有 job 绿色；
+7. 更新统一 S03 Gate 证据。
 
-因此，当前必须写为“R5+R6 路径通过/待本机条件验证，完整三端路径阻塞”，不得写成“新环境全部启动通过”。
+因此，当前必须写为“R4/R5/R6 静态交付已合入，完整三端路径待干净环境实测”，不得写成“新环境全部启动通过”。
 
 ## 9. 风险、已知限制、回滚与后续依赖
 
 ### 9.1 风险与限制
 
-- **PENDING-S03-R4-001（阻断）**：Agent Service 工程缺失，Python build/test/health 无法执行。
-- **PENDING-S03-R5-LINT（阻断统一 lint 口径）**：后端无专用格式化/lint 插件；R6 不越界改写 R5 配置。
-- 当前开发机的 Bash PATH 暴露 Java 17 且没有 Maven/Docker；R5 已有独立 Java 21/MySQL 复验记录，但 R6 本轮不能把当前机的后端/Compose 未运行项重新标为通过。
+- Agent Service 工程已合入；Python build/test/health/pip-audit 入口已定义，待干净环境执行。
+- R5 backend 已配置 Spotless 独立格式检查；待 Maven/Java 21 环境实际运行确认。
+- 当前开发机的 Bash PATH 暴露 Java 17 且没有 Maven/Docker；历史 R5 Java 21/MySQL 复验记录保留，但本轮不能把当前机的后端/Compose 未运行项标为通过。
 - 本地 npm 配置的镜像不实现 audit API；本轮切换官方 registry 后 `npm audit --audit-level=high` 实测 0 漏洞。CI 固定使用官方 registry；
 - Element Plus 全量注册使最小骨架 bundle 出现大 chunk 警告；S03 不做业务层按需拆包，后续页面开发时应引入按需组件或代码分割并重测。
 - Windows 无 Docker 时的 Redis 官方支持有限；应使用 WSL 中的 Redis 7 或团队受控实例并明确环境边界。
@@ -434,7 +436,7 @@ docker compose -f deploy\docker-compose.s03-local.yml down -v
 
 - S04 只能新增 Flyway 迁移，不得改写 S03 已发布迁移；当前迁移目录为空是预期状态。
 - S07 在本前端骨架上实现明示 Mock 的演示页，并继续禁止 Mock 冒充真实 API。
-- S08/S09/S10 分别依赖稳定的后端、Agent Service 和适配器/Mock 基础；R4 缺口未关闭前不能宣称 S09 可执行。
+- S08/S09/S10 分别依赖稳定的后端、Agent Service 和适配器/Mock 基础；S03 三端静态基础已具备，但运行态 Gate 仍需关闭。
 - S11/S14 依赖 REST/SSE、状态和真实服务联调；前端不得直连 Redis、Agent Service 或供应商。
 - S30 才建立完整裸机部署、Nginx、systemd、Windows 脚本、备份和恢复演练。
 

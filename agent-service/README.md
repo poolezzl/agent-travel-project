@@ -20,18 +20,25 @@ Python Agent 服务工程骨架，技术基线为 Python 3.11+、FastAPI、LangG
 
 ## 本地安装
 
-在仓库根目录执行：
+在仓库根目录创建虚拟环境并安装锁定依赖：
 
     python -m venv agent-service/.venv
-    source agent-service/.venv/Scripts/activate
     cd agent-service
     python -m pip install --upgrade pip setuptools wheel
     python -m pip install -r requirements.lock.txt
     python -m pip install --no-deps -e .
 
+Linux/macOS 激活命令：
+
+    source agent-service/.venv/bin/activate
+
 Windows PowerShell 激活命令：
 
     .\agent-service\.venv\Scripts\Activate.ps1
+
+Windows Git Bash 激活命令：
+
+    source agent-service/.venv/Scripts/activate
 
 需要重新解析开发依赖时执行：
 
@@ -50,17 +57,17 @@ Windows PowerShell 激活命令：
 
 ## 启动和健康检查
 
-在 `agent-service` 目录启动：
+在 `agent-service` 目录启动；该入口会使用 `AGENT_SERVICE_HOST` 和 `AGENT_SERVICE_PORT`：
 
-    python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+    python -m app.main
 
-健康检查：
+默认监听 `127.0.0.1:8000`。健康检查：
 
     GET http://127.0.0.1:8000/health
 
 Mock profile 预期响应：
 
-    {"status":"ok","service":"travelstar-agent-service","profile":"mock"}
+    {"status":"ok","service":"travelstar-agent-service","profile":"mock","dependencies":{"external_services":"disabled"}}
 
 OpenAPI 页面：
 
@@ -76,6 +83,8 @@ OpenAPI 页面：
     python -m pytest
     python -m compileall -q app tests
     python -m pip check
+    python -m build .
+    pip-audit -r requirements.lock.txt
 
 ## 当前范围
 

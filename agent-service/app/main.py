@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import uvicorn
 from fastapi import FastAPI
 
 from app.api.health import router as health_router
@@ -14,3 +15,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host=settings.host, port=settings.port)

@@ -72,21 +72,15 @@ jobs:
         run: python -m openapi_spec_validator contracts/openapi/agent-business.yaml
 
   agent-service:
-    name: Agent service checks (R4 prerequisite)
+    name: Agent service checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Require R4 project manifest
+      - name: Verify R4 project manifests
         shell: bash
         run: |
-          test -f agent-service/pyproject.toml || {
-            echo "PENDING: R4 agent-service/pyproject.toml is not present on dev-r6"
-            exit 1
-          }
-          test -f agent-service/requirements.txt || {
-            echo "PENDING: R4 agent-service/requirements.txt with pinned runtime, lint, and test dependencies is not present"
-            exit 1
-          }
+          test -f agent-service/pyproject.toml
+          test -f agent-service/requirements.lock.txt
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -95,14 +89,12 @@ jobs:
         working-directory: agent-service
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pip-audit==2.10.1
-          python -m pip install -r requirements.txt
+          python -m pip install -r requirements.lock.txt
           python -m pip install --no-deps -e .
+          python -m pip install build==1.6.1 pip-audit==2.10.1
       - name: Python build
         working-directory: agent-service
-        run: |
-          python -m pip install build==1.6.1
-          python -m build
+        run: python -m build
       - name: Ruff checks
         working-directory: agent-service
         run: |
@@ -113,7 +105,7 @@ jobs:
         run: pytest -q
       - name: Python dependency audit
         working-directory: agent-service
-        run: pip-audit -r requirements.txt
+        run: pip-audit -r requirements.lock.txt
 
   security:
     name: Secret and dependency manifest scan
@@ -133,7 +125,4 @@ jobs:
           test -f frontend/package-lock.json
           test -f backend/pom.xml
           test -f agent-service/pyproject.toml
-          test -f agent-service/requirements.txt || {
-            echo "PENDING: Python pinned dependency file awaits R4"
-            exit 1
-          }
+          test -f agent-service/requirements.lock.txt

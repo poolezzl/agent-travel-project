@@ -135,12 +135,14 @@ passed here.
 Run from the repository root:
 
 ```powershell
+mvn -f backend\pom.xml spotless:check
 mvn -f backend\pom.xml test
 mvn -f backend\pom.xml verify
 git diff --check
 ```
 
-The test suite loads the Spring context with `mock`, checks the Actuator
+The `spotless:check` goal is also bound to Maven `validate`, so `test` and
+`verify` enforce the same whitespace/formatting gate. The test suite loads the Spring context with `mock`, checks the Actuator
 health endpoint, verifies that the mock profile does not create a DataSource,
 and verifies that the Flyway migration directory has no versioned scripts.
 

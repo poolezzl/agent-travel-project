@@ -19,7 +19,7 @@ S03 工程骨架、CI 与本地环境入口：
 - [R6 进度与验证证据](docs/progress/S03-R6.md)
 - [本地三依赖 Compose](deploy/docker-compose.s03-local.yml)
 
-当前完整 S03 Gate 仍等待 R4 提供 `agent-service` 工程；不得把 R5+R6 的部分验证当作三端全量通过。
+R4 `agent-service` 工程已合入当前 `dev-r6`；完整 S03 Gate 仍需统一 CI、三端干净环境构建/测试/启动和共享本地依赖复验，不能把历史分角色证据直接视为全量通过。
 
 ---
 

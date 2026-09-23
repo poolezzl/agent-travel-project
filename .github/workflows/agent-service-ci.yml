@@ -40,9 +40,16 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r agent-service/requirements.lock.txt
           python -m pip install --no-deps -e agent-service
+          python -m pip install build==1.6.1 pip-audit==2.10.1
 
       - name: Validate S02 contracts
         run: python scripts/validate_s02_contracts.py
 
+      - name: Build Agent Service package
+        run: python -m build agent-service
+
       - name: Run Agent Service quality gate
         run: python agent-service/scripts/quality_gate.py
+
+      - name: Audit locked dependencies
+        run: pip-audit -r agent-service/requirements.lock.txt
