@@ -12,6 +12,15 @@
 
 完整文档索引见 [docs/README.md](docs/README.md)。旧 25 步文档、重复压缩包目录和 `.bak` 已删除。
 
+S03 工程骨架、CI 与本地环境入口：
+
+- [S03 总文档](docs/S03%20-%20工程骨架、CI%20与本地环境.md)
+- [R6 前端工程说明](frontend/README.md)
+- [R6 进度与验证证据](docs/progress/S03-R6.md)
+- [本地三依赖 Compose](deploy/docker-compose.s03-local.yml)
+
+当前完整 S03 Gate 仍等待 R4 提供 `agent-service` 工程；不得把 R5+R6 的部分验证当作三端全量通过。
+
 ---
 
 ## 目录结构
