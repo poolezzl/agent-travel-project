@@ -1,0 +1,1 @@
+policy_id,poi_id,ticket_type,applicable_group,reservation_required,reservation_channel,release_time,release_timezone,advance_days,currency,amount_minor,free_condition,valid_from,valid_until,holiday_exception,last_verified_at,stale_after_days,stale,source_record_id,review_status,version,operator_id,reviewer_id,reviewed_at
