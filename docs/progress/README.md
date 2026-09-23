@@ -24,3 +24,7 @@
 ## 证据文件必备内容
 
 每个 `Sxx.md` 必须记录：依赖检查、需求编号、修改文件、接口/Schema/迁移影响、关键设计、实际执行的命令与结果、边界场景、来源/权限/幂等/并发/降级/隐私/日志/回滚检查、风险和 `PENDING`。测试未运行时必须说明原因。
+
+## R4 合并补充
+
+R4 S03 Python Agent Service 工程骨架已合入当前 `dev-r6`：包含 FastAPI 入口、`/health` 健康检查、Pydantic Settings 配置、固定依赖、pytest/Ruff/MyPy/compileall 质量门禁和 Agent Service CI。S03 仍保持“进行中”，待 R5、R6、共享本地环境和完整三端 Gate 证据统一复核后再关闭。原有 R6 进度记录保留，R4 交付状态以 [S03.md](S03.md) 的 R4 补充章节为准。

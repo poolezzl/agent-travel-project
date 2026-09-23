@@ -43,3 +43,6 @@ coverage/
 test-results/
 playwright-report/
 .coverage
+*.egg-info/
+build/
+dist/
