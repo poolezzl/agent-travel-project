@@ -1,5 +1,93 @@
-# Agent Service
+# TravelStar Agent Service
 
-Python Agent 服务目录。S03 将按 Python 3.11+、FastAPI、LangGraph 和 Pydantic v2 初始化工程。
+Python Agent 服务工程骨架，技术基线为 Python 3.11+、FastAPI、LangGraph 和 Pydantic v2。
 
-Agent 服务只能通过 S02 冻结的 REST/OpenAPI 契约读写任务上下文和步骤结果；当前 S00 只保留目录。
+当前处于 S03，仅提供配置分层、Mock profile、健康检查和质量工具，不包含 LLM 网关、业务 Agent、数据库访问或第三方调用。
+
+## 服务边界
+
+- Spring Boot 是 MySQL 唯一写入方。
+- Agent Service 不直连业务数据库。
+- 后续 Agent 结果只能通过 S02 REST/OpenAPI 契约回写。
+- 默认 `mock` profile 不需要真实 API Key。
+- `real` profile 当前只代表配置合法，不代表真实接口已接通。
+
+## 环境要求
+
+- Python 3.11、3.12 或 3.13
+- pip
+- 基础健康检查不依赖 Docker、MySQL、Redis 或 Chroma
+
+## 本地安装
+
+在仓库根目录创建虚拟环境并安装锁定依赖：
+
+    python -m venv agent-service/.venv
+    cd agent-service
+    python -m pip install --upgrade pip setuptools wheel
+    python -m pip install -r requirements.lock.txt
+    python -m pip install --no-deps -e .
+
+Linux/macOS 激活命令：
+
+    source agent-service/.venv/bin/activate
+
+Windows PowerShell 激活命令：
+
+    .\agent-service\.venv\Scripts\Activate.ps1
+
+Windows Git Bash 激活命令：
+
+    source agent-service/.venv/Scripts/activate
+
+需要重新解析开发依赖时执行：
+
+    python -m pip install -e ".[dev]"
+
+## 配置
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `APP_PROFILE` | `mock` | 允许 `mock` 或 `real` |
+| `AGENT_SERVICE_NAME` | `travelstar-agent-service` | 服务名称 |
+| `AGENT_SERVICE_HOST` | `127.0.0.1` | 监听地址 |
+| `AGENT_SERVICE_PORT` | `8000` | 端口范围 1-65535 |
+
+不得提交本地 `.env`、API Key、访问令牌或供应商原始响应。
+
+## 启动和健康检查
+
+在 `agent-service` 目录启动；该入口会使用 `AGENT_SERVICE_HOST` 和 `AGENT_SERVICE_PORT`：
+
+    python -m app.main
+
+默认监听 `127.0.0.1:8000`。健康检查：
+
+    GET http://127.0.0.1:8000/health
+
+Mock profile 预期响应：
+
+    {"status":"ok","service":"travelstar-agent-service","profile":"mock","dependencies":{"external_services":"disabled"}}
+
+OpenAPI 页面：
+
+    http://127.0.0.1:8000/docs
+
+## 质量检查
+
+在 `agent-service` 目录执行：
+
+    python -m ruff format --check app scripts tests
+    python -m ruff check app scripts tests
+    python -m mypy app
+    python -m pytest
+    python -m compileall -q app tests
+    python -m pip check
+    python -m build .
+    pip-audit -r requirements.lock.txt
+
+## 当前范围
+
+S03 包含 FastAPI 应用骨架、Pydantic Settings 配置层、Mock/real profile 校验、健康检查、质量工具和依赖锁定。
+
+LLM Gateway、模型路由、预算、超时、重试、结构化输出防线和真实 Agent 编排属于 S09 或后续步骤，当前尚未实现。
