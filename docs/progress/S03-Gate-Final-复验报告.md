@@ -149,6 +149,28 @@ No hosted CI job was triggered. Therefore these jobs remain **PENDING**, not pas
 - security
 - isolated MySQL/Flyway verification
 
+### Gitee Go availability check
+
+The public repository page was checked at `https://gitee.com/small-soil-ash/agent-travel-project`.
+The page exposed the following platform state during this revalidation:
+
+```text
+gon.gitee_go_active=false
+gon.current_user=false
+project_id=50431928
+default_branch=master
+```
+
+This means Gitee Go was not active for the repository in the available project view, and
+the current session was unauthenticated. No Gitee Go pipeline could be created or triggered
+from this environment. The repository also has no official, confirmed Gitee Go pipeline file
+or registered Linux Runner available to this worktree; no guessed `.gitee` configuration was
+added. This is an external project-permission/platform blocker, not a CI pass or a source-code
+failure.
+
+The configured Git remote is owned by `small-soil-ash`; it is not the `wudiwaigou` profile URL
+provided separately. No remote ownership or credentials were changed during this task.
+
 Local command results are not presented as hosted CI results.
 
 ## 7. Runtime risk and cleanup
@@ -164,6 +186,7 @@ Local command results are not presented as hosted CI results.
 - Redis/Chroma local dependency verification: **PASS**.
 - Backend, Python, frontend, and contract regression: **PASS**.
 - Real hosted CI Runner verification: **PENDING**, because no executable approved Runner/platform was available.
+- Gitee Go availability: **PENDING**, because the repository page reported `gitee_go_active=false` and no authenticated project/Runner administration was available.
 - S03 Gate: **environment blocked, pending CI revalidation**.
 - S04 formal implementation: **not started**.
 
