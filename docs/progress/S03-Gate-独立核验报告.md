@@ -88,7 +88,7 @@
 - `docs/progress/S03.md`：将过时的 `feature/S03-backend` 当前分支表述改为历史来源，并明确已合入 `dev-r6` 及本次隔离收尾分支。
 - 前端格式化只改变 Windows 工作树换行/格式状态；规范化 Git diff 为空，未形成代码提交。
 
-本报告初次提交后将以紧随其后的 `update:` 提交补录最终 commit hash；在此之前不推送、不合并。
+初次收尾提交：`f0c91bc`（`add: S03 independent gate verification report`）。本次复核不推送、不合并。
 
 ## 8. 冻结文件检查
 
