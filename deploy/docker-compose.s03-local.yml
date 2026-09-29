@@ -1,0 +1,61 @@
+services:
+  mysql:
+    image: mysql:8.4.8
+    environment:
+      MYSQL_ROOT_PASSWORD: ${S03_LOCAL_MYSQL_ROOT_PASSWORD:?Set S03_LOCAL_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${S03_LOCAL_MYSQL_DATABASE:?Set S03_LOCAL_MYSQL_DATABASE}
+      MYSQL_USER: ${S03_LOCAL_MYSQL_USER:?Set S03_LOCAL_MYSQL_USER}
+      MYSQL_PASSWORD: ${S03_LOCAL_MYSQL_PASSWORD:?Set S03_LOCAL_MYSQL_PASSWORD}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    ports:
+      - "127.0.0.1:${S03_LOCAL_MYSQL_PORT:-13306}:3306"
+    volumes:
+      - s03_local_mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping --protocol=TCP -h127.0.0.1 -u"$${MYSQL_USER}" -p"$${MYSQL_PASSWORD}" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  redis:
+    image: redis:7.4.2-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:${S03_LOCAL_REDIS_PORT:-16379}:6379"
+    volumes:
+      - s03_local_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  chroma:
+    image: chromadb/chroma:0.6.3
+    environment:
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /data
+      ANONYMIZED_TELEMETRY: "FALSE"
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8000
+    ports:
+      - "127.0.0.1:${S03_LOCAL_CHROMA_PORT:-18000}:8000"
+    volumes:
+      - s03_local_chroma_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v2/heartbeat', timeout=2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  s03_local_mysql_data:
+  s03_local_redis_data:
+  s03_local_chroma_data:
