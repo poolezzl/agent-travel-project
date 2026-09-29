@@ -60,6 +60,10 @@ def _is_non_empty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _is_allowed_string(value: Any, choices: set[str] | dict[str, str]) -> bool:
+    return isinstance(value, str) and value in choices
+
+
 def _validate_string_list(value: Any, label: str, errors: list[str]) -> bool:
     if not isinstance(value, list) or any(
         not _is_non_empty_string(item) for item in value
@@ -109,9 +113,9 @@ def _validate_case(
         or version < 1
     ):
         errors.append(f"{path}: case_version must be a positive integer")
-    if case.get("status") not in CASE_STATUSES:
+    if not _is_allowed_string(case.get("status"), CASE_STATUSES):
         errors.append(f"{path}: invalid status")
-    if case.get("city_code") not in CITIES:
+    if not _is_allowed_string(case.get("city_code"), CITIES):
         errors.append(f"{path}: unknown city {case.get('city_code')}")
     try:
         evaluation_date = case.get("evaluation_date")
@@ -258,13 +262,13 @@ def _source_is_readable(
         if not _is_non_empty_string(source.get(field)):
             errors.append(f"{path}: {field} must be a non-empty string")
     _validate_string_list(source.get("aliases"), f"{path}: aliases", errors)
-    if source.get("city_code") not in CITIES:
+    if not _is_allowed_string(source.get("city_code"), CITIES):
         errors.append(f"{path}: unknown city {source.get('city_code')}")
-    if source.get("status") not in SOURCE_STATUSES:
+    if not _is_allowed_string(source.get("status"), SOURCE_STATUSES):
         errors.append(
             f"{path}: invalid source status {source.get('status')}"
         )
-    if source.get("freshness_status") not in FRESHNESS_STATUSES:
+    if not _is_allowed_string(source.get("freshness_status"), FRESHNESS_STATUSES):
         errors.append(f"{path}: invalid freshness_status")
     if not isinstance(source.get("is_estimated"), bool):
         errors.append(f"{path}: is_estimated must be a boolean")
@@ -374,11 +378,13 @@ def validate_data(root: Path, reference: datetime) -> list[str]:
         )
         if item.get("city_code") != "CN-BJ":
             errors.append(f"{path}: Beijing item must use city_code CN-BJ")
-        if item.get("status") not in SOURCE_STATUSES:
+        if not _is_allowed_string(item.get("city_code"), CITIES):
+            errors.append(f"{path}: unknown city {item.get('city_code')}")
+        if not _is_allowed_string(item.get("status"), SOURCE_STATUSES):
             errors.append(
                 f"{path}: invalid item status {item.get('status')}"
             )
-        if item.get("freshness_status") not in FRESHNESS_STATUSES:
+        if not _is_allowed_string(item.get("freshness_status"), FRESHNESS_STATUSES):
             errors.append(f"{path}: invalid freshness_status")
         if not isinstance(item.get("is_estimated"), bool):
             errors.append(f"{path}: is_estimated must be a boolean")
