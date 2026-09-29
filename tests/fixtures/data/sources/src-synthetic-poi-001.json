@@ -1,0 +1,18 @@
+{
+  "source_record_id": "src-synthetic-poi-001",
+  "source_url": "https://example.invalid/synthetic/poi-001",
+  "license": "synthetic-fixture-not-for-publication",
+  "city_code": "CN-BJ",
+  "poi_id": "poi-synthetic-bj-001",
+  "aliases": [
+    "synthetic-poi-a"
+  ],
+  "entered_by": "r7-synthetic",
+  "reviewed_by": "r7-synthetic-review-pending",
+  "retrieved_at": "2026-09-20T00:00:00Z",
+  "valid_until": "2026-12-31T00:00:00Z",
+  "freshness_status": "fresh",
+  "status": "published",
+  "content_hash": "sha256-synthetic-poi-001",
+  "notes": "synthetic record only"
+}

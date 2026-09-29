@@ -1,0 +1,12 @@
+{
+  "poi_id": "poi-synthetic-bj-rule-stale",
+  "city_code": "CN-BJ",
+  "name": "synthetic-rule-stale",
+  "aliases": [],
+  "source_record_id": "src-synthetic-poi-001",
+  "status": "published",
+  "conflict_flags": [],
+  "retrieved_at": "2026-08-01T00:00:00Z",
+  "freshness_status": "stale",
+  "is_estimated": false
+}

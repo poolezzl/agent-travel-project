@@ -1,0 +1,26 @@
+[
+  {
+    "run_id": "run-synthetic-001",
+    "case_id": "BJ-01",
+    "hard_constraints": [
+      {"id": "must-visit-1", "satisfied": true},
+      {"id": "date-window-1", "satisfied": true}
+    ],
+    "facts": [
+      {"source_record_id": "src-synthetic-poi-001", "freshness_status": "fresh", "is_estimated": false, "displayed_status": "fresh"},
+      {"source_record_id": "src-synthetic-rule-001", "freshness_status": "stale", "is_estimated": false, "displayed_status": "stale"}
+    ],
+    "route": {"feasible": true},
+    "schema_valid": true,
+    "latency_ms": 4200,
+    "cost": {"token_count": 1200, "api_cost_minor": 3},
+    "degraded_fields": [],
+    "degradation_explained": true,
+    "local_modification": {
+      "unchanged_blocks": [
+        {"path": "days[0]", "before_hash": "hash-a", "after_hash": "hash-a"},
+        {"path": "days[2]", "before_hash": "hash-c", "after_hash": "hash-c"}
+      ]
+    }
+  }
+]
