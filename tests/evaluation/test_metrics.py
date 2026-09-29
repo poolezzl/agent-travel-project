@@ -82,6 +82,88 @@ class MetricsTest(unittest.TestCase):
         with self.assertRaises(EvaluationInputError):
             calculate_metrics([negative_cost])
 
+    def test_rejects_non_object_run_and_invalid_identifiers(self):
+        with self.assertRaisesRegex(EvaluationInputError, "run record must be an object"):
+            calculate_metrics(["not-an-object"])
+
+        for field, value in (("run_id", ""), ("case_id", 1)):
+            with self.subTest(field=field, value=value):
+                run = copy.deepcopy(BASE_RUN)
+                run[field] = value
+                with self.assertRaises(EvaluationInputError):
+                    calculate_metrics([run])
+
+    def test_rejects_non_boolean_metric_states(self):
+        invalid_values = (
+            (("hard_constraints", 0, "satisfied"), "false"),
+            (("route", "feasible"), "true"),
+            (("schema_valid",), "false"),
+            (("degradation_explained",), 1),
+            (("facts", 0, "is_estimated"), 0),
+        )
+        for path, value in invalid_values:
+            with self.subTest(path=path, value=value):
+                run = copy.deepcopy(BASE_RUN)
+                target = run
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.assertRaises(EvaluationInputError):
+                    calculate_metrics([run])
+
+    def test_rejects_missing_route_feasibility(self):
+        run = copy.deepcopy(BASE_RUN)
+        run["route"] = {}
+        with self.assertRaisesRegex(EvaluationInputError, "route.feasible"):
+            calculate_metrics([run])
+
+    def test_rejects_non_finite_or_non_numeric_measurements(self):
+        invalid_values = (
+            (("latency_ms",), float("nan")),
+            (("latency_ms",), float("inf")),
+            (("cost", "api_cost_minor"), "3"),
+            (("cost", "api_cost_minor"), float("nan")),
+            (("cost", "api_cost_minor"), float("inf")),
+            (("cost", "token_count"), True),
+        )
+        for path, value in invalid_values:
+            with self.subTest(path=path, value=value):
+                run = copy.deepcopy(BASE_RUN)
+                target = run
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = value
+                with self.assertRaises(EvaluationInputError):
+                    calculate_metrics([run])
+
+    def test_rejects_malformed_fact_and_constraint_objects(self):
+        malformed_records = (
+            ("facts", ["not-an-object"]),
+            ("facts", [{"source_record_id": "src-1"}]),
+            ("hard_constraints", ["not-an-object"]),
+            ("hard_constraints", [{"id": "c1"}]),
+        )
+        for field, value in malformed_records:
+            with self.subTest(field=field, value=value):
+                run = copy.deepcopy(BASE_RUN)
+                run[field] = value
+                with self.assertRaises(EvaluationInputError):
+                    calculate_metrics([run])
+
+    def test_rejects_malformed_local_modification(self):
+        invalid_values = (
+            "not-an-object",
+            {"unchanged_blocks": "not-an-array"},
+            {"unchanged_blocks": ["not-an-object"]},
+            {"unchanged_blocks": [{"before_hash": "a"}]},
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                run = copy.deepcopy(BASE_RUN)
+                run["local_modification"] = value
+                with self.assertRaises(EvaluationInputError):
+                    calculate_metrics([run])
+
     def test_load_runs_requires_array(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "runs.json"
