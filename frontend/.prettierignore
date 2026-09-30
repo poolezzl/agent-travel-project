@@ -2,3 +2,5 @@ node_modules
 dist
 coverage
 *.svg
+test-results
+playwright-report
