@@ -49,7 +49,8 @@ npm --prefix frontend exec vite preview -- --host 127.0.0.1 --port 4173
 
 | 路由        | 视图                         | 说明                                                                           |
 | ----------- | ---------------------------- | ------------------------------------------------------------------------------ |
-| `/`         | `src/views/S07DemoView.vue`  | S07 开题演示页（输入表单、模拟进度、时间轴、地图占位、方案对比、社区静态样张） |
+| `/`（mock 构建） | `src/views/S07DemoView.vue`  | S07 开题演示页（输入表单、模拟进度、时间轴、地图占位、方案对比、社区静态样张），仅 mock 构建注册 |
+| `/`（production/local 构建） | `src/views/ScaffoldView.vue` | 回到 S03 骨架页；演示路由不注册，fixture 不进入主包                       |
 | `/scaffold` | `src/views/ScaffoldView.vue` | S03 骨架回归页，保留其单元测试价值，不属于 S07 演示流程                        |
 
 演示页的硬约束：
@@ -67,8 +68,11 @@ npm --prefix frontend exec vite preview -- --host 127.0.0.1 --port 4173
 
 - 仅在 `mock` profile（`__APP_PROFILE__ === 'mock'`）且 `VITE_ENABLE_MOCK === 'true'` 时渲染，
   用于演示成功 / 加载 / 空 / 部分完成 / 错误五种状态。
-- `production` 与 `local` 构建不会渲染该入口，也不会把演示 fixture 当作可执行业务入口加载。
-- 单元测试与 Playwright 用例都覆盖「选择器只在显式 mock profile 下存在」这一约束。
+- `production` 与 `local` 构建不注册演示路由（`/` 回到骨架页），且演示页组件与全部 fixture
+  通过动态导入 + 编译期常量分支被整体消除，不会出现在生产主包中
+  （可用 `grep "北京三日" dist/assets/*.js` 复验，应为 0 命中）。
+- 单元测试与 Playwright 用例都覆盖「选择器只在显式 mock profile 下存在」这一约束；
+  路由门禁由 `src/router/index.spec.ts` 覆盖两个分支。
 
 ## Playwright 演示证据
 
