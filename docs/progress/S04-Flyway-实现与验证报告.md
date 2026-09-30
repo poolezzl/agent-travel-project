@@ -9,7 +9,8 @@
 | 实现前 HEAD/父提交 | `218a7f4bc66fbccc98693e5466cb77374d0e4b33` |
 | 远端跟踪 | `origin/dev-r5` |
 | 实现前工作区 | 有用户已有未跟踪评审报告、冻结单、旧备份目录、Gitee 教程和 V1 草稿；无已跟踪修改 |
-| 本轮允许范围 | V1 migration、S04 冻结单一致性记录、S04 进度和本报告 |
+| 当前修复基线 | `4b3ef13c4b26bb1de20140a67b090844e42817d9` |
+| 本轮允许范围 | V1 migration、S04 冻结单/S04 进度/本报告、Spotless 纯格式修复和 Flyway 断言测试修复 |
 
 旧备份目录和 Gitee 教程未读取、未引用、未暂存。真实凭据未读取、未写入命令、日志或仓库。
 
@@ -19,8 +20,13 @@
 - `docs/progress/S04-最终数据模型冻结单.md`
 - `docs/progress/S04.md`
 - `docs/progress/S04-Flyway-实现与验证报告.md`
+- `backend/src/main/java/com/agenttravel/backend/BackendApplication.java`
+- `backend/src/main/java/com/agenttravel/backend/health/BackendHealthIndicator.java`
+- `backend/src/test/java/com/agenttravel/backend/BackendApplicationTests.java`
+- `backend/src/test/java/com/agenttravel/backend/DatabaseConfigurationTests.java`
+- `backend/src/test/java/com/agenttravel/backend/FlywayConfigurationTests.java`
 
-未修改 Java、配置、测试、Python、前端、S00-S03、ADR 或 contracts。
+Java 文件仅做 Spotless 纯格式/换行修复；Flyway 配置测试改为要求唯一批准的 `V1__initial_s04_schema.sql`，并静态确认本轮两条积分约束。未修改生产业务逻辑、配置、Python、前端、S00-S03、ADR 或 contracts。
 
 ## 3. 正式表与修订
 
@@ -55,54 +61,45 @@
 
 ```text
 mvn -f backend/pom.xml test
-FAIL：Spotless 在既有 Java 文件上报告 CRLF/格式差异；本轮未修改 Java。
-
-mvn -f backend/pom.xml '-Dspotless.check.skip=true' test
-FAIL：4 项通过，既有 FlywayConfigurationTests 失败；该测试断言 classpath 中不存在 V*.sql，而本任务要求正式新增 V1。
-
-mvn -f backend/pom.xml '-Dspotless.check.skip=true' '-DskipTests' package
-PASS：Spring Boot jar 构建成功。
+PASS：6 tests，0 failures；Spotless 检查通过。
 
 mvn -f backend/pom.xml verify
-FAIL：Spotless 在既有 Java 文件上报告 CRLF/格式差异。
-
-mvn -f backend/pom.xml '-Dspotless.check.skip=true' '-DskipTests' verify
-PASS：编译、打包和 verify 完成。
+PASS：Spotless、测试、打包和 verify 均通过。
 ```
 
 mock profile 的既有测试健康检查通过，但其明确禁用 DataSource 和 Flyway，不能作为真实迁移证据。local profile 的测试在无有效实例时按预期无法连接数据库；本轮没有把该结果写成成功。
 
 ## 6. MySQL 8 / Flyway 结果
 
-以下均为 `PENDING`，原因是本机 Docker daemon 不可用，且未使用或写入任何个人数据库凭据：
+本轮在隔离 Docker Compose 项目 `s04-fix-validation` 中使用固定镜像 `mysql:8.4.8` 和当前 PowerShell 进程生成的临时凭据完成验证；未使用个人常驻数据库，凭据未写入仓库、报告、日志或远端。
 
-1. MySQL 8 空库首次 Flyway migration。
-2. `flyway_schema_history` 首次成功 V1 记录。
-3. 同一空库重复启动/重复迁移。
-4. `flyway validate`。
-5. 实库表、索引、外键、检查约束和只有正式表的核对。
-6. 容器、数据库和卷销毁后的残留核对。
+| 检查 | 实际结果 |
+|---|---|
+| 初始空库 | PASS，0 张表；数据库 `utf8mb4` / `utf8mb4_0900_ai_ci` |
+| 第一次 `local` 启动 | PASS，健康 HTTP 200；`status=UP`、`databaseMode=mysql`、`db.status=UP` |
+| 第一次迁移 | PASS，40 张正式表 + `flyway_schema_history`；history 为 1 条 `V1 / initial s04 schema / success=1` |
+| 第二次启动 | PASS，同一数据库健康 HTTP 200；表清单相同，history 仍为 1 条 |
+| 实库结构检查 | PASS，72 FK、47 unique、83 CHECK、非主键索引查询通过；`ck_quote_expiry` 与 `ck_ledger_direction` 存在 |
+| `flyway validate` | PASS，Flyway API 成功 validated 1 migration |
+| 清理 | PASS，`down -v --remove-orphans` 后容器、卷、网络均为 0；临时日志和 classpath 文件已删除 |
 
-可复现命令（需由独立验收环境提供 MySQL 8 和临时凭据，不把凭据写入仓库或命令历史）：
+可复现入口（凭据必须在当前进程注入，不写入命令历史）：
 
 ```text
-docker compose -f deploy/docker-compose.s03.yml up -d
+docker compose -p s04-fix-validation -f deploy/docker-compose.s03.yml up -d
 $env:SPRING_PROFILES_ACTIVE='local'
 $env:DB_URL='jdbc:mysql://127.0.0.1:3306/<empty_db>?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&serverTimezone=UTC'
 $env:DB_USERNAME='<temporary_user>'
 $env:DB_PASSWORD='<temporary_password>'
 mvn -f backend/pom.xml verify
 curl.exe -i http://127.0.0.1:8080/actuator/health
-docker compose -f deploy/docker-compose.s03.yml down -v
+docker compose -p s04-fix-validation -f deploy/docker-compose.s03.yml down -v --remove-orphans
 ```
-
-实际项目当前没有 `deploy/docker-compose.s03.yml` 或本地 S03 验证脚本，因此不能声称这些入口已存在；应由环境验收任务先提供或按其允许范围补齐。该事实也是当前独立验收阻断项。
 
 ## 7. 风险与结论
 
-- 真实 MySQL 8 空库、Flyway 首次/重复启动和 validate 尚未完成。
-- 既有测试仍保留 S03 阶段“迁移目录为空”的断言，阻止标准 `mvn test` 通过；按本任务禁止修改测试文件，故未绕过或篡改。
-- 当前未执行数据库验证，也未生成业务数据；未执行容器清理是因为未启动容器。
+- 本轮验证是工程师在隔离环境中的可复现证据，不等同于独立验收 Agent 的最终通过。
+- 当前仍有独立复验 PENDING；不得标记 S04 Gate 通过或 S04 已完成。
 - S04 不包含业务 API、认证、Worker、Redis Streams、SSE、真实第三方服务或前端功能。
 
-结论：`S04 migration 实现未完成，存在阻断项`。不得标记 S04 Gate 通过，不得标记 S04 已完成；待独立环境完成 MySQL 8 空库和重复启动复验后重新验收。
+结论：代码和 Flyway 验证阻断项已修复；等待独立验收 Agent 对新 Commit 复验。
