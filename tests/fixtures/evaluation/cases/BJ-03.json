@@ -1,0 +1,37 @@
+{
+  "schema_version": "evaluation-case-v1",
+  "case_id": "BJ-03",
+  "case_version": 1,
+  "status": "ready",
+  "city_code": "CN-BJ",
+  "evaluation_date": "2026-10-05",
+  "user_request": {
+    "summary": "合成用户：闭馆日必须提示冲突并保留用户确认",
+    "traveler_profile": "脱敏成人画像"
+  },
+  "allowed_source_record_ids": [
+    "src-synthetic-poi-001"
+  ],
+  "hard_constraints": [
+    {
+      "id": "constraint-1",
+      "description": "闭馆日必须提示冲突并保留用户确认",
+      "expected": "satisfied"
+    }
+  ],
+  "soft_preferences": [
+    "节奏适中"
+  ],
+  "expected_behaviors": [
+    "closed_conflict"
+  ],
+  "local_modification": null,
+  "expected_evidence": [
+    "src-synthetic-poi-001"
+  ],
+  "manual_score": {
+    "status": "pending",
+    "score_total": null
+  },
+  "runs": []
+}

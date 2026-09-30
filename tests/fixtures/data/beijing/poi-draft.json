@@ -1,0 +1,12 @@
+{
+  "poi_id": "poi-synthetic-bj-001",
+  "city_code": "CN-BJ",
+  "name": "synthetic-poi-draft",
+  "aliases": [],
+  "source_record_id": "src-synthetic-poi-001",
+  "status": "draft",
+  "conflict_flags": [],
+  "retrieved_at": "2026-09-20T00:00:00Z",
+  "freshness_status": "fresh",
+  "is_estimated": false
+}

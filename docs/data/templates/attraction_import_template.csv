@@ -1,0 +1,1 @@
+knowledge_id,poi_id,fact_type,fact_value,chunk_id,source_record_id,published_at,last_verified_at,valid_until,freshness_status,review_status,version,operator_id,reviewer_id,reviewed_at

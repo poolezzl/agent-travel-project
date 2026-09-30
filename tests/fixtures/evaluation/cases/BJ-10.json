@@ -1,0 +1,46 @@
+{
+  "schema_version": "evaluation-case-v1",
+  "case_id": "BJ-10",
+  "case_version": 1,
+  "status": "ready",
+  "city_code": "CN-BJ",
+  "evaluation_date": "2026-10-05",
+  "user_request": {
+    "summary": "合成用户：跨日交换需列出两日影响范围",
+    "traveler_profile": "脱敏成人画像"
+  },
+  "allowed_source_record_ids": [
+    "src-synthetic-poi-001"
+  ],
+  "hard_constraints": [
+    {
+      "id": "constraint-1",
+      "description": "跨日交换需列出两日影响范围",
+      "expected": "satisfied"
+    }
+  ],
+  "soft_preferences": [
+    "节奏适中"
+  ],
+  "expected_behaviors": [
+    "cross_day_scope"
+  ],
+  "local_modification": {
+    "base_version_id": "version-synthetic-001",
+    "affected_blocks": [
+      "days[1]",
+      "days[2]"
+    ],
+    "unchanged_blocks": [
+      "days[0]"
+    ]
+  },
+  "expected_evidence": [
+    "src-synthetic-poi-001"
+  ],
+  "manual_score": {
+    "status": "pending",
+    "score_total": null
+  },
+  "runs": []
+}

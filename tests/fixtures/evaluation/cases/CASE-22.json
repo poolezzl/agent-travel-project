@@ -1,0 +1,31 @@
+{
+  "schema_version": "evaluation-case-v1",
+  "case_id": "CASE-22",
+  "case_version": 1,
+  "status": "template",
+  "city_code": "CN-NJ",
+  "evaluation_date": "2026-10-05",
+  "user_request": {
+    "summary": "待填充脱敏案例：partial_weather",
+    "traveler_profile": "合成画像"
+  },
+  "allowed_source_record_ids": [],
+  "hard_constraints": [
+    {
+      "id": "constraint-template",
+      "description": "待由 R7 填充并审核",
+      "expected": "pending"
+    }
+  ],
+  "soft_preferences": [],
+  "expected_behaviors": [
+    "partial_weather"
+  ],
+  "local_modification": null,
+  "expected_evidence": [],
+  "manual_score": {
+    "status": "pending",
+    "score_total": null
+  },
+  "runs": []
+}
