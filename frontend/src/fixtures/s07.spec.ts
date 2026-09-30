@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { createDemoViewModel, defaultPlanningInput, mockStatusOptions, toS02Status } from './s07'
+import {
+  createDemoViewModel,
+  defaultPlanningInput,
+  mockStatusOptions,
+  toS02Status,
+  validityLabel,
+  validityStatus,
+} from './s07'
 
 describe('S07 演示 fixture 契约', () => {
   it('保留 S02 公共信封字段形状', () => {
@@ -83,5 +90,39 @@ describe('S07 演示 fixture 契约', () => {
       'partial',
       'error',
     ])
+  })
+})
+
+describe('来源时效（valid_until）', () => {
+  // fixture 固定有效期 2026-10-01T08:00:00Z：取其之前/之后的时刻分别验证两种判定
+  const before = new Date('2026-09-30T07:00:00Z')
+  const after = new Date('2026-10-01T09:00:00Z')
+
+  it('按有效期派生 有效/过期/未声明 三态', () => {
+    expect(validityStatus('2026-10-01T08:00:00Z', before)).toBe('active')
+    expect(validityStatus('2026-10-01T08:00:00Z', after)).toBe('expired')
+    expect(validityStatus(null, after)).toBe('unspecified')
+    expect(validityStatus('not-a-date', after)).toBe('unspecified')
+  })
+
+  it('时效标签始终携带 Mock 口径并区分过期态', () => {
+    expect(validityLabel('2026-10-01T08:00:00Z', before)).toBe(
+      '有效期至：2026-10-01T08:00:00Z · 有效（Mock）',
+    )
+    expect(validityLabel('2026-10-01T08:00:00Z', after)).toContain('已过期')
+    expect(validityLabel('2026-10-01T08:00:00Z', after)).toMatch(/Mock/)
+    expect(validityLabel(null, after)).toContain('未声明')
+  })
+
+  it('逐事实 Evidence 与信封 source_metadata 都携带有效期', () => {
+    const model = createDemoViewModel('success')
+
+    expect(model.s02Envelope.source_metadata[0]?.valid_until).toBe('2026-10-01T08:00:00Z')
+    for (const day of model.days) {
+      expect(day.weatherEvidence.validUntil).toBe('2026-10-01T08:00:00Z')
+      for (const entry of day.items) {
+        expect(entry.evidence.validUntil).toBe('2026-10-01T08:00:00Z')
+      }
+    }
   })
 })

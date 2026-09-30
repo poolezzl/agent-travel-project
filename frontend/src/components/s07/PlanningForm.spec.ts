@@ -38,6 +38,44 @@ describe('PlanningForm', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('请选择城市')
   })
 
+  it('不可选城市被禁用，绕过 UI 强设时也会被校验拦截', async () => {
+    const wrapper = mountForm()
+
+    const unavailable = wrapper
+      .findAll('select option')
+      .find((option) => option.text().includes('上海'))
+    expect(unavailable?.attributes('disabled')).toBeDefined()
+
+    // 模拟绕过 disabled 的程序化赋值：校验层必须兜底拦截
+    await wrapper.get('select').setValue('上海')
+    await wrapper.get('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('暂不可选')
+  })
+
+  it('重置按钮恢复默认合成输入，并把默认值同步给父组件', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.findAll('textarea')[1]?.setValue('编辑后应被重置')
+    await wrapper.findAll('input[type="date"]')[0]?.setValue('2026-10-20')
+    await wrapper.get('button[type="button"]').trigger('click')
+
+    expect(wrapper.findAll('textarea')[1]?.element.value).toContain('摄影优先')
+    expect(wrapper.findAll('input[type="date"]')[0]?.element.value).toBe(
+      defaultPlanningInput.startDate,
+    )
+    expect(wrapper.get('select').element.value).toBe('北京')
+
+    // 前两次 emit 来自字段编辑的 @change 同步，最后一次来自重置
+    const updated = wrapper.emitted('update:modelValue')
+    expect(updated?.length).toBeGreaterThanOrEqual(1)
+    const payload = updated?.at(-1)?.[0] as PlanningInput
+    expect(payload.preference).toBe(defaultPlanningInput.preference)
+    expect(payload.startDate).toBe(defaultPlanningInput.startDate)
+    expect(payload.city).toBe('北京')
+  })
+
   it('返回日期早于出发日期时阻止提交', async () => {
     const wrapper = mountForm()
     const dateInputs = wrapper.findAll('input[type="date"]')

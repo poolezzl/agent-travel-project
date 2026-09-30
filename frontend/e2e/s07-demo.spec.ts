@@ -29,6 +29,8 @@ test.describe('S07 开题演示页（Mock）', () => {
 
     await expect(page.getByTestId('current-status')).toContainText('SUCCESS')
     await expect(page.getByTestId('map-placeholder')).toContainText('未接入地图服务')
+    await expect(page.getByTestId('envelope-panel')).toContainText('有效期至')
+    await expect(page.getByTestId('scenario-note')).toHaveCount(0)
   })
 
   test('桌面与 320px 窄屏都没有横向溢出', async ({ page }) => {

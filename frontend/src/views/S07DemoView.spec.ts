@@ -131,4 +131,47 @@ describe('S07DemoView', () => {
 
     wrapper.unmount()
   })
+
+  it('方案数量与结果一致：选择 1 套时只展示方案 A', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountView()
+
+    await wrapper.get('input[name="plan-count"][value="1"]').setValue()
+    await wrapper.get('[data-testid="planning-form"]').trigger('submit')
+    await vi.advanceTimersByTimeAsync(600 * 8)
+    await nextTick()
+
+    const comparison = wrapper.get('[data-testid="plan-comparison"]').text()
+    expect(comparison).toContain('方案 A')
+    expect(comparison).not.toContain('方案 B')
+    expect(wrapper.get('[data-testid="input-summary"]').text()).toContain('1 套')
+
+    wrapper.unmount()
+  })
+
+  it('默认场景不显示偏差标注；输入偏离固定场景时显著标注未按输入生成', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountView()
+
+    expect(wrapper.find('[data-testid="scenario-note"]').exists()).toBe(false)
+
+    // 只改返回日期（仍在 7 天演示范围内），与固定场景的日期不一致
+    await wrapper.findAll('input[type="date"]')[1]?.setValue('2026-10-11')
+    await wrapper.get('[data-testid="planning-form"]').trigger('submit')
+    await vi.advanceTimersByTimeAsync(600 * 8)
+    await nextTick()
+
+    const note = wrapper.get('[data-testid="scenario-note"]')
+    expect(note.text()).toContain('北京三日')
+    expect(note.text()).toContain('未按当前输入')
+
+    wrapper.unmount()
+  })
+
+  it('来源与时效区块展示有效期，不静默丢弃 valid_until', () => {
+    const wrapper = mountView()
+
+    expect(wrapper.get('[data-testid="envelope-panel"]').text()).toContain('有效期至')
+    expect(wrapper.get('[data-testid="envelope-panel"]').text()).toContain('2026-10-01T08:00:00Z')
+  })
 })
