@@ -19,6 +19,7 @@
 | S01 | 已完成 | [S01.md](S01.md) |
 | S02 | 已完成 | [S02.md](S02.md) |
 | S03 | 已完成（Hosted CI 环境豁免） | [S03.md](S03.md)、[S03-R6.md](S03-R6.md)、[S03-Gate-Final-复验报告.md](S03-Gate-Final-复验报告.md)、[S03-Gate-R5-环境豁免裁决.md](S03-Gate-R5-环境豁免裁决.md) |
+| S04 | 已完成 | [S04.md](S04.md)、[S04-最终数据模型冻结单.md](S04-最终数据模型冻结单.md)、[S04-Flyway-实现与验证报告.md](S04-Flyway-实现与验证报告.md)、[S04-Flyway-最终独立验收报告.md](S04-Flyway-最终独立验收报告.md) |
 | S05 | 进行中（TripStar/真实来源仍 PENDING） | [S05.md](S05.md) |
 | S06 | 进行中（真实来源许可仍 PENDING） | [S06.md](S06.md) |
 | S07-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
