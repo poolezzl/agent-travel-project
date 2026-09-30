@@ -18,9 +18,26 @@ export interface Evidence {
   sourceType: string
   sourceId: string
   retrievedAt: string
+  validUntil: string | null
   freshness: Freshness
   isEstimated: boolean
   label: string
+}
+
+export type ValidityStatus = 'active' | 'expired' | 'unspecified'
+
+export function validityStatus(validUntil: string | null, now: Date = new Date()): ValidityStatus {
+  if (!validUntil) return 'unspecified'
+  const until = Date.parse(validUntil)
+  if (Number.isNaN(until)) return 'unspecified'
+  return now.getTime() >= until ? 'expired' : 'active'
+}
+
+export function validityLabel(validUntil: string | null, now: Date = new Date()): string {
+  const status = validityStatus(validUntil, now)
+  if (status === 'unspecified') return '有效期：未声明 · Mock'
+  const suffix = status === 'expired' ? ' · 已过期（Mock 时效，仅演示）' : ' · 有效（Mock）'
+  return `有效期至：${validUntil}${suffix}`
 }
 
 export interface TimelineItem {
@@ -89,13 +106,14 @@ const mockValidUntil = '2026-10-01T08:00:00Z'
 function evidence(
   sourceType: string,
   sourceId: string,
-  options: Partial<Pick<Evidence, 'freshness' | 'isEstimated' | 'label'>> = {},
+  options: Partial<Pick<Evidence, 'freshness' | 'isEstimated' | 'label' | 'validUntil'>> = {},
 ): Evidence {
   const isEstimated = options.isEstimated ?? true
   return {
     sourceType,
     sourceId,
     retrievedAt: mockRetrievedAt,
+    validUntil: options.validUntil !== undefined ? options.validUntil : mockValidUntil,
     freshness: options.freshness ?? 'unknown',
     isEstimated,
     label: options.label ?? 'Mock / 示例 / 待核验',

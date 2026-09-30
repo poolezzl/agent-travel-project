@@ -2,6 +2,7 @@
 import { reactive, ref, watch } from 'vue'
 
 import type { PlanningInput } from '@/fixtures/s07'
+import { defaultPlanningInput } from '@/fixtures/s07'
 
 const props = withDefaults(
   defineProps<{
@@ -61,7 +62,14 @@ function daysBetween(startDate: string, endDate: string): number {
 function validate(input: PlanningInput): string[] {
   const messages: string[] = []
   const city = typeof input.city === 'string' ? input.city.trim() : ''
-  if (city.length === 0) messages.push('请选择城市（当前仅北京为合成演示可用）。')
+  if (city.length === 0) {
+    messages.push('请选择城市（当前仅北京为合成演示可用）。')
+  } else {
+    const cityOption = cityOptions.find((option) => option.value === city)
+    if (cityOption && !cityOption.available) {
+      messages.push(`「${city}」在演示台账中为 planned，暂不可选；当前仅北京开放合成演示。`)
+    }
+  }
   if (!input.startDate || !input.endDate) {
     messages.push('请填写出发与返回日期。')
   } else {
@@ -89,9 +97,13 @@ function handleSubmit(): void {
 }
 
 function resetForm(): void {
-  Object.assign(draft, cloneInput(props.modelValue))
-  mustVisitText.value = props.modelValue.mustVisit.join('\n')
+  // 从不可变的默认输入常量恢复，而不是当前 modelValue：
+  // 控件 @change 已把编辑同步回父组件，若从 props.modelValue 恢复只会得到刚编辑后的值。
+  const restored = cloneInput(defaultPlanningInput)
+  Object.assign(draft, restored)
+  mustVisitText.value = restored.mustVisit.join('\n')
   errors.value = []
+  emit('update:modelValue', cloneInput(defaultPlanningInput))
 }
 </script>
 
@@ -116,7 +128,12 @@ function resetForm(): void {
           :disabled="props.disabled"
           @change="syncInput"
         >
-          <option v-for="option in cityOptions" :key="option.value" :value="option.value">
+          <option
+            v-for="option in cityOptions"
+            :key="option.value"
+            :value="option.value"
+            :disabled="!option.available"
+          >
             {{ option.label }}
           </option>
         </select>

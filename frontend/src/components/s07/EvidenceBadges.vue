@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Evidence } from '@/fixtures/s07'
+import { validityLabel } from '@/fixtures/s07'
 
 const props = defineProps<{
   evidence: Evidence
@@ -17,6 +18,7 @@ const freshnessLabel: Record<Evidence['freshness'], string> = {
     <span class="evidence__flag">{{ props.evidence.label }}</span>
     <span>来源：{{ props.evidence.sourceType }} / {{ props.evidence.sourceId }}</span>
     <span>取得时间：{{ props.evidence.retrievedAt }}</span>
+    <span>{{ validityLabel(props.evidence.validUntil) }}</span>
     <span>{{ freshnessLabel[props.evidence.freshness] }}</span>
     <span v-if="props.evidence.isEstimated">估算值</span>
   </div>

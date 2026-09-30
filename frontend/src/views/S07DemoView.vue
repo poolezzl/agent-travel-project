@@ -3,7 +3,12 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import type { DemoStatus, PlanningInput } from '@/fixtures/s07'
-import { createDemoViewModel, defaultPlanningInput, mockStatusOptions } from '@/fixtures/s07'
+import {
+  createDemoViewModel,
+  defaultPlanningInput,
+  mockStatusOptions,
+  validityLabel,
+} from '@/fixtures/s07'
 import CommunitySamples from '@/components/s07/CommunitySamples.vue'
 import DemoNotice from '@/components/s07/DemoNotice.vue'
 import LoadingSkeleton from '@/components/s07/LoadingSkeleton.vue'
@@ -36,7 +41,24 @@ const planningInput = ref<PlanningInput>({
 
 let stageTimer: ReturnType<typeof setTimeout> | null = null
 
-const viewModel = computed(() => createDemoViewModel(status.value))
+const viewModel = computed(() => {
+  const base = createDemoViewModel(status.value)
+  // 方案数量跟随本次输入展示：fixture 固定提供 3 套合成方案，按用户选择的数量切片，
+  // 避免出现“选择 1 套却展示 3 套”的输入与结果矛盾。
+  return {
+    ...base,
+    variants: base.variants.slice(0, planningInput.value.planCount),
+  }
+})
+
+// 演示数据是固定的北京三日场景：当输入与场景参数不一致时，
+// 在结果区显著标注“未按本次输入生成”，不把固定合成结果冒充成对该次输入的响应。
+const inputMatchesScenario = computed(
+  () =>
+    planningInput.value.city === defaultPlanningInput.city &&
+    planningInput.value.startDate === defaultPlanningInput.startDate &&
+    planningInput.value.endDate === defaultPlanningInput.endDate,
+)
 const stages = computed(() => buildMockStages(progressIndex.value, outcome.value))
 const isSimulating = computed(() => status.value === 'loading')
 const hasResultData = computed(() => status.value === 'success' || status.value === 'partial')
@@ -191,7 +213,8 @@ onBeforeUnmount(clearStageTimer)
             <ul v-else>
               <li v-for="source in envelope.source_metadata" :key="source.source_record_id">
                 {{ source.source_type }} / {{ source.source_record_id }} · 取得时间
-                {{ source.retrieved_at }} · 时效 {{ source.freshness_status ?? 'unknown' }} ·
+                {{ source.retrieved_at }} · {{ validityLabel(source.valid_until ?? null) }} · 时效
+                {{ source.freshness_status ?? 'unknown' }} ·
                 {{ source.is_estimated ? '估算值' : '非估算' }}
               </li>
             </ul>
@@ -245,6 +268,19 @@ onBeforeUnmount(clearStageTimer)
         />
 
         <template v-else>
+          <p
+            v-if="!inputMatchesScenario"
+            class="s07-scenario-note"
+            data-testid="scenario-note"
+            role="note"
+          >
+            演示说明：本次结果仍为固定的「北京三日」合成场景（{{ defaultPlanningInput.startDate }} →
+            {{
+              defaultPlanningInput.endDate
+            }}），未按当前输入的城市与日期动态生成；方案数量已按输入展示
+            {{ planningInput.planCount }} 套。所有内容继续标注 Mock。
+          </p>
+
           <ResultState
             :status="status"
             :title="viewModel.title"
@@ -443,6 +479,18 @@ onBeforeUnmount(clearStageTimer)
   border-radius: var(--radius-md);
   color: var(--ink-secondary);
   font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.s07-scenario-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #d97706;
+  border-radius: var(--radius-md);
+  color: #713b00;
+  background: #fff4cf;
+  font-size: 14px;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 
