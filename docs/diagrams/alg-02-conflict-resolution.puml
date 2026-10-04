@@ -1,0 +1,76 @@
+@startuml alg-02-conflict-resolution
+!pragma useVerticalIf on
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+skinparam ActivityDiamondBackgroundColor #FFF6E5
+skinparam ActivityDiamondBorderColor #D79B00
+title ALG-02 冲突消解决策流程（ADR-0011 六级优先级）
+
+start
+:质量校验 / 日级编排发现冲突;
+note right
+  六级硬约束优先级（不得被用户确认绕过客观不可行）：
+  1. 用户本次显式硬约束
+  2. 闭馆 / 预约 / 生效期 / 开放时间
+  3. 可达性 / 交通方式 / 时间窗
+  4. 天气安全与明确风险限制
+  5. 用户明确预算上限
+  6. 节奏 / 主题 / 口味 / 评分等软偏好
+end note
+
+if (冲突涉及必去点 / 锁定项 / 固定起终点?) then (是)
+  :进入 ALG-03\nAWAITING_CONFIRMATION;
+  stop
+else (否)
+endif
+
+:按确定性顺序尝试消解;
+
+:① 同日换序;
+note right
+  每次候选都必须重新验证：
+  - 开放时间 / 闭馆 / 午休
+  - 可达性与时间窗
+  - 预算硬上限
+  - 来源有效性与新鲜度
+  - 必去点 / 锁定项 / 跨日安排
+end note
+if (候选通过复验?) then (是)
+  :采用候选;
+  stop
+else (否)
+endif
+
+:② 同城同类候选替换;
+if (候选通过复验?) then (是)
+  :采用候选;
+  stop
+else (否)
+endif
+
+:③ 跨日互换;
+if (未改变城市 / 日期硬约束 且 通过复验?) then (是)
+  :采用候选;
+  stop
+else (否)
+endif
+
+:④ 删除最低优先级软偏好项;
+if (仅涉及第 6 级软偏好 且 通过复验?) then (是)
+  :采用候选;
+  stop
+else (否)
+endif
+
+if (存在可由用户选择的可行解?) then (是)
+  :进入 ALG-03\nAWAITING_CONFIRMATION\n提供有来源的选项与费用影响;
+else (否)
+:FAILED / 无可行方案;
+endif
+
+stop
+
+@enduml

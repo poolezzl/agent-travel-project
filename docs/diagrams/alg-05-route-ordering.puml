@@ -1,0 +1,69 @@
+@startuml alg-05-route-ordering
+!pragma useVerticalIf on
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+skinparam ActivityDiamondBackgroundColor #FFF6E5
+skinparam ActivityDiamondBorderColor #D79B00
+title ALG-05 逐日路线排序与降级流程（单日）
+
+start
+:输入已消歧点位\npoi_id + 坐标 + 城市 + GCJ02;
+note right
+  输入来自 ALG-04；
+  同名 / 跨城 / 缺坐标 / 坐标系不一致
+  已在门禁阶段失败或澄清。
+  硬约束检查：闭馆、午休、跨日、重复点、必去点、
+  固定起终点、不可达、零/负时长、时区夏令边界。
+  PENDING：贪心评分权重、2-opt 停止条件、seed 具体值、
+  单日规模上限、tie-break、换乘摘要独立字段。
+end note
+
+:固定 seed + 算法版本;
+:构建逐段出行矩阵;
+
+if (精确缓存命中?) then (是)
+  :复用精确路段\n保留原来源时间;
+else (否)
+  :调用地图适配器;
+  if (适配器返回 ok?) then (是)
+    :精确路段\n写入来源快照;
+  elseif (允许估算?) then (是)
+    :直线估算\nis_estimated=true;
+    note right
+      估算仅作展示；
+      不得通过“行程可行”硬 Gate。
+    end note
+  else (否)
+    :不可用\nSOURCE_UNAVAILABLE;
+    stop
+  endif
+endif
+
+:贪心构造初始顺序;
+:2-opt 局部搜索\n(固定 seed，确定性 tie-break);
+
+if (满足全部硬约束?) then (是)
+  :输出 ordered_points + segments\n总时长 = 逐段 duration_min 汇总;
+else (否)
+  if (存在可自动消解候选?) then (是)
+    :转 ALG-02 确定性消解;
+  elseif (可由用户选择?) then (是)
+    :转 ALG-03 AWAITING_CONFIRMATION;
+  else (否)
+    :status=failed\n不输出伪路线;
+    stop
+  endif
+endif
+
+if (存在估算段?) then (是)
+  :route.is_estimated=true\nstatus=degraded;
+else (否)
+  :route.is_estimated=false;
+endif
+
+stop
+
+@enduml
