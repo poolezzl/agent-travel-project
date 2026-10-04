@@ -12,6 +12,20 @@
   background: #f5f7fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  /* S07 演示页设计令牌：颜色、圆角、阴影与焦点统一在此声明。 */
+  --ink: #111827;
+  --ink-secondary: #4b5563;
+  --ink-muted: #6b7280;
+  --line: #dcdfe6;
+  --line-strong: #b9c2cf;
+  --surface: #ffffff;
+  --surface-soft: #f2f6fc;
+  --accent: #0f766e;
+  --focus: #0ea5a0;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-soft: 0 10px 30px rgb(31 41 55 / 6%);
 }
 
 * {
