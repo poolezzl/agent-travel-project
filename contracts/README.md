@@ -1,6 +1,6 @@
 # Contracts
 
-跨服务契约目录。Agent 输入输出以 `../agents/` 下的 Draft-07 JSON Schema 为事实来源；Java 与 Python 的 REST 边界以 `openapi/agent-business.yaml` 为事实来源。契约版本为 `agent-contract-v1`。
+跨服务契约目录。Agent 输入输出以 `../agents/` 下的 Draft-07 JSON Schema 为事实来源；Java 与 Python 的 REST 边界以 `openapi/agent-business.yaml` 为事实来源。S08 公共认证与积分接口见 `openapi/s08-public.yaml`，版本为 `s08-v1`；Agent 契约版本为 `agent-contract-v1`。
 
 计划结构：
 
