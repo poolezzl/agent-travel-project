@@ -159,3 +159,14 @@ and backend CI validation. Not created: business tables, Flyway migrations,
 business APIs, authentication, task orchestration, Redis Streams, SSE,
 agent-service, frontend, or real third-party calls. Those remain pending for
 the responsible later step or collaborator.
+
+## S08 public API
+
+The S08 public contract is `../contracts/openapi/s08-public.yaml`. Set
+`JWT_SECRET` through the environment with at least 32 random characters before
+starting the MySQL profile. The API provides registration, login, refresh-token
+rotation, logout, current-user lookup, server-side quote pricing, reserve,
+zero-value confirmation, full refund, administrator grant, and balance lookup.
+Refresh tokens are stored only as SHA-256 hashes. Points use append-only
+ledger rows and account-row locks; the client cannot supply the role, owner,
+price, or balance used for a write.
