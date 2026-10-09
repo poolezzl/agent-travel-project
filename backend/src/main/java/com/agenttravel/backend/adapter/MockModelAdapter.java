@@ -25,7 +25,7 @@ public final class MockModelAdapter implements ModelAdapter {
         });
         Instant now = clock.instant();
         ProviderSource source = new ProviderSource(alias, "mock-model-response", now, null,
-                FreshnessStatus.UNKNOWN, false);
+                FreshnessStatus.UNKNOWN, true);
         return new ProviderResponse<>(response, source, false);
     }
 }

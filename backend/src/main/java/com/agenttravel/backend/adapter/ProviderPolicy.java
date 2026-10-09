@@ -28,9 +28,16 @@ public record ProviderPolicy(
                 || retryBackoff.isNegative() || circuitFailureThreshold < 1
                 || circuitOpenDuration.isZero() || circuitOpenDuration.isNegative()
                 || rateLimitPerSecond < 1 || quotaPerWindow < 1
-                || quotaWindow.isZero() || quotaWindow.isNegative() || cacheVersion.isBlank()) {
+                || quotaWindow.isZero() || quotaWindow.isNegative() || cacheTtl.isZero() || cacheTtl.isNegative()
+                || negativeCacheTtl.isZero() || negativeCacheTtl.isNegative() || cacheVersion.isBlank()) {
             throw new IllegalArgumentException("供应商韧性配置无效");
         }
+    }
+
+    public ProviderPolicy withCacheTtl(Duration ttl) {
+        return new ProviderPolicy(timeout, maxRetries, retryBackoff, circuitFailureThreshold,
+                circuitOpenDuration, rateLimitPerSecond, quotaPerWindow, quotaWindow, ttl,
+                negativeCacheTtl, cacheVersion);
     }
 
     public static ProviderPolicy defaults() {

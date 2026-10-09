@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public final class MockQWeatherAdapter implements WeatherAdapter {
 
@@ -33,17 +32,33 @@ public final class MockQWeatherAdapter implements WeatherAdapter {
     public ProviderResponse<List<WeatherRecord>> forecast(WeatherRequest request) {
         String key = AdapterCacheKeys.weather(policy.cacheVersion(), alias, request);
         Instant now = clock.instant();
-        Optional<CacheEntry<List<WeatherRecord>>> cached = cache.get(key, now);
-        if (cached.isPresent()) {
-            if (cached.get().negative()) {
-                throw new ProviderException(ProviderKind.QWEATHER, cached.get().negativeCode(), "天气无可用预报");
+        CacheLookup<List<WeatherRecord>> cached = cache.get(key, now);
+        if (cached.present() && cached.fresh()) {
+            if (cached.entry().negative()) {
+                throw new ProviderException(ProviderKind.QWEATHER, cached.entry().negativeCode(), "天气无可用预报");
             }
-            return new ProviderResponse<>(cached.get().value(), cached.get().source().refreshedStatus(now), true);
+            return cachedResponse(cached.entry(), now);
         }
 
-        List<WeatherRecord> records;
         try {
-            records = calls.call(ProviderKind.QWEATHER, () -> buildForecast(request, now));
+            List<WeatherRecord> records = cache.singleFlight(key, () -> loadForecast(key, request));
+            ProviderSource source = source(clock.instant(), request.cityId());
+            return new ProviderResponse<>(records, source, false);
+        } catch (ProviderException exception) {
+            if (cached.present() && cached.stale() && !cached.entry().negative()) {
+                cache.restore(key, cached.entry());
+                return cachedResponse(cached.entry(), clock.instant()).asDegraded(exception.code());
+            }
+            throw exception;
+        }
+    }
+
+    private List<WeatherRecord> loadForecast(String key, WeatherRequest request) {
+        Instant now = clock.instant();
+        try {
+            List<WeatherRecord> records = calls.call(ProviderKind.QWEATHER, () -> buildForecast(request, now));
+            cache.put(key, records, source(now, request.cityId()), now, policy.cacheTtl());
+            return records;
         } catch (ProviderException exception) {
             if (exception.code() == ProviderErrorCode.EMPTY_RESULT
                     || exception.code() == ProviderErrorCode.INVALID_RESPONSE
@@ -52,10 +67,17 @@ public final class MockQWeatherAdapter implements WeatherAdapter {
             }
             throw exception;
         }
-        ProviderSource source = new ProviderSource(alias, "forecast-" + request.cityId(), now,
-                now.plus(policy.cacheTtl()), FreshnessStatus.FRESH, true);
-        cache.put(key, records, source, now, policy.cacheTtl());
-        return new ProviderResponse<>(records, source, false);
+    }
+
+    private ProviderSource source(Instant retrievedAt, String cityId) {
+        return new ProviderSource(alias, "forecast-" + cityId, retrievedAt,
+                retrievedAt.plus(policy.cacheTtl()), FreshnessStatus.FRESH, true);
+    }
+
+    private <T> ProviderResponse<T> cachedResponse(CacheEntry<T> entry, Instant now) {
+        ProviderSource source = entry.source().refreshedStatus(now);
+        return new ProviderResponse<>(entry.value(), source, true,
+                source.freshnessStatus() != FreshnessStatus.FRESH, null);
     }
 
     private List<WeatherRecord> buildForecast(WeatherRequest request, Instant now) {

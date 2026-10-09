@@ -9,6 +9,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -40,6 +44,23 @@ class AdapterTests {
             assertThat(poi.value()).hasSize(1);
             assertThat(poi.value().get(0).poiId()).startsWith("mock-poi-");
         }
+    }
+
+    @Test
+    void cacheKeysAreVersionedHashedAndResistDelimiterCollisions() {
+        RouteRequest first = new RouteRequest("GCJ02", new Coordinate(116.3, 39.9),
+                new Coordinate(116.4, 39.9), "walk|ing", NOW);
+        RouteRequest second = new RouteRequest("GCJ02", new Coordinate(116.3, 39.9),
+                new Coordinate(116.4, 39.9), "walking", NOW);
+        String firstKey = AdapterCacheKeys.route("v1", "amap|attacker", first);
+        String secondKey = AdapterCacheKeys.route("v1", "amap|attacker", second);
+
+        assertThat(firstKey).startsWith("adapter-cache:");
+        assertThat(firstKey).doesNotContain("amap|attacker");
+        assertThat(firstKey).doesNotContain("walk|ing");
+        assertThat(firstKey).isNotEqualTo(secondKey);
+        assertThat(AdapterCacheKeys.poi("v1", "amap", new PoiSearchRequest("a|b", "c|d", "e", 1)))
+                .isNotEqualTo(AdapterCacheKeys.poi("v1", "amap", new PoiSearchRequest("a", "b|c|d", "e", 1)));
     }
 
     @Test
@@ -108,6 +129,7 @@ class AdapterTests {
             assertThat(response.value().outputText()).contains("mock");
             assertThat(response.cacheHit()).isFalse();
             assertThat(response.source().freshnessStatus()).isEqualTo(FreshnessStatus.UNKNOWN);
+            assertThat(response.source().estimated()).isTrue();
             assertThatThrownBy(() -> adapter.complete(new ModelRequest("planner-mock", "empty")))
                     .isInstanceOf(ProviderException.class)
                     .extracting(exception -> ((ProviderException) exception).code())
@@ -122,8 +144,9 @@ class AdapterTests {
                 FreshnessStatus.FRESH, true);
         cache.put("key", "value", source, NOW, Duration.ofSeconds(1));
 
-        assertThat(cache.get("key", NOW.plusMillis(999))).isPresent();
-        assertThat(cache.get("key", NOW.plusSeconds(1))).isEmpty();
+        assertThat(cache.get("key", NOW.plusMillis(999)).fresh()).isTrue();
+        assertThat(cache.get("key", NOW.plusSeconds(1)).stale()).isTrue();
+        assertThat(cache.get("key", NOW.plusSeconds(1)).entry().source().sourceRecordId()).isEqualTo("route-1");
     }
 
     @Test
@@ -144,6 +167,128 @@ class AdapterTests {
                     .extracting(exception -> ((ProviderException) exception).code())
                     .isEqualTo(ProviderErrorCode.CIRCUIT_OPEN);
         }
+    }
+
+    @Test
+    void halfOpenNonRetryableFailureClearsProbeAndAllowsRecovery() {
+        MutableClock clock = new MutableClock(NOW);
+        ProviderPolicy policy = new ProviderPolicy(Duration.ofSeconds(1), 0, Duration.ZERO, 1,
+                Duration.ofSeconds(1), 20, 100, Duration.ofHours(1), Duration.ofMinutes(5),
+                Duration.ofSeconds(10), "v1");
+        try (ProviderCallExecutor calls = executor(policy, clock)) {
+            assertThatThrownBy(() -> calls.call(ProviderKind.AMAP_ROUTE,
+                    () -> { throw new ProviderException(ProviderKind.AMAP_ROUTE, ProviderErrorCode.TIMEOUT, "超时"); }))
+                    .isInstanceOf(ProviderException.class)
+                    .extracting(exception -> ((ProviderException) exception).code())
+                    .isEqualTo(ProviderErrorCode.TIMEOUT);
+            clock.advance(Duration.ofSeconds(2));
+            assertThatThrownBy(() -> calls.call(ProviderKind.AMAP_ROUTE,
+                    () -> { throw new ProviderException(ProviderKind.AMAP_ROUTE,
+                            ProviderErrorCode.AUTHENTICATION_FAILED, "鉴权失败"); }))
+                    .isInstanceOf(ProviderException.class)
+                    .extracting(exception -> ((ProviderException) exception).code())
+                    .isEqualTo(ProviderErrorCode.AUTHENTICATION_FAILED);
+            assertThat(calls.call(ProviderKind.AMAP_ROUTE, () -> "recovered")).isEqualTo("recovered");
+        }
+    }
+
+    @Test
+    void staleCacheFallsBackWithVisibleDegradedSourceAndRestoresEntry() {
+        ProviderPolicy policy = policy(Duration.ofSeconds(1), 0, 30, 100);
+        InMemoryProviderCache<RouteData> cache = new InMemoryProviderCache<>();
+        RouteRequest request = new RouteRequest("GCJ02", new Coordinate(116.3, 39.9),
+                new Coordinate(116.4, 39.9), "dirty", NOW);
+        RouteData old = new RouteData(request.origin(), request.destination(), "walking", 100, 1, true);
+        String key = AdapterCacheKeys.route(policy.cacheVersion(), "amap", request);
+        ProviderSource source = new ProviderSource("amap", "old-route", NOW.minusSeconds(10),
+                NOW.minusSeconds(1), FreshnessStatus.STALE, true);
+        cache.restore(key, CacheEntry.value(old, source, NOW.minusSeconds(1)));
+        try (ProviderCallExecutor calls = executor(policy)) {
+            MockAmapAdapter adapter = new MockAmapAdapter("amap", policy, CLOCK, calls, cache,
+                    new InMemoryProviderCache<>());
+            ProviderResponse<RouteData> response = adapter.route(request);
+
+            assertThat(response.degraded()).isTrue();
+            assertThat(response.degradationCode()).isEqualTo(ProviderErrorCode.DIRTY_DATA);
+            assertThat(response.source().freshnessStatus()).isEqualTo(FreshnessStatus.STALE);
+            assertThat(cache.get(key, NOW).entry().value()).isEqualTo(old);
+        }
+    }
+
+    @Test
+    void unknownCacheSourceIsReturnedAsVisibleDegradation() {
+        ProviderPolicy policy = policy(Duration.ofSeconds(1), 0, 30, 100);
+        InMemoryProviderCache<RouteData> cache = new InMemoryProviderCache<>();
+        RouteRequest request = new RouteRequest("GCJ02", new Coordinate(116.3, 39.9),
+                new Coordinate(116.4, 39.9), "walking", NOW);
+        String key = AdapterCacheKeys.route(policy.cacheVersion(), "amap", request);
+        RouteData route = new RouteData(request.origin(), request.destination(), "walking", 100, 1, true);
+        cache.restore(key, CacheEntry.value(route,
+                new ProviderSource("amap", "unknown-route", NOW, null, FreshnessStatus.UNKNOWN, true),
+                NOW.plusSeconds(30)));
+        try (ProviderCallExecutor calls = executor(policy)) {
+            MockAmapAdapter adapter = new MockAmapAdapter("amap", policy, CLOCK, calls, cache,
+                    new InMemoryProviderCache<>());
+            ProviderResponse<RouteData> response = adapter.route(request);
+
+            assertThat(response.degraded()).isTrue();
+            assertThat(response.source().freshnessStatus()).isEqualTo(FreshnessStatus.UNKNOWN);
+        }
+    }
+
+    @Test
+    void cacheSupportsSingleFlightAndScopedInvalidation() throws Exception {
+        InMemoryProviderCache<String> cache = new InMemoryProviderCache<>();
+        AtomicInteger loads = new AtomicInteger();
+        CountDownLatch started = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> first = executor.submit(() -> cache.singleFlight("adapter-cache:v1:route:key", () -> {
+                loads.incrementAndGet();
+                started.countDown();
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("测试线程被中断", exception);
+                }
+                return "value";
+            }));
+            started.await();
+            Future<String> second = executor.submit(() -> cache.singleFlight("adapter-cache:v1:route:key", () -> {
+                loads.incrementAndGet();
+                return "other";
+            }));
+            assertThat(first.get()).isEqualTo("value");
+            assertThat(second.get()).isEqualTo("value");
+            assertThat(loads).hasValue(1);
+
+            String v1Route = AdapterCacheKeys.namespace("v1", "route", "amap") + "a";
+            String v1Poi = AdapterCacheKeys.namespace("v1", "poi", "amap") + "b";
+            String v2Route = AdapterCacheKeys.namespace("v2", "route", "amap") + "c";
+            cache.put(v1Route, "a", source(), NOW, Duration.ofMinutes(1));
+            cache.put(v1Poi, "b", source(), NOW, Duration.ofMinutes(1));
+            cache.put(v2Route, "c", source(), NOW, Duration.ofMinutes(1));
+            cache.invalidateVersion("v1");
+            assertThat(cache.get(v1Route, NOW).present()).isFalse();
+            assertThat(cache.get(v1Poi, NOW).present()).isFalse();
+            assertThat(cache.get(v2Route, NOW).present()).isTrue();
+            cache.invalidate(v2Route);
+            assertThat(cache.get(v2Route, NOW).present()).isFalse();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void domainCacheTtlsArePositiveAndIndependent() {
+        AdapterProperties properties = new AdapterProperties();
+        assertThat(properties.getRouteCacheTtlSeconds()).isEqualTo(604800);
+        assertThat(properties.getWeatherCacheTtlSeconds()).isEqualTo(3600);
+        assertThat(properties.getPoiCacheTtlSeconds()).isEqualTo(2592000);
+        properties.setWeatherCacheTtlSeconds(0);
+        assertThatThrownBy(() -> properties.policy(Duration.ofSeconds(properties.getWeatherCacheTtlSeconds())))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -173,10 +318,45 @@ class AdapterTests {
     }
 
     private ProviderCallExecutor executor(ProviderPolicy policy) {
+        return executor(policy, CLOCK);
+    }
+
+    private ProviderCallExecutor executor(ProviderPolicy policy, Clock clock) {
         Map<ProviderKind, ProviderPolicy> policies = new EnumMap<>(ProviderKind.class);
         for (ProviderKind kind : ProviderKind.values()) {
             policies.put(kind, policy);
         }
-        return new ProviderCallExecutor(policies, CLOCK);
+        return new ProviderCallExecutor(policies, clock);
+    }
+
+    private ProviderSource source() {
+        return new ProviderSource("amap", "source", NOW, NOW.plusSeconds(30), FreshnessStatus.FRESH, true);
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        private void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public ZoneOffset getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(java.time.ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 }
