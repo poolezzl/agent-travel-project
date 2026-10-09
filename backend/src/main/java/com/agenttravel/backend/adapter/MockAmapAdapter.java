@@ -3,14 +3,14 @@ package com.agenttravel.backend.adapter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 public final class MockAmapAdapter implements RouteAdapter, PoiAdapter {
 
     private final String alias;
-    private final ProviderPolicy policy;
+    private final ProviderPolicy routePolicy;
+    private final ProviderPolicy poiPolicy;
     private final Clock clock;
     private final ProviderCallExecutor calls;
     private final InMemoryProviderCache<RouteData> routeCache;
@@ -18,8 +18,15 @@ public final class MockAmapAdapter implements RouteAdapter, PoiAdapter {
 
     public MockAmapAdapter(String alias, ProviderPolicy policy, Clock clock, ProviderCallExecutor calls,
             InMemoryProviderCache<RouteData> routeCache, InMemoryProviderCache<List<PoiRecord>> poiCache) {
+        this(alias, policy, policy, clock, calls, routeCache, poiCache);
+    }
+
+    public MockAmapAdapter(String alias, ProviderPolicy routePolicy, ProviderPolicy poiPolicy, Clock clock,
+            ProviderCallExecutor calls, InMemoryProviderCache<RouteData> routeCache,
+            InMemoryProviderCache<List<PoiRecord>> poiCache) {
         this.alias = alias;
-        this.policy = policy;
+        this.routePolicy = routePolicy;
+        this.poiPolicy = poiPolicy;
         this.clock = clock;
         this.calls = calls;
         this.routeCache = routeCache;
@@ -28,19 +35,58 @@ public final class MockAmapAdapter implements RouteAdapter, PoiAdapter {
 
     @Override
     public ProviderResponse<RouteData> route(RouteRequest request) {
-        String key = AdapterCacheKeys.route(policy.cacheVersion(), alias, request);
+        String key = AdapterCacheKeys.route(routePolicy.cacheVersion(), alias, request);
         Instant now = clock.instant();
-        Optional<CacheEntry<RouteData>> cached = routeCache.get(key, now);
-        if (cached.isPresent()) {
-            if (cached.get().negative()) {
-                throw new ProviderException(ProviderKind.AMAP_ROUTE, cached.get().negativeCode(), "路线无可用结果");
+        CacheLookup<RouteData> cached = routeCache.get(key, now);
+        if (cached.present() && cached.fresh()) {
+            if (cached.entry().negative()) {
+                throw new ProviderException(ProviderKind.AMAP_ROUTE, cached.entry().negativeCode(), "路线无可用结果");
             }
-            return new ProviderResponse<>(cached.get().value(), cached.get().source().refreshedStatus(now), true);
+            return cachedResponse(cached.entry(), now);
         }
 
-        RouteData route;
         try {
-            route = calls.call(ProviderKind.AMAP_ROUTE, () -> {
+            RouteData route = routeCache.singleFlight(key, () -> loadRoute(key, request));
+            ProviderSource source = source("route", clock.instant(), true);
+            return new ProviderResponse<>(route, source, false);
+        } catch (ProviderException exception) {
+            if (cached.present() && cached.stale() && !cached.entry().negative()) {
+                routeCache.restore(key, cached.entry());
+                return cachedResponse(cached.entry(), clock.instant()).asDegraded(exception.code());
+            }
+            throw exception;
+        }
+    }
+
+    @Override
+    public ProviderResponse<List<PoiRecord>> search(PoiSearchRequest request) {
+        String key = AdapterCacheKeys.poi(poiPolicy.cacheVersion(), alias, request);
+        Instant now = clock.instant();
+        CacheLookup<List<PoiRecord>> cached = poiCache.get(key, now);
+        if (cached.present() && cached.fresh()) {
+            if (cached.entry().negative()) {
+                throw new ProviderException(ProviderKind.AMAP_POI, cached.entry().negativeCode(), "POI 无可用结果");
+            }
+            return cachedResponse(cached.entry(), now);
+        }
+
+        try {
+            List<PoiRecord> records = poiCache.singleFlight(key, () -> loadPois(key, request));
+            ProviderSource source = source("poi", clock.instant(), true);
+            return new ProviderResponse<>(records, source, false);
+        } catch (ProviderException exception) {
+            if (cached.present() && cached.stale() && !cached.entry().negative()) {
+                poiCache.restore(key, cached.entry());
+                return cachedResponse(cached.entry(), clock.instant()).asDegraded(exception.code());
+            }
+            throw exception;
+        }
+    }
+
+    private RouteData loadRoute(String key, RouteRequest request) {
+        Instant now = clock.instant();
+        try {
+            RouteData route = calls.call(ProviderKind.AMAP_ROUTE, () -> {
                 if (request.mode().equalsIgnoreCase("empty")) {
                     throw new ProviderException(ProviderKind.AMAP_ROUTE, ProviderErrorCode.EMPTY_RESULT, "路线为空");
                 }
@@ -49,45 +95,38 @@ public final class MockAmapAdapter implements RouteAdapter, PoiAdapter {
                 }
                 return buildRoute(request);
             });
+            routeCache.put(key, route, source("route", now, true), now, routePolicy.cacheTtl());
+            return route;
         } catch (ProviderException exception) {
             if (exception.code() == ProviderErrorCode.EMPTY_RESULT
                     || exception.code() == ProviderErrorCode.INVALID_RESPONSE
                     || exception.code() == ProviderErrorCode.DIRTY_DATA) {
-                routeCache.putNegative(key, exception.code(), now, policy.negativeCacheTtl());
+                routeCache.putNegative(key, exception.code(), now, routePolicy.negativeCacheTtl());
             }
             throw exception;
         }
-        ProviderSource source = source("route", now, true);
-        routeCache.put(key, route, source, now, policy.cacheTtl());
-        return new ProviderResponse<>(route, source, false);
     }
 
-    @Override
-    public ProviderResponse<List<PoiRecord>> search(PoiSearchRequest request) {
-        String key = AdapterCacheKeys.poi(policy.cacheVersion(), alias, request);
+    private List<PoiRecord> loadPois(String key, PoiSearchRequest request) {
         Instant now = clock.instant();
-        Optional<CacheEntry<List<PoiRecord>>> cached = poiCache.get(key, now);
-        if (cached.isPresent()) {
-            if (cached.get().negative()) {
-                throw new ProviderException(ProviderKind.AMAP_POI, cached.get().negativeCode(), "POI 无可用结果");
-            }
-            return new ProviderResponse<>(cached.get().value(), cached.get().source().refreshedStatus(now), true);
-        }
-
-        List<PoiRecord> records;
         try {
-            records = calls.call(ProviderKind.AMAP_POI, () -> buildPois(request, now));
+            List<PoiRecord> records = calls.call(ProviderKind.AMAP_POI, () -> buildPois(request, now));
+            poiCache.put(key, records, source("poi", now, true), now, poiPolicy.cacheTtl());
+            return records;
         } catch (ProviderException exception) {
             if (exception.code() == ProviderErrorCode.EMPTY_RESULT
                     || exception.code() == ProviderErrorCode.INVALID_RESPONSE
                     || exception.code() == ProviderErrorCode.DIRTY_DATA) {
-                poiCache.putNegative(key, exception.code(), now, policy.negativeCacheTtl());
+                poiCache.putNegative(key, exception.code(), now, poiPolicy.negativeCacheTtl());
             }
             throw exception;
         }
-        ProviderSource source = source("poi", now, true);
-        poiCache.put(key, records, source, now, policy.cacheTtl());
-        return new ProviderResponse<>(records, source, false);
+    }
+
+    private <T> ProviderResponse<T> cachedResponse(CacheEntry<T> entry, Instant now) {
+        ProviderSource source = entry.source().refreshedStatus(now);
+        return new ProviderResponse<>(entry.value(), source, true,
+                source.freshnessStatus() != FreshnessStatus.FRESH, null);
     }
 
     private RouteData buildRoute(RouteRequest request) {
@@ -112,7 +151,8 @@ public final class MockAmapAdapter implements RouteAdapter, PoiAdapter {
     }
 
     private ProviderSource source(String recordId, Instant retrievedAt, boolean estimated) {
-        return new ProviderSource(alias, recordId, retrievedAt, retrievedAt.plus(policy.cacheTtl()),
+        ProviderPolicy sourcePolicy = recordId.equals("route") ? routePolicy : poiPolicy;
+        return new ProviderSource(alias, recordId, retrievedAt, retrievedAt.plus(sourcePolicy.cacheTtl()),
                 FreshnessStatus.FRESH, estimated);
     }
 

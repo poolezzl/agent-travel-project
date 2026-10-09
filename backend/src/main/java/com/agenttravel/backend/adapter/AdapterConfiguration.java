@@ -49,7 +49,9 @@ public class AdapterConfiguration {
             ProviderCallExecutor providerCallExecutor,
             InMemoryProviderCache<RouteData> routeProviderCache,
             InMemoryProviderCache<java.util.List<PoiRecord>> poiProviderCache) {
-        return new MockAmapAdapter(properties.getAmapAlias(), properties.policy(), providerClock,
+        return new MockAmapAdapter(properties.getAmapAlias(), properties.policy(
+                java.time.Duration.ofSeconds(properties.getRouteCacheTtlSeconds())), properties.policy(
+                java.time.Duration.ofSeconds(properties.getPoiCacheTtlSeconds())), providerClock,
                 providerCallExecutor, routeProviderCache, poiProviderCache);
     }
 
@@ -58,7 +60,8 @@ public class AdapterConfiguration {
     MockQWeatherAdapter mockQWeatherAdapter(AdapterProperties properties, Clock providerClock,
             ProviderCallExecutor providerCallExecutor,
             InMemoryProviderCache<java.util.List<WeatherRecord>> weatherProviderCache) {
-        return new MockQWeatherAdapter(properties.getQweatherAlias(), properties.policy(), 3, providerClock,
+        return new MockQWeatherAdapter(properties.getQweatherAlias(), properties.policy(
+                java.time.Duration.ofSeconds(properties.getWeatherCacheTtlSeconds())), 3, providerClock,
                 providerCallExecutor, weatherProviderCache);
     }
 

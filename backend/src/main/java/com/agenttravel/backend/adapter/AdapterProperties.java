@@ -19,14 +19,20 @@ public class AdapterProperties {
     private int rateLimitPerSecond = 20;
     private int quotaPerWindow = 1000;
     private int quotaWindowSeconds = 86400;
-    private int cacheTtlSeconds = 300;
+    private int routeCacheTtlSeconds = 604800;
+    private int weatherCacheTtlSeconds = 3600;
+    private int poiCacheTtlSeconds = 2592000;
     private int negativeCacheTtlSeconds = 15;
     private String cacheVersion = "v1";
 
     public ProviderPolicy policy() {
+        return policy(Duration.ofSeconds(routeCacheTtlSeconds));
+    }
+
+    public ProviderPolicy policy(Duration cacheTtl) {
         return new ProviderPolicy(Duration.ofMillis(timeoutMs), maxRetries, Duration.ofMillis(retryBackoffMs),
                 circuitFailureThreshold, Duration.ofSeconds(circuitOpenSeconds), rateLimitPerSecond,
-                quotaPerWindow, Duration.ofSeconds(quotaWindowSeconds), Duration.ofSeconds(cacheTtlSeconds),
+                quotaPerWindow, Duration.ofSeconds(quotaWindowSeconds), cacheTtl,
                 Duration.ofSeconds(negativeCacheTtlSeconds), cacheVersion);
     }
 
@@ -126,12 +132,28 @@ public class AdapterProperties {
         this.quotaWindowSeconds = quotaWindowSeconds;
     }
 
-    public int getCacheTtlSeconds() {
-        return cacheTtlSeconds;
+    public int getRouteCacheTtlSeconds() {
+        return routeCacheTtlSeconds;
     }
 
-    public void setCacheTtlSeconds(int cacheTtlSeconds) {
-        this.cacheTtlSeconds = cacheTtlSeconds;
+    public void setRouteCacheTtlSeconds(int routeCacheTtlSeconds) {
+        this.routeCacheTtlSeconds = routeCacheTtlSeconds;
+    }
+
+    public int getWeatherCacheTtlSeconds() {
+        return weatherCacheTtlSeconds;
+    }
+
+    public void setWeatherCacheTtlSeconds(int weatherCacheTtlSeconds) {
+        this.weatherCacheTtlSeconds = weatherCacheTtlSeconds;
+    }
+
+    public int getPoiCacheTtlSeconds() {
+        return poiCacheTtlSeconds;
+    }
+
+    public void setPoiCacheTtlSeconds(int poiCacheTtlSeconds) {
+        this.poiCacheTtlSeconds = poiCacheTtlSeconds;
     }
 
     public int getNegativeCacheTtlSeconds() {

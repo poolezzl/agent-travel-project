@@ -47,14 +47,26 @@ public final class ProviderCallExecutor implements AutoCloseable {
     public <T> T call(ProviderKind provider, Callable<T> operation) {
         ProviderPolicy policy = policies.getOrDefault(provider, ProviderPolicy.defaults());
         for (int attempt = 0; attempt <= policy.maxRetries(); attempt++) {
-            admit(provider, policy);
+            CircuitState circuit = circuits.get(provider);
+            boolean circuitAdmitted = false;
+            boolean operationStarted = false;
             try {
+                circuit.admit(provider, clock.instant());
+                circuitAdmitted = true;
+                admitRateAndQuota(provider, policy);
+                operationStarted = true;
                 T result = invoke(provider, operation, policy.timeout());
-                circuits.get(provider).success();
+                circuit.success();
                 return result;
             } catch (ProviderException exception) {
-                circuits.get(provider).failure(exception.code());
-                circuits.get(provider).openIfNeeded(policy, clock.instant());
+                if (circuitAdmitted) {
+                    if (operationStarted) {
+                        circuit.failure(exception.code());
+                        circuit.openIfNeeded(policy, clock.instant());
+                    } else {
+                        circuit.cancelProbe();
+                    }
+                }
                 if (!exception.retryable() || attempt == policy.maxRetries()) {
                     throw exception;
                 }
@@ -83,9 +95,8 @@ public final class ProviderCallExecutor implements AutoCloseable {
         }
     }
 
-    private void admit(ProviderKind provider, ProviderPolicy policy) {
+    private void admitRateAndQuota(ProviderKind provider, ProviderPolicy policy) {
         Instant now = clock.instant();
-        circuits.get(provider).admit(provider, now, policy.circuitOpenDuration());
         if (!rateWindows.get(provider).allow(now, Duration.ofSeconds(1), policy.rateLimitPerSecond())) {
             throw new ProviderException(provider, ProviderErrorCode.RATE_LIMITED, "供应商请求频率受限");
         }
@@ -116,7 +127,7 @@ public final class ProviderCallExecutor implements AutoCloseable {
         private Instant openUntil;
         private boolean probeInFlight;
 
-        synchronized void admit(ProviderKind provider, Instant now, Duration openDuration) {
+        synchronized void admit(ProviderKind provider, Instant now) {
             if (openUntil == null) {
                 return;
             }
@@ -133,10 +144,20 @@ public final class ProviderCallExecutor implements AutoCloseable {
         }
 
         synchronized void failure(ProviderErrorCode code) {
+            boolean probeFailure = probeInFlight;
+            probeInFlight = false;
+            if (probeFailure && !code.retryable()) {
+                failures = 0;
+                openUntil = null;
+                return;
+            }
             if (!code.retryable()) {
                 return;
             }
             failures++;
+        }
+
+        synchronized void cancelProbe() {
             probeInFlight = false;
         }
 
