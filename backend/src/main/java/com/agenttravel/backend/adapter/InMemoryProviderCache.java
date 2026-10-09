@@ -48,7 +48,7 @@ public final class InMemoryProviderCache<T> {
     }
 
     public void invalidateVersion(String version) {
-        invalidateNamespace(AdapterCacheKeys.versionNamespace(version));
+        AdapterCacheKeys.versionNamespaces(version).forEach(this::invalidateNamespace);
     }
 
     public T singleFlight(String key, Supplier<T> loader) {

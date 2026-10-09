@@ -55,12 +55,41 @@ class AdapterTests {
         String firstKey = AdapterCacheKeys.route("v1", "amap|attacker", first);
         String secondKey = AdapterCacheKeys.route("v1", "amap|attacker", second);
 
-        assertThat(firstKey).startsWith("adapter-cache:");
+        assertThat(firstKey).startsWith("cache:v1:route:");
         assertThat(firstKey).doesNotContain("amap|attacker");
         assertThat(firstKey).doesNotContain("walk|ing");
         assertThat(firstKey).isNotEqualTo(secondKey);
         assertThat(AdapterCacheKeys.poi("v1", "amap", new PoiSearchRequest("a|b", "c|d", "e", 1)))
                 .isNotEqualTo(AdapterCacheKeys.poi("v1", "amap", new PoiSearchRequest("a", "b|c|d", "e", 1)));
+    }
+
+    @Test
+    void cacheKeysUseFrozenNamespacesAndRetainVersionAndParameters() {
+        RouteRequest routeRequest = new RouteRequest("GCJ02", new Coordinate(116.3, 39.9),
+                new Coordinate(116.4, 39.9), "walking", NOW);
+        PoiSearchRequest poiRequest = new PoiSearchRequest("beijing", "故宫", "attraction", 1);
+        WeatherRequest weatherRequest = new WeatherRequest("beijing", NOW.atZone(ZoneOffset.UTC).toLocalDate(),
+                NOW.atZone(ZoneOffset.UTC).toLocalDate().plusDays(3), 3);
+
+        String routeKey = AdapterCacheKeys.route("v1", "amap", routeRequest);
+        String poiKey = AdapterCacheKeys.poi("v1", "amap", poiRequest);
+        String weatherKey = AdapterCacheKeys.weather("v1", "qweather", weatherRequest);
+
+        assertThat(routeKey).startsWith("cache:v1:route:");
+        assertThat(poiKey).startsWith("cache:v1:poi:");
+        assertThat(weatherKey).startsWith("cache:v1:weather:");
+        assertThat(routeKey).contains(":p");
+        assertThat(poiKey).contains(":p");
+        assertThat(weatherKey).contains(":p");
+        assertThat(AdapterCacheKeys.route("v2", "amap", routeRequest)).isNotEqualTo(routeKey);
+        assertThat(AdapterCacheKeys.poi("v2", "amap", poiRequest)).isNotEqualTo(poiKey);
+        assertThat(AdapterCacheKeys.weather("v2", "qweather", weatherRequest)).isNotEqualTo(weatherKey);
+        assertThat(AdapterCacheKeys.namespace("v1", "route", "amap"))
+                .startsWith("cache:v1:route:");
+        assertThat(AdapterCacheKeys.versionNamespaces("v1"))
+                .containsExactly("cache:v1:route:" + digestForTest("v1") + ":",
+                        "cache:v1:poi:" + digestForTest("v1") + ":",
+                        "cache:v1:weather:" + digestForTest("v1") + ":");
     }
 
     @Test
@@ -243,7 +272,7 @@ class AdapterTests {
         CountDownLatch started = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<String> first = executor.submit(() -> cache.singleFlight("adapter-cache:v1:route:key", () -> {
+            Future<String> first = executor.submit(() -> cache.singleFlight("cache:v1:route:key", () -> {
                 loads.incrementAndGet();
                 started.countDown();
                 try {
@@ -255,7 +284,7 @@ class AdapterTests {
                 return "value";
             }));
             started.await();
-            Future<String> second = executor.submit(() -> cache.singleFlight("adapter-cache:v1:route:key", () -> {
+            Future<String> second = executor.submit(() -> cache.singleFlight("cache:v1:route:key", () -> {
                 loads.incrementAndGet();
                 return "other";
             }));
@@ -331,6 +360,11 @@ class AdapterTests {
 
     private ProviderSource source() {
         return new ProviderSource("amap", "source", NOW, NOW.plusSeconds(30), FreshnessStatus.FRESH, true);
+    }
+
+    private String digestForTest(String value) {
+        return AdapterCacheKeys.route(value, "amap", new RouteRequest("GCJ02", new Coordinate(116.3, 39.9),
+                new Coordinate(116.4, 39.9), "walking", NOW)).split(":")[3];
     }
 
     private static final class MutableClock extends Clock {

@@ -4,9 +4,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 
 final class AdapterCacheKeys {
+
+    private static final String CACHE_NAMESPACE = "cache:v1:";
 
     private AdapterCacheKeys() {
     }
@@ -14,7 +17,7 @@ final class AdapterCacheKeys {
     static String route(String version, String alias, RouteRequest request) {
         String parameters = canonical(version, alias, request.coordinateSystem(), coordinate(request.origin()),
                 coordinate(request.destination()), request.mode(), request.departureAt().toString());
-        return "adapter-cache:" + safe(version) + ":route:" + safe(alias)
+        return CACHE_NAMESPACE + "route:" + safe(version) + ":" + safe(alias)
                 + ":o" + digest(coordinate(request.origin()))
                 + ":d" + digest(coordinate(request.destination()))
                 + ":t" + digest(request.departureAt().truncatedTo(ChronoUnit.MINUTES).toString())
@@ -24,7 +27,7 @@ final class AdapterCacheKeys {
     static String poi(String version, String alias, PoiSearchRequest request) {
         String parameters = canonical(version, alias, request.cityId(),
                 request.query().trim().toLowerCase(Locale.ROOT), request.category(), Integer.toString(request.page()));
-        return "adapter-cache:" + safe(version) + ":poi:" + safe(alias)
+        return CACHE_NAMESPACE + "poi:" + safe(version) + ":" + safe(alias)
                 + ":i" + digest(canonical(request.cityId(), request.query(), request.category()))
                 + ":p" + digest(parameters);
     }
@@ -32,7 +35,7 @@ final class AdapterCacheKeys {
     static String weather(String version, String alias, WeatherRequest request) {
         String parameters = canonical(version, alias, request.cityId(), request.from().toString(),
                 request.to().toString(), Integer.toString(request.forecastHorizonDays()));
-        return "adapter-cache:" + safe(version) + ":weather:" + safe(alias) + ":p" + digest(parameters);
+        return CACHE_NAMESPACE + "weather:" + safe(version) + ":" + safe(alias) + ":p" + digest(parameters);
     }
 
     private static String coordinate(Coordinate coordinate) {
@@ -40,11 +43,18 @@ final class AdapterCacheKeys {
     }
 
     static String namespace(String version, String domain, String alias) {
-        return "adapter-cache:" + safe(version) + ":" + domain + ":" + safe(alias) + ":";
+        return domainNamespace(domain) + safe(version) + ":" + safe(alias) + ":";
     }
 
-    static String versionNamespace(String version) {
-        return "adapter-cache:" + safe(version) + ":";
+    static List<String> versionNamespaces(String version) {
+        String versionSegment = safe(version) + ":";
+        return List.of(domainNamespace("route") + versionSegment,
+                domainNamespace("poi") + versionSegment,
+                domainNamespace("weather") + versionSegment);
+    }
+
+    private static String domainNamespace(String domain) {
+        return CACHE_NAMESPACE + domain + ":";
     }
 
     private static String canonical(String... values) {
