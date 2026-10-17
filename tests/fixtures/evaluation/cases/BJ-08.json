@@ -1,0 +1,46 @@
+{
+  "schema_version": "evaluation-case-v1",
+  "case_id": "BJ-08",
+  "case_version": 1,
+  "status": "ready",
+  "city_code": "CN-BJ",
+  "evaluation_date": "2026-10-05",
+  "user_request": {
+    "summary": "合成用户：单点替换不改变未影响日期",
+    "traveler_profile": "脱敏成人画像"
+  },
+  "allowed_source_record_ids": [
+    "src-synthetic-poi-001"
+  ],
+  "hard_constraints": [
+    {
+      "id": "constraint-1",
+      "description": "单点替换不改变未影响日期",
+      "expected": "satisfied"
+    }
+  ],
+  "soft_preferences": [
+    "节奏适中"
+  ],
+  "expected_behaviors": [
+    "local_point_preserved"
+  ],
+  "local_modification": {
+    "base_version_id": "version-synthetic-001",
+    "affected_blocks": [
+      "days[1]"
+    ],
+    "unchanged_blocks": [
+      "days[0]",
+      "days[2]"
+    ]
+  },
+  "expected_evidence": [
+    "src-synthetic-poi-001"
+  ],
+  "manual_score": {
+    "status": "pending",
+    "score_total": null
+  },
+  "runs": []
+}

@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+app:
+  database:
+    mode: mysql
+  external-services:
+    enabled: false

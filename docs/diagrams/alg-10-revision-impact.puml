@@ -1,0 +1,73 @@
+@startuml alg-10-revision-impact
+!pragma useVerticalIf on
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+skinparam ActivityDiamondBackgroundColor #FFF6E5
+skinparam ActivityDiamondBorderColor #D79B00
+title ALG-10 修正影响范围判定与确认流程
+
+start
+:读取当前不可变 trip_version + ETag;
+:输入 base_version_id / current_plan / locked_paths / revision_request;
+note right
+  红线：确认前不写新版本；已发布版本不可原地修改；
+  回滚以历史版本为内容来源创建新版本；
+  局部修改只重跑白名单范围。
+end note
+
+:意图分类;
+
+if (intent?) then (query)
+  :只读回答\n不建版本、不扣费、不触发子 Agent;
+  stop
+elseif (ambiguous) then
+  :返回 clarification_question;
+  stop
+else (change)
+endif
+
+:定位影响范围\n(affected_days / affected_agents / locked_paths);
+note right
+  impact_scope 子字段与 changes[] item 字段
+  尚未在 S02 冻结：PENDING-R4/R1。
+end note
+
+if (影响保护项 或 范围不确定?) then (是)
+  :needs_confirm=true;
+  :进入 ALG-03 AWAITING_CONFIRMATION;
+  if (用户决定?) then (拒绝 / 24h 超时)
+    :原版本不变\nCANCELLED，有预扣则 REFUNDED;
+    stop
+  elseif (接受) then
+    if (ETag 仍为最新?) then (否)
+      :409 REVISION_BASE_MISMATCH\n不执行旧选项;
+      stop
+    else (是)
+      :服务端报价与预扣 2 积分;
+    endif
+  else (基准版本不可恢复)
+    :FAILED -> REFUNDED;
+    stop
+  endif
+else (否)
+  :服务端报价与预扣 2 积分;
+endif
+
+:只调度白名单 Agent;
+:复用未影响区块与新鲜来源快照;
+:确定性质量校验;
+
+if (未影响区块 before_hash == after_hash?) then (是)
+  :原子创建子版本 + change_set;
+  :结构化 diff + 终态结算;
+else (否)
+  :回滚事务\n不写版本;
+  stop
+endif
+
+stop
+
+@enduml

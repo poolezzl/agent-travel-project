@@ -1,0 +1,28 @@
+services:
+  mysql:
+    image: mysql:8.4.8
+    environment:
+      MYSQL_ROOT_PASSWORD: ${S03_MYSQL_ROOT_PASSWORD:?Set S03_MYSQL_ROOT_PASSWORD in the current process}
+      MYSQL_DATABASE: ${S03_MYSQL_DATABASE:?Set S03_MYSQL_DATABASE in the current process}
+      MYSQL_USER: ${S03_MYSQL_USER:?Set S03_MYSQL_USER in the current process}
+      MYSQL_PASSWORD: ${S03_MYSQL_PASSWORD:?Set S03_MYSQL_PASSWORD in the current process}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    ports:
+      - "${S03_MYSQL_PORT:-13306}:3306"
+    volumes:
+      - s03_mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping --protocol=TCP -h127.0.0.1 -u"$${MYSQL_USER}" -p"$${MYSQL_PASSWORD}" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+volumes:
+  s03_mysql_data:

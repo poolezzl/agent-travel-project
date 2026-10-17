@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!frontend/.env.mock
 *.pem
 *.key
 
@@ -22,6 +23,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.venv-*/
 venv/
 
 # Frontend

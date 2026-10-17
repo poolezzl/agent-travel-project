@@ -1,0 +1,92 @@
+@startuml alg-01-task-dag
+!pragma useVerticalIf on
+skinparam defaultFontName "Microsoft YaHei"
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+skinparam ActivityDiamondBackgroundColor #FFF6E5
+skinparam ActivityDiamondBorderColor #D79B00
+title ALG-01 任务 DAG 与并行/恢复路径（首次生成）
+
+start
+:鉴权 / 服务端报价 / 预扣;
+note right
+  幂等键：planning_task(owner_id, idempotency_key)
+  预扣、任务、Outbox 同一事务提交
+end note
+
+:创建 planning_task + outbox_event;
+:需求解析与可行性预检\n(PARSING);
+
+if (硬冲突且必须确认?) then (是)
+  :AWAITING_CONFIRMATION\n保存冲突与选项;
+  if (确认结果?) then (接受且 ETag 有效)
+    :按服务端报价预扣;
+  elseif (拒绝 / 24h 超时) then
+    :CANCELLED -> REFUNDED;
+    stop
+  else (基准版本不可恢复)
+    :FAILED -> REFUNDED;
+    stop
+  endif
+else (否)
+endif
+
+fork
+  :景点资讯\n(COLLECTING);
+fork again
+  :天气\n(COLLECTING);
+fork again
+  :预约规则\n(COLLECTING);
+end fork
+
+:日级分配与硬约束初检\n(SCHEDULING);
+
+fork
+  :第 1 日路线\n(ROUTING, 贪心 + 2-opt);
+fork again
+  :第 N 日路线\n(ROUTING, 贪心 + 2-opt);
+end fork
+
+:餐饮住宿候选;
+:确定性质量校验\n(ASSEMBLING);
+
+if (存在硬冲突?) then (可自动消解)
+  :ALG-02 确定性消解\n同日换序 -> 同城同类替换 -> 跨日互换 -> 删除最低软偏好;
+elseif (必须确认) then
+  :AWAITING_CONFIRMATION;
+  stop
+else (不可绕过)
+  :FAILED -> REFUNDED;
+  stop
+endif
+
+:整合 + 来源快照\n(source_snapshot / trip_version_source);
+:Java 原子创建不可变 trip_version + plan_snapshot;
+
+if (版本完整性?) then (完整)
+  :SUCCEEDED + confirm 原预扣;
+elseif (可用且有可追溯缺失) then
+  :PARTIAL + confirm 原预扣;
+else (无可用版本)
+  :FAILED -> REFUNDED;
+endif
+
+stop
+
+partition "进程恢复路径" {
+  start
+  :从 MySQL 读取 planning_task / task_step / task_event;
+  :回收过期租约;
+  if (最后成功步骤 input_hash 一致且来源新鲜?) then (是)
+    :复用已成功步骤;
+  else (否)
+    :从最早失效步骤重跑\n下游结果失效但不删除审计记录;
+  endif
+  :重新写 Outbox;
+  :按 (task_id, step_name, attempt_no) 与事件 ID 去重;
+  stop
+}
+
+@enduml

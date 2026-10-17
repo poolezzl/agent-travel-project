@@ -13,3 +13,4 @@ def test_health_returns_mock_service_status() -> None:
     assert body["status"] == "ok"
     assert body["service"] == "travelstar-agent-service"
     assert body["profile"] == "mock"
+    assert body["dependencies"] == {"external_services": "disabled"}

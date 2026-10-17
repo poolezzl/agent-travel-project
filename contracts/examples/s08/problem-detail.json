@@ -1,0 +1,9 @@
+{
+  "type": "https://agent-travel.local/problems/INSUFFICIENT_POINTS",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "积分余额不足",
+  "code": "INSUFFICIENT_POINTS",
+  "traceId": "synthetic-trace-001",
+  "timestamp": "2026-10-08T00:00:00Z"
+}

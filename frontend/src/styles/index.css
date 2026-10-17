@@ -1,0 +1,112 @@
+:root {
+  color-scheme: light;
+  font-family:
+    Inter,
+    'PingFang SC',
+    'Microsoft YaHei',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  color: #1f2937;
+  background: #f5f7fa;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  /* S07 演示页设计令牌：颜色、圆角、阴影与焦点统一在此声明。 */
+  --ink: #111827;
+  --ink-secondary: #4b5563;
+  --ink-muted: #6b7280;
+  --line: #dcdfe6;
+  --line-strong: #b9c2cf;
+  --surface: #ffffff;
+  --surface-soft: #f2f6fc;
+  --accent: #0f766e;
+  --focus: #0ea5a0;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-soft: 0 10px 30px rgb(31 41 55 / 6%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.scaffold-shell {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.scaffold-card {
+  width: min(100%, 720px);
+  padding: clamp(24px, 5vw, 48px);
+  border: 1px solid #dcdfe6;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgb(31 41 55 / 8%);
+}
+
+.scaffold-card h1 {
+  margin: 20px 0 12px;
+  color: #111827;
+  font-size: clamp(28px, 6vw, 44px);
+  line-height: 1.15;
+}
+
+.scaffold-card > p {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.75;
+}
+
+.scaffold-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 28px 0;
+}
+
+.scaffold-status div {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f2f6fc;
+}
+
+.scaffold-status dt {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.scaffold-status dd {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+  color: #111827;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .scaffold-shell {
+    align-items: start;
+    padding: 16px;
+  }
+
+  .scaffold-status {
+    grid-template-columns: 1fr;
+  }
+}

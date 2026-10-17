@@ -1,0 +1,140 @@
+{
+  "schema_version": "evaluation-index-v1",
+  "reference_time": "2026-10-01T00:00:00Z",
+  "case_count": 30,
+  "ready_case_count": 10,
+  "beijing_case_ids": [
+    "BJ-01",
+    "BJ-02",
+    "BJ-03",
+    "BJ-04",
+    "BJ-05",
+    "BJ-06",
+    "BJ-07",
+    "BJ-08",
+    "BJ-09",
+    "BJ-10"
+  ],
+  "cases": [
+    {
+      "case_id": "BJ-01",
+      "path": "tests/fixtures/evaluation/cases/BJ-01.json"
+    },
+    {
+      "case_id": "BJ-02",
+      "path": "tests/fixtures/evaluation/cases/BJ-02.json"
+    },
+    {
+      "case_id": "BJ-03",
+      "path": "tests/fixtures/evaluation/cases/BJ-03.json"
+    },
+    {
+      "case_id": "BJ-04",
+      "path": "tests/fixtures/evaluation/cases/BJ-04.json"
+    },
+    {
+      "case_id": "BJ-05",
+      "path": "tests/fixtures/evaluation/cases/BJ-05.json"
+    },
+    {
+      "case_id": "BJ-06",
+      "path": "tests/fixtures/evaluation/cases/BJ-06.json"
+    },
+    {
+      "case_id": "BJ-07",
+      "path": "tests/fixtures/evaluation/cases/BJ-07.json"
+    },
+    {
+      "case_id": "BJ-08",
+      "path": "tests/fixtures/evaluation/cases/BJ-08.json"
+    },
+    {
+      "case_id": "BJ-09",
+      "path": "tests/fixtures/evaluation/cases/BJ-09.json"
+    },
+    {
+      "case_id": "BJ-10",
+      "path": "tests/fixtures/evaluation/cases/BJ-10.json"
+    },
+    {
+      "case_id": "CASE-11",
+      "path": "tests/fixtures/evaluation/cases/CASE-11.json"
+    },
+    {
+      "case_id": "CASE-12",
+      "path": "tests/fixtures/evaluation/cases/CASE-12.json"
+    },
+    {
+      "case_id": "CASE-13",
+      "path": "tests/fixtures/evaluation/cases/CASE-13.json"
+    },
+    {
+      "case_id": "CASE-14",
+      "path": "tests/fixtures/evaluation/cases/CASE-14.json"
+    },
+    {
+      "case_id": "CASE-15",
+      "path": "tests/fixtures/evaluation/cases/CASE-15.json"
+    },
+    {
+      "case_id": "CASE-16",
+      "path": "tests/fixtures/evaluation/cases/CASE-16.json"
+    },
+    {
+      "case_id": "CASE-17",
+      "path": "tests/fixtures/evaluation/cases/CASE-17.json"
+    },
+    {
+      "case_id": "CASE-18",
+      "path": "tests/fixtures/evaluation/cases/CASE-18.json"
+    },
+    {
+      "case_id": "CASE-19",
+      "path": "tests/fixtures/evaluation/cases/CASE-19.json"
+    },
+    {
+      "case_id": "CASE-20",
+      "path": "tests/fixtures/evaluation/cases/CASE-20.json"
+    },
+    {
+      "case_id": "CASE-21",
+      "path": "tests/fixtures/evaluation/cases/CASE-21.json"
+    },
+    {
+      "case_id": "CASE-22",
+      "path": "tests/fixtures/evaluation/cases/CASE-22.json"
+    },
+    {
+      "case_id": "CASE-23",
+      "path": "tests/fixtures/evaluation/cases/CASE-23.json"
+    },
+    {
+      "case_id": "CASE-24",
+      "path": "tests/fixtures/evaluation/cases/CASE-24.json"
+    },
+    {
+      "case_id": "CASE-25",
+      "path": "tests/fixtures/evaluation/cases/CASE-25.json"
+    },
+    {
+      "case_id": "CASE-26",
+      "path": "tests/fixtures/evaluation/cases/CASE-26.json"
+    },
+    {
+      "case_id": "CASE-27",
+      "path": "tests/fixtures/evaluation/cases/CASE-27.json"
+    },
+    {
+      "case_id": "CASE-28",
+      "path": "tests/fixtures/evaluation/cases/CASE-28.json"
+    },
+    {
+      "case_id": "CASE-29",
+      "path": "tests/fixtures/evaluation/cases/CASE-29.json"
+    },
+    {
+      "case_id": "CASE-30",
+      "path": "tests/fixtures/evaluation/cases/CASE-30.json"
+    }
+  ]
+}

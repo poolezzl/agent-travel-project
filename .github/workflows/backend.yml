@@ -1,0 +1,50 @@
+name: backend
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "deploy/docker-compose.s03.yml"
+      - "scripts/s03_mysql_verify.ps1"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "deploy/docker-compose.s03.yml"
+      - "scripts/s03_mysql_verify.ps1"
+      - ".github/workflows/backend.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Verify backend
+        run: mvn --batch-mode verify
+      - name: Check resolved dependencies
+        run: mvn --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=text
+      - name: Verify isolated MySQL 8 empty database with local profile
+        working-directory: .
+        shell: pwsh
+        run: ./scripts/s03_mysql_verify.ps1
+      - name: Scan backend for committed secret literals
+        working-directory: .
+        shell: bash
+        run: |
+          if git grep -n -I -E '(password|api[_-]?key|token|secret)[[:space:]]*:[[:space:]]*["'"'][^$<{][^"'"']*["'"']' -- backend deploy scripts .github/workflows/backend.yml; then
+            echo "Potential committed secret literal found in S03 validation assets"
+            exit 1
+          fi
