@@ -7,11 +7,11 @@ from pathlib import Path
 
 try:
     import yaml
-    from jsonschema import Draft7Validator
+    from openapi_schema_validator import OAS30Validator
     from openapi_spec_validator import validate_spec
 except ImportError:
     yaml = None
-    Draft7Validator = None
+    OAS30Validator = None
     validate_spec = None
 
 
@@ -32,7 +32,7 @@ def main() -> None:
         schemas = spec["components"]["schemas"]
         for schema_name, filename in samples.items():
             instance = json.loads((EXAMPLES / filename).read_text(encoding="utf-8"))
-            Draft7Validator(schemas[schema_name]).validate(instance)
+            OAS30Validator(schemas[schema_name]).validate(instance)
         mode = "完整"
     else:
         required = (

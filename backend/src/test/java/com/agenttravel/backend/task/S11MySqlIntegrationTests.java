@@ -162,6 +162,29 @@ class S11MySqlIntegrationTests {
     }
 
     @Test
+    void failedExecutorResultDoesNotAdvanceTaskAndNextClaimUsesHigherAttempt() {
+        TaskModels.TaskView created = createTask(null, null, "GENERATION");
+        TaskWorkerClaimService.ClaimResult first = claimService.claim(created.taskId(), "it-worker");
+        assertThat(first.hasWork()).isTrue();
+        TaskWorkerClaimService.Claim firstClaim = first.claim();
+
+        assertThat(claimService.commit(firstClaim, new TaskModels.WorkerResult(UUID.randomUUID(), "failed",
+                Map.of("error_code", "MOCK_FAILED"), List.of("source_unavailable")), "it-trace")).isFalse();
+
+        TaskRepository.TaskRow task = repository.findTask(created.taskId());
+        assertThat(task.status()).isEqualTo(TaskStatus.PARSING);
+        TaskRepository.StepRow failedStep = repository.latestStep(created.taskId(), firstClaim.stepName());
+        assertThat(failedStep.status()).isEqualTo("FAILED");
+        assertThat(failedStep.attemptNo()).isEqualTo(1);
+        assertThat(failedStep.outputResultId()).isNotNull();
+
+        TaskWorkerClaimService.ClaimResult retry = claimService.claim(created.taskId(), "it-worker");
+        assertThat(retry.hasWork()).isTrue();
+        assertThat(retry.claim().attemptNo()).isEqualTo(2);
+        assertThat(repository.findTask(created.taskId()).status()).isEqualTo(TaskStatus.PARSING);
+    }
+
+    @Test
     void taskTripAndBaseVersionMustBelongToAuthenticatedOwner() {
         UUID tripId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();

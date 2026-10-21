@@ -13,10 +13,16 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.agenttravel.backend.common.ApiException;
 import com.agenttravel.backend.common.AuditRepository;
@@ -24,7 +30,10 @@ import com.agenttravel.backend.points.PointsModels;
 import com.agenttravel.backend.points.PointsService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 class S11TaskUnitTests {
 
@@ -270,6 +279,110 @@ class S11TaskUnitTests {
         assertThat(heartbeat.activeCount()).isZero();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = { "ok", "partial", "degraded" })
+    void nonFailedResultsUseTheirOwnStepStatusAndAdvance(String status) {
+        TaskRepository repository = mock(TaskRepository.class);
+        TaskTerminationService termination = mock(TaskTerminationService.class);
+        AuditRepository audit = mock(AuditRepository.class);
+        TaskWorkerClaimService worker = new TaskWorkerClaimService(repository, termination, audit,
+                new TaskProperties(), new S11Metrics(new SimpleMeterRegistry()));
+        TaskWorkerClaimService.Claim claim = claim("worker", 1);
+        UUID resultId = UUID.randomUUID();
+        String expectedStepStatus = switch (status) {
+            case "ok" -> "SUCCEEDED";
+            case "partial" -> "PARTIAL";
+            case "degraded" -> "DEGRADED";
+            default -> throw new IllegalStateException();
+        };
+        when(repository.findTaskForUpdate(claim.taskId()))
+                .thenReturn(task(claim.taskId(), UUID.randomUUID(), TaskStatus.PARSING, 3, 10));
+        when(repository.heartbeat(any(), eq("worker"), eq(1), any(), any())).thenReturn(1);
+        when(repository.insertAgentResult(any(), any(), anyInt(), any(), any(), any(), any(), any(), eq(status),
+                any(), any(), any())).thenReturn(resultId);
+        when(repository.completeStep(any(), eq("worker"), eq(1), eq(expectedStepStatus), eq(resultId),
+                any())).thenReturn(1);
+        when(repository.transitionStatus(eq(claim.taskId()), eq(TaskStatus.PARSING), eq(TaskStatus.COLLECTING),
+                eq(3L), any())).thenReturn(1);
+
+        assertThat(worker.commit(claim, result(status, List.of("weather_optional")), "trace")).isTrue();
+
+        verify(repository).completeStep(any(), eq("worker"), eq(1), eq(expectedStepStatus), eq(resultId),
+                any());
+        verify(repository).transitionStatus(eq(claim.taskId()), eq(TaskStatus.PARSING), eq(TaskStatus.COLLECTING),
+                eq(3L), any());
+        verify(repository, never()).failStepWithResult(any(), anyString(), anyInt(), any(), any());
+        verify(termination, never()).failAndRefund(any(), anyString());
+    }
+
+    @Test
+    void failedResultMarksStepFailedWithoutAdvancingSuccessState() {
+        TaskRepository repository = mock(TaskRepository.class);
+        TaskTerminationService termination = mock(TaskTerminationService.class);
+        AuditRepository audit = mock(AuditRepository.class);
+        TaskWorkerClaimService worker = new TaskWorkerClaimService(repository, termination, audit,
+                new TaskProperties(), new S11Metrics(new SimpleMeterRegistry()));
+        TaskWorkerClaimService.Claim claim = claim("worker", 1);
+        UUID resultId = UUID.randomUUID();
+        when(repository.findTaskForUpdate(claim.taskId()))
+                .thenReturn(task(claim.taskId(), UUID.randomUUID(), TaskStatus.PARSING, 3, 10));
+        when(repository.heartbeat(any(), eq("worker"), eq(1), any(), any())).thenReturn(1);
+        when(repository.insertAgentResult(any(), any(), anyInt(), any(), any(), any(), any(), any(), eq("failed"),
+                any(), any(), any())).thenReturn(resultId);
+        when(repository.failStepWithResult(any(), eq("worker"), eq(1), eq(resultId), any())).thenReturn(1);
+
+        assertThat(worker.commit(claim, result("failed", List.of("source_unavailable")), "trace")).isFalse();
+
+        verify(repository).failStepWithResult(any(), eq("worker"), eq(1), eq(resultId), any());
+        verify(repository, never()).completeStep(any(), anyString(), anyInt(), anyString(), any(), any());
+        verify(repository, never()).transitionStatus(any(), any(), any(), any(), any());
+        verify(termination, never()).failAndRefund(any(), anyString());
+        verify(audit).write(null, "TASK_STEP_FAILED", "TASK_STEP", claim.stepId(), "FAILURE",
+                "AGENT_RESULT_FAILED");
+    }
+
+    @Test
+    void failedResultAtAttemptLimitTerminatesAndStartsRefund() {
+        TaskRepository repository = mock(TaskRepository.class);
+        TaskTerminationService termination = mock(TaskTerminationService.class);
+        TaskWorkerClaimService worker = new TaskWorkerClaimService(repository, termination,
+                mock(AuditRepository.class), new TaskProperties(), new S11Metrics(new SimpleMeterRegistry()));
+        TaskWorkerClaimService.Claim claim = claim("worker", 3);
+        UUID resultId = UUID.randomUUID();
+        when(repository.findTaskForUpdate(claim.taskId()))
+                .thenReturn(task(claim.taskId(), UUID.randomUUID(), TaskStatus.PARSING, 3, 10));
+        when(repository.heartbeat(any(), eq("worker"), eq(3), any(), any())).thenReturn(1);
+        when(repository.insertAgentResult(any(), any(), anyInt(), any(), any(), any(), any(), any(), eq("failed"),
+                any(), any(), any())).thenReturn(resultId);
+        when(repository.failStepWithResult(any(), eq("worker"), eq(3), eq(resultId), any())).thenReturn(1);
+
+        assertThat(worker.commit(claim, result("failed", List.of()), "trace")).isFalse();
+
+        verify(termination).failAndRefund(claim.taskId(), "STEP_RETRY_EXHAUSTED");
+        verify(repository, never()).completeStep(any(), anyString(), anyInt(), anyString(), any(), any());
+        verify(repository, never()).transitionStatus(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void lateResultForTerminalTaskIsRejectedWithoutWriting() {
+        TaskRepository repository = mock(TaskRepository.class);
+        AuditRepository audit = mock(AuditRepository.class);
+        S11Metrics metrics = new S11Metrics(new SimpleMeterRegistry());
+        TaskWorkerClaimService worker = new TaskWorkerClaimService(repository,
+                mock(TaskTerminationService.class), audit, new TaskProperties(), metrics);
+        TaskWorkerClaimService.Claim claim = claim("worker", 1);
+        when(repository.findTaskForUpdate(claim.taskId()))
+                .thenReturn(task(claim.taskId(), UUID.randomUUID(), TaskStatus.REFUNDED, 7, 10));
+
+        assertThat(worker.commit(claim, result("ok", List.of()), "trace")).isFalse();
+
+        verify(repository, never()).insertAgentResult(any(), any(), anyInt(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any());
+        verify(audit).write(null, "WORKER_RESULT_STALE", "PLANNING_TASK", claim.taskId(), "DENIED",
+                "WORKER_RESULT_STALE");
+        assertThat(metrics.count("stale-results")).isEqualTo(1.0);
+    }
+
     @Test
     void outboxRelayPublishesBeforeMarkingTheRowPublished() {
         TaskRepository repository = mock(TaskRepository.class);
@@ -403,10 +516,96 @@ class S11TaskUnitTests {
         verify(repository, never()).eventsAfter(any(), anyLong(), anyInt());
     }
 
+    @Test
+    void concurrentPollsSendEachEventOnlyOnceForOneSubscriber() throws Exception {
+        TaskRepository repository = mock(TaskRepository.class);
+        TaskService taskService = mock(TaskService.class);
+        TaskProperties properties = new TaskProperties();
+        RecordingEmitter emitter = new RecordingEmitter();
+        TaskEventStreamService stream = new TaskEventStreamService(repository, taskService, properties,
+                new S11Metrics(new SimpleMeterRegistry()), timeout -> emitter);
+        UUID taskId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        TaskRepository.TaskRow task = task(taskId, userId, TaskStatus.PARSING, 3, 10);
+        TaskModels.TaskEventView event = new TaskModels.TaskEventView(1, "TASK_STATUS_CHANGED",
+                "PARSING", "parse", 1, "开始", List.of(), Instant.now());
+        when(taskService.requireVisible(userId, "USER", taskId)).thenReturn(task);
+        when(repository.findTask(taskId)).thenReturn(task);
+        when(repository.eventsAfter(eq(taskId), eq(0L), eq(properties.getSseBatchSize())))
+                .thenReturn(List.of(), List.of(event), List.of());
+
+        stream.subscribe(userId, "USER", taskId, 0);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = executor.submit(() -> {
+                start.await();
+                stream.pollAll();
+                return null;
+            });
+            Future<?> second = executor.submit(() -> {
+                start.await();
+                stream.pollAll();
+                return null;
+            });
+            start.countDown();
+            first.get();
+            second.get();
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(emitter.sendCount()).isEqualTo(1);
+    }
+
+    @Test
+    void reconnectedSubscriberStartsFromLastEventId() {
+        TaskRepository repository = mock(TaskRepository.class);
+        TaskService taskService = mock(TaskService.class);
+        TaskProperties properties = new TaskProperties();
+        TaskEventStreamService stream = new TaskEventStreamService(repository, taskService, properties,
+                new S11Metrics(new SimpleMeterRegistry()), timeout -> new RecordingEmitter());
+        UUID taskId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(taskService.requireVisible(userId, "USER", taskId))
+                .thenReturn(task(taskId, userId, TaskStatus.PARSING, 3, 10));
+        when(repository.findTask(taskId)).thenReturn(task(taskId, userId, TaskStatus.PARSING, 3, 10));
+        when(repository.eventsAfter(eq(taskId), eq(7L), eq(properties.getSseBatchSize())))
+                .thenReturn(List.of());
+
+        stream.subscribe(userId, "USER", taskId, 7);
+
+        verify(repository).eventsAfter(eq(taskId), eq(7L), eq(properties.getSseBatchSize()));
+    }
+
     private static TaskRepository.TaskRow task(UUID taskId, UUID ownerId, TaskStatus status, long version,
             long reservedPoints) {
         Instant now = Instant.now();
         return new TaskRepository.TaskRow(taskId, ownerId, UUID.randomUUID(), "GENERATION", status, version,
                 reservedPoints, now.plusSeconds(180), null, now, now);
+    }
+
+    private static TaskWorkerClaimService.Claim claim(String workerId, int attemptNo) {
+        return new TaskWorkerClaimService.Claim(UUID.randomUUID(), UUID.randomUUID(), "parse", attemptNo,
+                workerId, TaskStatus.PARSING, TaskStatus.COLLECTING);
+    }
+
+    private static TaskModels.WorkerResult result(String status, List<String> degradedFields) {
+        return new TaskModels.WorkerResult(UUID.randomUUID(), status,
+                "failed".equals(status) ? Map.of("error_code", "MOCK_FAILED") : Map.of("simulated", true),
+                degradedFields);
+    }
+
+    private static final class RecordingEmitter extends SseEmitter {
+        private final AtomicInteger sends = new AtomicInteger();
+
+        @Override
+        public void send(SseEmitter.SseEventBuilder builder) throws IOException {
+            sends.incrementAndGet();
+        }
+
+        private int sendCount() {
+            return sends.get();
+        }
     }
 }

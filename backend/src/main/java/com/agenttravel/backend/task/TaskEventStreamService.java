@@ -7,8 +7,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongFunction;
 
 import com.agenttravel.backend.common.ApiException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpStatus;
@@ -25,14 +27,22 @@ public class TaskEventStreamService {
     private final TaskService taskService;
     private final TaskProperties properties;
     private final S11Metrics metrics;
+    private final LongFunction<SseEmitter> emitterFactory;
     private final Map<UUID, Subscriber> subscribers = new ConcurrentHashMap<>();
 
+    @Autowired
     public TaskEventStreamService(TaskRepository repository, TaskService taskService, TaskProperties properties,
             S11Metrics metrics) {
+        this(repository, taskService, properties, metrics, SseEmitter::new);
+    }
+
+    TaskEventStreamService(TaskRepository repository, TaskService taskService, TaskProperties properties,
+            S11Metrics metrics, LongFunction<SseEmitter> emitterFactory) {
         this.repository = repository;
         this.taskService = taskService;
         this.properties = properties;
         this.metrics = metrics;
+        this.emitterFactory = emitterFactory;
     }
 
     public SseEmitter subscribe(UUID userId, String role, UUID taskId, long afterSequence) {
@@ -43,7 +53,7 @@ public class TaskEventStreamService {
         if (subscribers.size() >= properties.getSseMaxSubscribers()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "进度连接数已达上限");
         }
-        SseEmitter emitter = new SseEmitter(properties.getSseTimeoutMs());
+        SseEmitter emitter = emitterFactory.apply(properties.getSseTimeoutMs());
         UUID subscriberId = UUID.randomUUID();
         Subscriber subscriber = new Subscriber(subscriberId, task.id(), emitter, new AtomicLong(afterSequence));
         subscribers.put(subscriberId, subscriber);
@@ -67,28 +77,34 @@ public class TaskEventStreamService {
     }
 
     private void poll(Subscriber subscriber) {
-        try {
-            List<TaskModels.TaskEventView> events = repository.eventsAfter(subscriber.taskId,
-                    subscriber.lastSequence.get(), properties.getSseBatchSize());
-            for (TaskModels.TaskEventView event : events) {
-                subscriber.emitter.send(SseEmitter.event()
-                        .id(Long.toString(event.sequenceNo()))
-                        .name("task-progress")
-                        .data(event));
-                subscriber.lastSequence.set(event.sequenceNo());
+        synchronized (subscriber.lock) {
+            if (subscriber.closed.get()) {
+                return;
             }
-            if (!events.isEmpty()) {
-                metrics.sseReplayed(events.size());
+            try {
+                long cursor = subscriber.lastSequence.get();
+                List<TaskModels.TaskEventView> events = repository.eventsAfter(subscriber.taskId, cursor,
+                        properties.getSseBatchSize());
+                for (TaskModels.TaskEventView event : events) {
+                    subscriber.emitter.send(SseEmitter.event()
+                            .id(Long.toString(event.sequenceNo()))
+                            .name("task-progress")
+                            .data(event));
+                    subscriber.lastSequence.set(event.sequenceNo());
+                }
+                if (!events.isEmpty()) {
+                    metrics.sseReplayed(events.size());
+                }
+                TaskRepository.TaskRow task = repository.findTask(subscriber.taskId);
+                if (task != null && task.status().terminal()
+                        && repository.eventsAfter(subscriber.taskId, subscriber.lastSequence.get(), 1).isEmpty()) {
+                    subscriber.close();
+                    metrics.sseClosed();
+                }
+            } catch (IOException | RuntimeException exception) {
+                subscribers.remove(subscriber.id);
+                subscriber.emitter.completeWithError(exception);
             }
-            TaskRepository.TaskRow task = repository.findTask(subscriber.taskId);
-            if (task != null && task.status().terminal()
-                    && repository.eventsAfter(subscriber.taskId, subscriber.lastSequence.get(), 1).isEmpty()) {
-                subscriber.close();
-                metrics.sseClosed();
-            }
-        } catch (IOException | RuntimeException exception) {
-            subscribers.remove(subscriber.id);
-            subscriber.emitter.completeWithError(exception);
         }
     }
 
@@ -98,6 +114,7 @@ public class TaskEventStreamService {
         private final SseEmitter emitter;
         private final AtomicLong lastSequence;
         private final AtomicBoolean closed = new AtomicBoolean();
+        private final Object lock = new Object();
 
         private Subscriber(UUID id, UUID taskId, SseEmitter emitter, AtomicLong lastSequence) {
             this.id = id;

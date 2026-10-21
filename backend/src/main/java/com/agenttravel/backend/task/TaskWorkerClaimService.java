@@ -113,12 +113,35 @@ public class TaskWorkerClaimService {
         } catch (DuplicateKeyException duplicate) {
             resultId = repository.findAgentResultId(claim.taskId(), claim.stepId(), claim.attemptNo());
         }
-        if (repository.completeStep(claim.stepId(), claim.workerId(), claim.attemptNo(), "SUCCEEDED",
+        String stepStatus = switch (result.status()) {
+            case "ok" -> "SUCCEEDED";
+            case "partial" -> "PARTIAL";
+            case "degraded" -> "DEGRADED";
+            case "failed" -> "FAILED";
+            default -> throw new IllegalArgumentException("未知执行结果状态");
+        };
+        if ("FAILED".equals(stepStatus)) {
+            if (repository.failStepWithResult(claim.stepId(), claim.workerId(), claim.attemptNo(), resultId,
+                    Instant.now()) != 1) {
+                stale(claim.taskId());
+                throw new StaleWorkException();
+            }
+            audit.write(null, "TASK_STEP_FAILED", "TASK_STEP", claim.stepId(), "FAILURE",
+                    "AGENT_RESULT_FAILED");
+            append(claim.taskId(), claim.workStatus(), claim.stepName(), claim.attemptNo(), "执行器返回失败",
+                    result.degradedFields());
+            if (claim.attemptNo() >= properties.getMaxStepAttempts()) {
+                termination.failAndRefund(claim.taskId(), "STEP_RETRY_EXHAUSTED");
+            }
+            return false;
+        }
+        if (repository.completeStep(claim.stepId(), claim.workerId(), claim.attemptNo(), stepStatus,
                 resultId, Instant.now()) != 1) {
             stale(claim.taskId());
             throw new StaleWorkException();
         }
-        append(claim.taskId(), claim.workStatus(), claim.stepName(), claim.attemptNo(), "模拟步骤已完成");
+        append(claim.taskId(), claim.workStatus(), claim.stepName(), claim.attemptNo(),
+                "模拟步骤已完成，结果=" + stepStatus, result.degradedFields());
         if (claim.nextStatus() == null) {
             repository.appendEvent(claim.taskId(), "TASK_ASSEMBLY_READY",
                     new TaskModels.EventData("ASSEMBLING", claim.stepName(), claim.attemptNo(),
@@ -129,7 +152,8 @@ public class TaskWorkerClaimService {
                 Instant.now()) != 1) {
             throw new StaleWorkException();
         }
-        append(claim.taskId(), claim.nextStatus(), claim.stepName(), claim.attemptNo(), "步骤已完成");
+        append(claim.taskId(), claim.nextStatus(), claim.stepName(), claim.attemptNo(), "步骤已完成",
+                result.degradedFields());
         return true;
     }
 
@@ -167,8 +191,13 @@ public class TaskWorkerClaimService {
     }
 
     private void append(UUID taskId, TaskStatus status, String stepName, Integer attemptNo, String message) {
+        append(taskId, status, stepName, attemptNo, message, List.of());
+    }
+
+    private void append(UUID taskId, TaskStatus status, String stepName, Integer attemptNo, String message,
+            List<String> degradedFields) {
         repository.appendEvent(taskId, "TASK_STATUS_CHANGED",
-                new TaskModels.EventData(status.name(), stepName, attemptNo, message, List.of()));
+                new TaskModels.EventData(status.name(), stepName, attemptNo, message, degradedFields));
     }
 
     private void stale(UUID taskId) {

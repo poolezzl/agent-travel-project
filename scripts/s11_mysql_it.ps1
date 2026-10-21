@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$MysqlHome = "D:\MySQL\mysql-8.4.8-winx64",
     [string]$JavaHome = "D:\Develope\Java工具\jdk"
 )

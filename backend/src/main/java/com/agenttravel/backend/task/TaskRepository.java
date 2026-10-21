@@ -269,6 +269,18 @@ public class TaskRepository {
                 Timestamp.from(now), Timestamp.from(now), stepId.toString(), attemptNo, owner);
     }
 
+    public int failStepWithResult(UUID stepId, String owner, int attemptNo, UUID resultId, Instant now) {
+        return jdbc.update("""
+                UPDATE task_step
+                SET status='FAILED',output_result_id=UUID_TO_BIN(?),finished_at=?,updated_at=?,
+                  lease_owner=NULL,lease_expires_at=NULL,heartbeat_at=?
+                WHERE id=UUID_TO_BIN(?) AND status='RUNNING' AND attempt_no=? AND lease_owner=?
+                  AND lease_expires_at>?
+                """,
+                resultId.toString(), Timestamp.from(now), Timestamp.from(now), Timestamp.from(now),
+                stepId.toString(), attemptNo, owner, Timestamp.from(now));
+    }
+
     public int expireStep(UUID stepId, Instant now) {
         return jdbc.update("""
                 UPDATE task_step

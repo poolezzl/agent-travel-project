@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$RedisArchive,
     [string]$JavaHome = "D:\Develope\Java工具\jdk"
