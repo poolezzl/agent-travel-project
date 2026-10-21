@@ -1,0 +1,250 @@
+openapi: 3.0.3
+info:
+  title: S11 Planning Task Contract
+  version: s11-task-v1
+  description: Java owns task facts and accepts authenticated commands. Progress events are persisted before SSE delivery.
+servers:
+  - url: /api
+paths:
+  /v1/tasks:
+    post:
+      operationId: createPlanningTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+            examples:
+              generation:
+                $ref: '../examples/s11/create-task-request.json'
+      responses:
+        '201':
+          description: Task, reserve ledger and outbox were committed in one database transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskView'
+              examples:
+                queued:
+                  $ref: '../examples/s11/task-queued.json'
+        '200':
+          description: The same idempotency key and request returned the existing task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskView'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /v1/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      operationId: getPlanningTask
+      responses:
+        '200':
+          description: Task visible to its owner or an administrator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskView'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /v1/tasks/{taskId}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      operationId: cancelPlanningTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelTaskRequest'
+      responses:
+        '200':
+          description: Cancellation won the state-version check; late worker results are rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskView'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /v1/tasks/{taskId}/events:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+      - name: after_sequence_no
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: Last-Event-ID
+        in: header
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+    get:
+      operationId: streamPlanningTaskEvents
+      description: Authenticated server-sent events. Each event id is the persisted monotonic sequence_no.
+      responses:
+        '200':
+          description: Event stream; closes after all events for a terminal task are delivered
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                progress:
+                  $ref: '../examples/s11/progress-event.txt'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+components:
+  parameters:
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+  responses:
+    Problem:
+      description: Stable problem details
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    CreateTaskRequest:
+      type: object
+      additionalProperties: false
+      required: [task_type, plan_count, request]
+      properties:
+        task_type:
+          type: string
+          enum: [GENERATION, REVISION]
+        trip_id:
+          type: string
+          format: uuid
+        base_version_id:
+          type: string
+          format: uuid
+          nullable: true
+        plan_count:
+          type: integer
+          minimum: 1
+          maximum: 3
+        request:
+          type: object
+          minProperties: 1
+          additionalProperties: true
+          description: Immutable planning input. Sensitive keys are redacted before persistence.
+    CancelTaskRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      properties:
+        expected_version:
+          type: integer
+          minimum: 0
+    TaskView:
+      type: object
+      additionalProperties: false
+      required:
+        - task_id
+        - owner_id
+        - task_type
+        - status
+        - state_version
+        - reserved_points
+        - operation_deadline_at
+        - created_at
+        - updated_at
+        - reused
+      properties:
+        task_id: { type: string, format: uuid }
+        owner_id: { type: string, format: uuid }
+        quote_id: { type: string, format: uuid, nullable: true }
+        task_type: { type: string, enum: [GENERATION, REVISION] }
+        status:
+          type: string
+          enum:
+            - CREATED
+            - BALANCE_RESERVED
+            - QUEUED
+            - PARSING
+            - COLLECTING
+            - SCHEDULING
+            - ROUTING
+            - ASSEMBLING
+            - AWAITING_CONFIRMATION
+            - SUCCEEDED
+            - PARTIAL
+            - FAILED
+            - CANCELLED
+            - REFUNDED
+        state_version: { type: integer, minimum: 0 }
+        reserved_points: { type: integer, minimum: 0 }
+        operation_deadline_at: { type: string, format: date-time }
+        confirmation_deadline_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        reused: { type: boolean }
+    TaskEvent:
+      type: object
+      additionalProperties: false
+      required: [sequence_no, event_type, status, created_at]
+      properties:
+        sequence_no: { type: integer, minimum: 1 }
+        event_type: { type: string, minLength: 1 }
+        status: { type: string, minLength: 1 }
+        step_name: { type: string, nullable: true }
+        attempt_no: { type: integer, minimum: 1, nullable: true }
+        message: { type: string, nullable: true }
+        degraded_fields:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, code, traceId, timestamp]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]*$' }
+        traceId: { type: string }
+        timestamp: { type: string, format: date-time }

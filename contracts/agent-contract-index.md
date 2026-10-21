@@ -23,3 +23,10 @@ Contract version: `agent-contract-v1`. Java/Spring Boot is the system of record 
 | revision | `agents/07-revision/input.schema.json` | `agents/07-revision/output.schema.json` | `REVISION_AMBIGUOUS` |
 
 The OpenAPI request/response envelope is in `contracts/openapi/agent-business.yaml`; status fixtures are under `contracts/examples/`.
+
+## S11 task runtime
+
+- External task, cancellation and progress contracts are in `contracts/openapi/s11-tasks.yaml`.
+- The task create call uses the authenticated owner only; the client cannot supply identity, price, reserved points or task state.
+- Java creates the task, quote, reserve ledger and outbox in one database transaction. Redis only transports the queued command.
+- SSE event identifiers are persisted per-task `sequence_no` values. Reconnects use `Last-Event-ID` or `after_sequence_no`.
