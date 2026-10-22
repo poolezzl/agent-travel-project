@@ -22,13 +22,20 @@ public class AdapterConfiguration {
     }
 
     @Bean
-    ProviderCallExecutor providerCallExecutor(AdapterProperties properties, Clock providerClock) {
+    @ConditionalOnMissingBean(ProviderCallMetrics.class)
+    ProviderCallMetrics providerCallMetrics() {
+        return ProviderCallMetrics.noop();
+    }
+
+    @Bean
+    ProviderCallExecutor providerCallExecutor(
+            AdapterProperties properties, Clock providerClock, ProviderCallMetrics providerCallMetrics) {
         Map<ProviderKind, ProviderPolicy> policies = new EnumMap<>(ProviderKind.class);
         ProviderPolicy policy = properties.policy();
         for (ProviderKind kind : ProviderKind.values()) {
             policies.put(kind, policy);
         }
-        return new ProviderCallExecutor(policies, providerClock);
+        return new ProviderCallExecutor(policies, providerClock, providerCallMetrics);
     }
 
     @Bean(name = "routeProviderCache")
@@ -52,6 +59,12 @@ public class AdapterConfiguration {
         return new JavaProviderHttpTransport(
                 java.time.Duration.ofMillis(properties.getConnectTimeoutMs()),
                 properties.getHttpMaxResponseBytes());
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(AdapterCityRegistry.class)
+    AdapterCityRegistry adapterCityRegistry(AdapterProperties properties) {
+        return new AdapterCityRegistry(properties.getCities());
     }
 
     @Bean
@@ -90,6 +103,7 @@ public class AdapterConfiguration {
             Clock providerClock,
             ProviderCallExecutor providerCallExecutor,
             ProviderHttpTransport providerHttpTransport,
+            AdapterCityRegistry adapterCityRegistry,
             ObjectMapper objectMapper,
             InMemoryProviderCache<RouteData> routeProviderCache,
             InMemoryProviderCache<java.util.List<PoiRecord>> poiProviderCache) {
@@ -102,6 +116,7 @@ public class AdapterConfiguration {
                 providerClock,
                 providerCallExecutor,
                 providerHttpTransport,
+                adapterCityRegistry,
                 objectMapper,
                 routeProviderCache,
                 poiProviderCache);
@@ -114,6 +129,7 @@ public class AdapterConfiguration {
             Clock providerClock,
             ProviderCallExecutor providerCallExecutor,
             ProviderHttpTransport providerHttpTransport,
+            AdapterCityRegistry adapterCityRegistry,
             ObjectMapper objectMapper,
             InMemoryProviderCache<java.util.List<WeatherRecord>> weatherProviderCache) {
         return new RealQWeatherAdapter(
@@ -127,6 +143,7 @@ public class AdapterConfiguration {
                 providerClock,
                 providerCallExecutor,
                 providerHttpTransport,
+                adapterCityRegistry,
                 weatherProviderCache);
     }
 

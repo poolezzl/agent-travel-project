@@ -49,6 +49,47 @@ app:
     qweather-api-key: "${QWEATHER_API_KEY:}"
     qweather-forecast-days: "${QWEATHER_FORECAST_DAYS:3}"
     qweather-zone-id: "${QWEATHER_ZONE_ID:Asia/Shanghai}"
+    cities:
+      beijing:
+        amap-adcode: "110000"
+        amap-citycode: "010"
+        qweather-location: "101010100"
+      shanghai:
+        amap-adcode: "310000"
+        amap-citycode: "021"
+        qweather-location: "101020100"
+      hangzhou:
+        amap-adcode: "330100"
+        amap-citycode: "0571"
+        qweather-location: "101210101"
+      nanjing:
+        amap-adcode: "320100"
+        amap-citycode: "025"
+        qweather-location: "101190101"
+      suzhou:
+        amap-adcode: "320500"
+        amap-citycode: "0512"
+        qweather-location: "101190401"
+      chengdu:
+        amap-adcode: "510100"
+        amap-citycode: "028"
+        qweather-location: "101270101"
+      xian:
+        amap-adcode: "610100"
+        amap-citycode: "029"
+        qweather-location: "101110101"
+      chongqing:
+        amap-adcode: "500000"
+        amap-citycode: "023"
+        qweather-location: "101040100"
+      guangzhou:
+        amap-adcode: "440100"
+        amap-citycode: "020"
+        qweather-location: "101280101"
+      xiamen:
+        amap-adcode: "350200"
+        amap-citycode: "0592"
+        qweather-location: "101230201"
   database:
     mode: mysql
     charset: utf8mb4

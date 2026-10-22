@@ -33,11 +33,17 @@ public final class MockQWeatherAdapter implements WeatherAdapter {
         String key = AdapterCacheKeys.weather(policy.cacheVersion(), alias, request);
         Instant now = clock.instant();
         CacheLookup<List<WeatherRecord>> cached = cache.get(key, now);
+        boolean cachedRecordsFresh =
+                cached.present()
+                        && !cached.entry().negative()
+                        && freshness(cached.entry().value(), now).fresh();
         if (cached.present() && cached.fresh()) {
             if (cached.entry().negative()) {
                 throw new ProviderException(ProviderKind.QWEATHER, cached.entry().negativeCode(), "天气无可用预报");
             }
-            return cachedResponse(cached.entry(), now);
+            if (cachedRecordsFresh) {
+                return cachedResponse(cached.entry(), now);
+            }
         }
 
         try {
@@ -45,7 +51,7 @@ public final class MockQWeatherAdapter implements WeatherAdapter {
             ProviderSource source = source(clock.instant(), request.cityId());
             return new ProviderResponse<>(records, source, false);
         } catch (ProviderException exception) {
-            if (cached.present() && cached.stale() && !cached.entry().negative()) {
+            if (cached.present() && !cached.entry().negative() && !cachedRecordsFresh) {
                 cache.restore(key, cached.entry());
                 return cachedResponse(cached.entry(), clock.instant()).asDegraded(exception.code());
             }
@@ -74,10 +80,18 @@ public final class MockQWeatherAdapter implements WeatherAdapter {
                 retrievedAt.plus(policy.cacheTtl()), FreshnessStatus.FRESH, true);
     }
 
-    private <T> ProviderResponse<T> cachedResponse(CacheEntry<T> entry, Instant now) {
-        ProviderSource source = entry.source().refreshedStatus(now);
-        return new ProviderResponse<>(entry.value(), source, true,
-                source.freshnessStatus() != FreshnessStatus.FRESH, null);
+    private ProviderResponse<List<WeatherRecord>> cachedResponse(
+            CacheEntry<List<WeatherRecord>> entry, Instant now) {
+        FreshnessView freshness = freshness(entry.value(), now);
+        ProviderSource source = new ProviderSource(
+                entry.source().providerAlias(),
+                entry.source().sourceRecordId(),
+                entry.source().retrievedAt(),
+                freshness.validUntil(),
+                freshness.status(),
+                entry.source().estimated());
+        return new ProviderResponse<>(freshness.records(), source, true,
+                freshness.degradationCode() != null, freshness.degradationCode());
     }
 
     private List<WeatherRecord> buildForecast(WeatherRequest request, Instant now) {
@@ -89,11 +103,61 @@ public final class MockQWeatherAdapter implements WeatherAdapter {
                 continue;
             }
             records.add(new WeatherRecord(date, 18, 28, 0.2, "晴间多云", "forecast",
-                    "qweather-" + request.cityId() + "-" + date, now, now.plus(policy.cacheTtl())));
+                    "qweather-" + request.cityId() + "-" + date, now,
+                    min(now.plus(policy.cacheTtl()),
+                            date.plusDays(1).atStartOfDay(clock.getZone()).toInstant()),
+                    FreshnessStatus.FRESH));
         }
         if (records.isEmpty()) {
             throw new ProviderException(ProviderKind.QWEATHER, ProviderErrorCode.EMPTY_RESULT, "请求日期超出实际预报窗口");
         }
         return List.copyOf(records);
+    }
+
+    private FreshnessView freshness(List<WeatherRecord> records, Instant now) {
+        List<WeatherRecord> refreshed =
+                records.stream().map(record -> record.refreshedAt(now)).toList();
+        boolean stale = false;
+        boolean unknown = refreshed.isEmpty();
+        Instant earliest = null;
+        for (WeatherRecord record : refreshed) {
+            if (record.freshnessStatus() == FreshnessStatus.STALE) {
+                stale = true;
+            } else if (record.freshnessStatus() != FreshnessStatus.FRESH) {
+                unknown = true;
+            }
+            if (record.validUntil() == null) {
+                unknown = true;
+            } else if (earliest == null || record.validUntil().isBefore(earliest)) {
+                earliest = record.validUntil();
+            }
+        }
+        FreshnessStatus status =
+                stale ? FreshnessStatus.STALE
+                        : unknown ? FreshnessStatus.UNKNOWN : FreshnessStatus.FRESH;
+        Instant validUntil = unknown ? null : earliest;
+        ProviderErrorCode code =
+                status == FreshnessStatus.STALE
+                        ? ProviderErrorCode.STALE_DATA
+                        : status == FreshnessStatus.UNKNOWN
+                                ? ProviderErrorCode.SOURCE_FRESHNESS_UNKNOWN
+                                : null;
+        return new FreshnessView(refreshed, status, validUntil, code, code == null);
+    }
+
+    private Instant min(Instant first, Instant second) {
+        return first.isBefore(second) ? first : second;
+    }
+
+    private record FreshnessView(
+            List<WeatherRecord> records,
+            FreshnessStatus status,
+            Instant validUntil,
+            ProviderErrorCode degradationCode,
+            boolean fresh) {
+
+        private FreshnessView {
+            records = List.copyOf(records);
+        }
     }
 }

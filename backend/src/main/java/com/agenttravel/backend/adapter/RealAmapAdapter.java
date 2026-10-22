@@ -34,6 +34,7 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
     private final Clock clock;
     private final ProviderCallExecutor calls;
     private final ProviderHttpTransport transport;
+    private final AdapterCityRegistry cityRegistry;
     private final InMemoryProviderCache<RouteData> routeCache;
     private final InMemoryProviderCache<List<PoiRecord>> poiCache;
 
@@ -46,6 +47,7 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
             Clock clock,
             ProviderCallExecutor calls,
             ProviderHttpTransport transport,
+            AdapterCityRegistry cityRegistry,
             ObjectMapper mapper,
             InMemoryProviderCache<RouteData> routeCache,
             InMemoryProviderCache<List<PoiRecord>> poiCache) {
@@ -57,6 +59,7 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.calls = Objects.requireNonNull(calls, "calls");
         this.transport = Objects.requireNonNull(transport, "transport");
+        this.cityRegistry = Objects.requireNonNull(cityRegistry, "cityRegistry");
         this.mapper = Objects.requireNonNull(mapper, "mapper");
         this.routeCache = Objects.requireNonNull(routeCache, "routeCache");
         this.poiCache = Objects.requireNonNull(poiCache, "poiCache");
@@ -91,7 +94,9 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
 
     @Override
     public ProviderResponse<List<PoiRecord>> search(PoiSearchRequest request) {
-        String key = AdapterCacheKeys.poi(poiPolicy.cacheVersion(), alias, request);
+        AdapterCityRegistry.ResolvedCity city = resolveCity(request.cityId());
+        String key = AdapterCacheKeys.poi(
+                poiPolicy.cacheVersion(), alias, request, city.amapAdcode());
         Instant now = clock.instant();
         CacheLookup<List<PoiRecord>> cached = poiCache.get(key, now);
         if (cached.present() && cached.fresh()) {
@@ -103,8 +108,9 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
         }
 
         try {
-            PoiLoad load = poiCache.singleFlight(key, () -> loadPois(key, request));
-            ProviderSource source = poiResponseSource(request, load.records(), clock.instant());
+            PoiLoad load = poiCache.singleFlight(key, () -> loadPois(key, request, city));
+            ProviderSource source =
+                    poiResponseSource(request, city, load.records(), clock.instant());
             return new ProviderResponse<>(
                     load.records(), source, false, load.degraded(), load.degradationCode());
         } catch (ProviderException exception) {
@@ -137,16 +143,20 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
         }
     }
 
-    private PoiLoad loadPois(String key, PoiSearchRequest request) {
+    private PoiLoad loadPois(
+            String key, PoiSearchRequest request, AdapterCityRegistry.ResolvedCity city) {
         Instant now = clock.instant();
-        URI uri = poiUri(request);
+        URI uri = poiUri(request, city);
         try {
-            PoiLoad load = calls.call(ProviderKind.AMAP_POI, () -> parsePois(send(ProviderKind.AMAP_POI, uri, request), request));
+            PoiLoad load =
+                    calls.call(
+                            ProviderKind.AMAP_POI,
+                            () -> parsePois(send(ProviderKind.AMAP_POI, uri, request), request, city));
             if (!load.degraded()) {
                 poiCache.put(
                         key,
                         load.records(),
-                        poiResponseSource(request, load.records(), now),
+                        poiResponseSource(request, city, load.records(), now),
                         now,
                         poiPolicy.cacheTtl());
             }
@@ -188,7 +198,10 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
         return new RouteData(origin, destination, request.mode(), distance, durationMinutes, false);
     }
 
-    private PoiLoad parsePois(ProviderHttpResponse response, PoiSearchRequest request) {
+    private PoiLoad parsePois(
+            ProviderHttpResponse response,
+            PoiSearchRequest request,
+            AdapterCityRegistry.ResolvedCity city) {
         JsonNode root = parseSuccessResponse(ProviderKind.AMAP_POI, response);
         JsonNode pois = root.path("pois");
         if (!pois.isArray()) {
@@ -206,7 +219,7 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
         Map<String, PoiRecord> unique = new LinkedHashMap<>();
         int dirtyCount = 0;
         for (JsonNode poi : pois) {
-            PoiRecord record = parsePoi(poi, request, now);
+            PoiRecord record = parsePoi(poi, request, city, now);
             if (record == null) {
                 dirtyCount++;
                 continue;
@@ -223,7 +236,8 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
         return new PoiLoad(records, dirtyCount > 0, dirtyCount > 0 ? ProviderErrorCode.DIRTY_DATA : null);
     }
 
-    private PoiRecord parsePoi(JsonNode poi, PoiSearchRequest request, Instant now) {
+    private PoiRecord parsePoi(
+            JsonNode poi, PoiSearchRequest request, AdapterCityRegistry.ResolvedCity city, Instant now) {
         String id = text(poi, "id");
         String name = text(poi, "name");
         String category = text(poi, "typecode");
@@ -235,7 +249,7 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
                 || name.isBlank()
                 || category.isBlank()
                 || coordinate == null
-                || !matchesCity(request.cityId(), poi)) {
+                || !matchesCity(city, poi)) {
             return null;
         }
         ProviderSource source = new ProviderSource(
@@ -245,7 +259,7 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
                 now.plus(poiPolicy.cacheTtl()),
                 FreshnessStatus.FRESH,
                 false);
-        return new PoiRecord(id, request.cityId(), coordinate, "GCJ02", category, name, now, source);
+        return new PoiRecord(id, city.cityKey(), coordinate, "GCJ02", category, name, now, source);
     }
 
     private JsonNode parseSuccessResponse(ProviderKind kind, ProviderHttpResponse response) {
@@ -332,12 +346,12 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
                 .toUri();
     }
 
-    private URI poiUri(PoiSearchRequest request) {
+    private URI poiUri(PoiSearchRequest request, AdapterCityRegistry.ResolvedCity city) {
         UriComponentsBuilder builder =
                 UriComponentsBuilder.fromUri(baseUri)
                         .path("/v5/place/text")
                         .queryParam("keywords", request.query())
-                        .queryParam("city", request.cityId())
+                        .queryParam("city", city.amapAdcode())
                         .queryParam("city_limit", "true")
                         .queryParam("page_num", request.page())
                         .queryParam("page_size", 20)
@@ -368,10 +382,14 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
     }
 
     private ProviderSource poiResponseSource(
-            PoiSearchRequest request, List<PoiRecord> records, Instant retrievedAt) {
+            PoiSearchRequest request,
+            AdapterCityRegistry.ResolvedCity city,
+            List<PoiRecord> records,
+            Instant retrievedAt) {
         List<String> values = new ArrayList<>();
         values.add("amap-poi-response");
-        values.add(request.cityId());
+        values.add(city.cityKey());
+        values.add(city.amapAdcode());
         values.add(request.query());
         values.add(request.category());
         values.add(Integer.toString(request.page()));
@@ -473,15 +491,30 @@ public final class RealAmapAdapter implements RouteAdapter, PoiAdapter {
                 && Math.abs(actual.latitude() - expected.latitude()) <= 0.02;
     }
 
-    private boolean matchesCity(String requestedCity, JsonNode poi) {
-        String city = text(poi, "cityname");
+    private boolean matchesCity(AdapterCityRegistry.ResolvedCity city, JsonNode poi) {
         String adcode = text(poi, "adcode");
         String citycode = text(poi, "citycode");
-        String value = requestedCity.trim();
-        if (value.chars().allMatch(Character::isDigit)) {
-            return value.equals(adcode) || value.equals(citycode);
+        return samePrefecture(city.amapAdcode(), adcode) || city.amapCitycode().equals(citycode);
+    }
+
+    private boolean samePrefecture(String expected, String actual) {
+        if (expected == null || actual == null || expected.length() < 4 || actual.length() < 4) {
+            return false;
         }
-        return value.equalsIgnoreCase(city);
+        int prefixLength = expected.endsWith("0000") ? 2 : 4;
+        return expected.regionMatches(0, actual, 0, prefixLength);
+    }
+
+    private AdapterCityRegistry.ResolvedCity resolveCity(String cityId) {
+        try {
+            return cityRegistry.resolve(cityId);
+        } catch (IllegalArgumentException exception) {
+            throw new ProviderException(
+                    ProviderKind.AMAP_POI,
+                    ProviderErrorCode.INVALID_REQUEST,
+                    "标准城市未配置高德映射",
+                    exception);
+        }
     }
 
     private String coordinateText(Coordinate coordinate) {
