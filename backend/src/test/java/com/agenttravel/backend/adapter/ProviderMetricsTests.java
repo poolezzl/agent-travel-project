@@ -3,6 +3,7 @@ package com.agenttravel.backend.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -86,6 +87,64 @@ class ProviderMetricsTests {
             assertThat(metrics.providerFailures).hasValue(1);
             assertThat(metrics.retries).hasValue(0);
         }
+    }
+
+    @Test
+    void micrometerRegistryExposesProductionCounters() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        MicrometerProviderCallMetrics metrics = new MicrometerProviderCallMetrics(registry);
+        MutableClock clock = new MutableClock(NOW);
+        ProviderPolicy policy = policy(Duration.ofMillis(20), 1, 20, 100, 2);
+        try (ProviderCallExecutor calls = new ProviderCallExecutor(policies(policy), clock, metrics)) {
+            assertThatThrownBy(() -> calls.call(ProviderKind.QWEATHER, () -> {
+                        Thread.sleep(100);
+                        return "never";
+                    }))
+                    .isInstanceOf(ProviderException.class);
+            clock.advance(Duration.ofSeconds(2));
+            assertThat(calls.call(ProviderKind.QWEATHER, () -> "recovered")).isEqualTo("recovered");
+        }
+
+        assertThat(
+                        registry.get("adapter.provider.retries")
+                                .tag("provider", "qweather")
+                                .counter()
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        registry.get("adapter.provider.circuit.opened")
+                                .tag("provider", "qweather")
+                                .counter()
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        registry.get("adapter.provider.circuit.half.opened")
+                                .tag("provider", "qweather")
+                                .counter()
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        registry.get("adapter.provider.failures")
+                                .tag("provider", "qweather")
+                                .tag("code", "timeout")
+                                .counter()
+                                .count())
+                .isEqualTo(2);
+
+        metrics.localRateLimited(ProviderKind.AMAP_ROUTE);
+        metrics.quotaExceeded(ProviderKind.AMAP_POI);
+        assertThat(
+                        registry.get("adapter.provider.local.rate.limited")
+                                .tag("provider", "amap_route")
+                                .counter()
+                                .count())
+                .isEqualTo(1);
+        assertThat(
+                        registry.get("adapter.provider.quota.exceeded")
+                                .tag("provider", "amap_poi")
+                                .counter()
+                                .count())
+                .isEqualTo(1);
     }
 
     private ProviderPolicy policy(

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
@@ -452,6 +453,9 @@ class RealAdapterTests {
                                             "test-key")));
             context.registerBean(
                     ObjectMapper.class, (java.util.function.Supplier<ObjectMapper>) ObjectMapper::new);
+            context.registerBean(
+                    SimpleMeterRegistry.class,
+                    (java.util.function.Supplier<SimpleMeterRegistry>) SimpleMeterRegistry::new);
             context.register(AdapterConfiguration.class);
             context.refresh();
 
