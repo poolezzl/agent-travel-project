@@ -84,6 +84,13 @@ class AdapterTests {
         assertThat(AdapterCacheKeys.route("v2", "amap", routeRequest)).isNotEqualTo(routeKey);
         assertThat(AdapterCacheKeys.poi("v2", "amap", poiRequest)).isNotEqualTo(poiKey);
         assertThat(AdapterCacheKeys.weather("v2", "qweather", weatherRequest)).isNotEqualTo(weatherKey);
+        assertThat(AdapterCacheKeys.poi("v1", "amap", poiRequest, "110000"))
+                .isNotEqualTo(AdapterCacheKeys.poi("v1", "amap", poiRequest, "310000"));
+        assertThat(AdapterCacheKeys.weather("v1", "qweather", weatherRequest, "101010100", 3))
+                .isNotEqualTo(
+                        AdapterCacheKeys.weather("v1", "qweather", weatherRequest, "101020100", 3))
+                .isNotEqualTo(
+                        AdapterCacheKeys.weather("v1", "qweather", weatherRequest, "101010100", 7));
         assertThat(AdapterCacheKeys.namespace("v1", "route", "amap"))
                 .startsWith("cache:v1:route:");
         assertThat(AdapterCacheKeys.versionNamespaces("v1"))

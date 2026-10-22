@@ -8,6 +8,8 @@ public enum ProviderErrorCode {
     AUTHENTICATION_FAILED(false),
     EMPTY_RESULT(false),
     FORECAST_WINDOW_OUTSIDE(false),
+    STALE_DATA(false),
+    SOURCE_FRESHNESS_UNKNOWN(false),
     INVALID_RESPONSE(false),
     DIRTY_DATA(false),
     INVALID_REQUEST(false),

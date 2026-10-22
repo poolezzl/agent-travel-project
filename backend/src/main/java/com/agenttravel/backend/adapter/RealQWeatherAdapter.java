@@ -30,6 +30,7 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
     private final Clock clock;
     private final ProviderCallExecutor calls;
     private final ProviderHttpTransport transport;
+    private final AdapterCityRegistry cityRegistry;
     private final InMemoryProviderCache<List<WeatherRecord>> cache;
 
     public RealQWeatherAdapter(
@@ -43,6 +44,7 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
             Clock clock,
             ProviderCallExecutor calls,
             ProviderHttpTransport transport,
+            AdapterCityRegistry cityRegistry,
             InMemoryProviderCache<List<WeatherRecord>> cache) {
         this.alias = requireText(alias, "供应商别名");
         this.baseUri = Objects.requireNonNull(baseUri, "baseUri");
@@ -57,48 +59,61 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.calls = Objects.requireNonNull(calls, "calls");
         this.transport = Objects.requireNonNull(transport, "transport");
+        this.cityRegistry = Objects.requireNonNull(cityRegistry, "cityRegistry");
         this.cache = Objects.requireNonNull(cache, "cache");
     }
 
     @Override
     public ProviderResponse<List<WeatherRecord>> forecast(WeatherRequest request) {
-        String key = AdapterCacheKeys.weather(policy.cacheVersion(), alias, request);
+        AdapterCityRegistry.ResolvedCity city = resolveCity(request.cityId());
+        String key = AdapterCacheKeys.weather(
+                policy.cacheVersion(),
+                alias,
+                request,
+                city.qweatherLocation(),
+                configuredForecastDays);
         Instant now = clock.instant();
         CacheLookup<List<WeatherRecord>> cached = cache.get(key, now);
-        if (cached.present() && cached.fresh()) {
-            if (cached.entry().negative()) {
-                throw new ProviderException(
-                        ProviderKind.QWEATHER, cached.entry().negativeCode(), "天气无可用预报");
-            }
+        boolean cachedRecordsFresh =
+                cached.present()
+                        && !cached.entry().negative()
+                        && freshness(cached.entry().value(), now).fresh();
+        if (cached.present() && cached.fresh() && cachedRecordsFresh) {
             return cachedResponse(cached.entry(), now);
+        }
+        if (cached.present() && cached.fresh() && cached.entry().negative()) {
+            throw new ProviderException(
+                    ProviderKind.QWEATHER, cached.entry().negativeCode(), "天气无可用预报");
         }
 
         try {
-            WeatherLoad load = cache.singleFlight(key, () -> loadForecast(key, request));
-            ProviderSource source = responseSource(request, load.records(), clock.instant());
+            WeatherLoad load = cache.singleFlight(key, () -> loadForecast(key, request, city));
+            ProviderSource source =
+                    responseSource(city, request, load.records(), clock.instant());
             return new ProviderResponse<>(
                     load.records(), source, false, load.degraded(), load.degradationCode());
         } catch (ProviderException exception) {
-            if (cached.present() && cached.stale() && !cached.entry().negative()) {
+            if (cached.present() && !cached.entry().negative() && !cachedRecordsFresh) {
                 return cachedResponse(cached.entry(), clock.instant()).asDegraded(exception.code());
             }
             throw exception;
         }
     }
 
-    private WeatherLoad loadForecast(String key, WeatherRequest request) {
+    private WeatherLoad loadForecast(
+            String key, WeatherRequest request, AdapterCityRegistry.ResolvedCity city) {
         Instant now = clock.instant();
-        URI uri = forecastUri(request);
+        URI uri = forecastUri(request, city);
         try {
             WeatherLoad load =
                     calls.call(
                             ProviderKind.QWEATHER,
-                            () -> parseForecast(send(uri, request), request, now));
+                            () -> parseForecast(send(uri, request), request, city, now));
             if (!load.degraded()) {
                 cache.put(
                         key,
                         load.records(),
-                        responseSource(request, load.records(), now),
+                        responseSource(city, request, load.records(), now),
                         now,
                         policy.cacheTtl());
             }
@@ -121,7 +136,10 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
     }
 
     private WeatherLoad parseForecast(
-            ProviderHttpResponse response, WeatherRequest request, Instant retrievedAt) {
+            ProviderHttpResponse response,
+            WeatherRequest request,
+            AdapterCityRegistry.ResolvedCity city,
+            Instant retrievedAt) {
         JsonNode root = parseSuccessResponse(response);
         JsonNode daily = root.path("daily");
         if (!daily.isArray()) {
@@ -140,7 +158,7 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
         int dirtyCount = 0;
         LocalDate today = LocalDate.now(clock.withZone(supplierZone));
         for (JsonNode day : daily) {
-            WeatherRecord record = parseDay(day, retrievedAt, today);
+            WeatherRecord record = parseDay(day, city, retrievedAt, today);
             if (record == null) {
                 dirtyCount++;
                 continue;
@@ -173,7 +191,11 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
         return new WeatherLoad(List.copyOf(records), code != null, code);
     }
 
-    private WeatherRecord parseDay(JsonNode day, Instant retrievedAt, LocalDate today) {
+    private WeatherRecord parseDay(
+            JsonNode day,
+            AdapterCityRegistry.ResolvedCity city,
+            Instant retrievedAt,
+            LocalDate today) {
         LocalDate date = parseDate(text(day, "fxDate"));
         Double tempMin = parseDecimal(text(day, "tempMin"));
         Double tempMax = parseDecimal(text(day, "tempMax"));
@@ -207,9 +229,11 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
                 precipProbability,
                 condition,
                 "forecast",
-                "qweather-" + date,
+                "qweather:" + city.cityKey() + ":" + date + ":" + alias + ":"
+                        + configuredForecastDays + "d",
                 retrievedAt,
-                validUntil);
+                validUntil,
+                FreshnessStatus.FRESH);
     }
 
     private JsonNode parseSuccessResponse(ProviderHttpResponse response) {
@@ -283,10 +307,11 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
         }
     }
 
-    private URI forecastUri(WeatherRequest request) {
+    private URI forecastUri(
+            WeatherRequest request, AdapterCityRegistry.ResolvedCity city) {
         return UriComponentsBuilder.fromUri(baseUri)
                 .path("/v7/weather/" + configuredForecastDays + "d")
-                .queryParam("location", request.cityId())
+                .queryParam("location", city.qweatherLocation())
                 .queryParam("key", apiKey)
                 .build()
                 .encode()
@@ -294,28 +319,89 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
     }
 
     private ProviderSource responseSource(
-            WeatherRequest request, List<WeatherRecord> records, Instant retrievedAt) {
+            AdapterCityRegistry.ResolvedCity city,
+            WeatherRequest request,
+            List<WeatherRecord> records,
+            Instant retrievedAt) {
         List<String> values = new ArrayList<>();
         values.add("qweather-response");
-        values.add(request.cityId());
+        values.add(city.cityKey());
+        values.add(city.qweatherLocation());
+        values.add(alias);
         values.add(request.from().toString());
         values.add(request.to().toString());
         values.add(Integer.toString(configuredForecastDays));
         records.forEach(record -> values.add(record.date().toString()));
+        FreshnessView freshness = freshness(records, retrievedAt);
         return new ProviderSource(
                 alias,
                 sourceId(values.toArray(String[]::new)),
                 retrievedAt,
-                retrievedAt.plus(policy.cacheTtl()),
-                FreshnessStatus.FRESH,
+                freshness.validUntil(),
+                freshness.status(),
                 false);
     }
 
     private ProviderResponse<List<WeatherRecord>> cachedResponse(
             CacheEntry<List<WeatherRecord>> entry, Instant now) {
-        ProviderSource source = entry.source().refreshedStatus(now);
+        FreshnessView freshness = freshness(entry.value(), now);
+        ProviderSource source = new ProviderSource(
+                entry.source().providerAlias(),
+                entry.source().sourceRecordId(),
+                entry.source().retrievedAt(),
+                freshness.validUntil(),
+                freshness.status(),
+                entry.source().estimated());
         return new ProviderResponse<>(
-                entry.value(), source, true, source.freshnessStatus() != FreshnessStatus.FRESH, null);
+                freshness.records(),
+                source,
+                true,
+                freshness.degradationCode() != null,
+                freshness.degradationCode());
+    }
+
+    private FreshnessView freshness(List<WeatherRecord> records, Instant now) {
+        List<WeatherRecord> refreshed =
+                records.stream().map(record -> record.refreshedAt(now)).toList();
+        boolean stale = false;
+        boolean unknown = refreshed.isEmpty();
+        Instant earliestValidUntil = null;
+        for (WeatherRecord record : refreshed) {
+            if (record.freshnessStatus() == FreshnessStatus.STALE) {
+                stale = true;
+            } else if (record.freshnessStatus() != FreshnessStatus.FRESH) {
+                unknown = true;
+            }
+            if (record.validUntil() == null) {
+                unknown = true;
+            } else if (earliestValidUntil == null || record.validUntil().isBefore(earliestValidUntil)) {
+                earliestValidUntil = record.validUntil();
+            }
+        }
+        FreshnessStatus status =
+                stale ? FreshnessStatus.STALE
+                        : unknown ? FreshnessStatus.UNKNOWN : FreshnessStatus.FRESH;
+        Instant aggregateValidUntil = unknown ? null : earliestValidUntil;
+        ProviderErrorCode degradationCode =
+                status == FreshnessStatus.STALE
+                        ? ProviderErrorCode.STALE_DATA
+                        : status == FreshnessStatus.UNKNOWN
+                                ? ProviderErrorCode.SOURCE_FRESHNESS_UNKNOWN
+                                : null;
+        return new FreshnessView(
+                refreshed, status, aggregateValidUntil, degradationCode, degradationCode == null);
+    }
+
+    private AdapterCityRegistry.ResolvedCity resolveCity(String cityId) {
+        try {
+            return cityRegistry.resolve(cityId);
+        } catch (IllegalArgumentException exception) {
+            throw new ProviderException(
+                    ProviderKind.QWEATHER,
+                    ProviderErrorCode.INVALID_REQUEST,
+                    "标准城市未配置和风天气映射",
+                    exception);
+        }
     }
 
     private boolean isNegativeCacheable(ProviderErrorCode code) {
@@ -380,6 +466,18 @@ public final class RealQWeatherAdapter implements WeatherAdapter {
             if (degraded != (degradationCode != null)) {
                 throw new IllegalArgumentException("天气降级状态不一致");
             }
+        }
+    }
+
+    private record FreshnessView(
+            List<WeatherRecord> records,
+            FreshnessStatus status,
+            Instant validUntil,
+            ProviderErrorCode degradationCode,
+            boolean fresh) {
+
+        private FreshnessView {
+            records = List.copyOf(records);
         }
     }
 }

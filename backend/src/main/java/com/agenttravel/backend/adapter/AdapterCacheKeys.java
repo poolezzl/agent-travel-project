@@ -25,16 +25,33 @@ final class AdapterCacheKeys {
     }
 
     static String poi(String version, String alias, PoiSearchRequest request) {
-        String parameters = canonical(version, alias, request.cityId(),
+        return poi(version, alias, request, request.cityId());
+    }
+
+    static String poi(
+            String version, String alias, PoiSearchRequest request, String providerCityId) {
+        String parameters = canonical(version, alias, request.cityId(), providerCityId,
                 request.query().trim().toLowerCase(Locale.ROOT), request.category(), Integer.toString(request.page()));
         return CACHE_NAMESPACE + "poi:" + safe(version) + ":" + safe(alias)
-                + ":i" + digest(canonical(request.cityId(), request.query(), request.category()))
+                + ":i" + digest(canonical(request.cityId(), providerCityId, request.query(),
+                        request.category()))
                 + ":p" + digest(parameters);
     }
 
     static String weather(String version, String alias, WeatherRequest request) {
-        String parameters = canonical(version, alias, request.cityId(), request.from().toString(),
-                request.to().toString(), Integer.toString(request.forecastHorizonDays()));
+        return weather(version, alias, request, request.cityId(), request.forecastHorizonDays());
+    }
+
+    static String weather(
+            String version,
+            String alias,
+            WeatherRequest request,
+            String providerLocation,
+            int supplierWindowDays) {
+        String parameters = canonical(version, alias, request.cityId(), providerLocation,
+                request.from().toString(), request.to().toString(),
+                Integer.toString(request.forecastHorizonDays()),
+                Integer.toString(supplierWindowDays));
         return CACHE_NAMESPACE + "weather:" + safe(version) + ":" + safe(alias) + ":p" + digest(parameters);
     }
 

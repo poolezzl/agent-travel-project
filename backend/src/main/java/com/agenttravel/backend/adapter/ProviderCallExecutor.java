@@ -19,6 +19,7 @@ public final class ProviderCallExecutor implements AutoCloseable {
 
     private final Clock clock;
     private final Map<ProviderKind, ProviderPolicy> policies;
+    private final ProviderCallMetrics metrics;
     private final Map<ProviderKind, CircuitState> circuits = new EnumMap<>(ProviderKind.class);
     private final Map<ProviderKind, WindowState> rateWindows = new EnumMap<>(ProviderKind.class);
     private final Map<ProviderKind, WindowState> quotaWindows = new EnumMap<>(ProviderKind.class);
@@ -29,11 +30,19 @@ public final class ProviderCallExecutor implements AutoCloseable {
     });
 
     public ProviderCallExecutor(Map<ProviderKind, ProviderPolicy> policies) {
-        this(policies, Clock.systemUTC());
+        this(policies, Clock.systemUTC(), ProviderCallMetrics.noop());
     }
 
     public ProviderCallExecutor(Map<ProviderKind, ProviderPolicy> policies, Clock clock) {
+        this(policies, clock, ProviderCallMetrics.noop());
+    }
+
+    public ProviderCallExecutor(
+            Map<ProviderKind, ProviderPolicy> policies,
+            Clock clock,
+            ProviderCallMetrics metrics) {
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.metrics = Objects.requireNonNull(metrics, "metrics");
         this.policies = new EnumMap<>(ProviderKind.class);
         this.policies.putAll(policies);
         for (ProviderKind kind : ProviderKind.values()) {
@@ -51,8 +60,11 @@ public final class ProviderCallExecutor implements AutoCloseable {
             boolean circuitAdmitted = false;
             boolean operationStarted = false;
             try {
-                circuit.admit(provider, clock.instant());
+                boolean halfOpen = circuit.admit(provider, clock.instant());
                 circuitAdmitted = true;
+                if (halfOpen) {
+                    metrics.circuitHalfOpened(provider);
+                }
                 admitRateAndQuota(provider, policy);
                 operationStarted = true;
                 T result = invoke(provider, operation, policy.timeout());
@@ -61,8 +73,11 @@ public final class ProviderCallExecutor implements AutoCloseable {
             } catch (ProviderException exception) {
                 if (circuitAdmitted) {
                     if (operationStarted) {
+                        metrics.providerFailed(provider, exception.code());
                         circuit.failure(exception.code());
-                        circuit.openIfNeeded(policy, clock.instant());
+                        if (circuit.openIfNeeded(policy, clock.instant())) {
+                            metrics.circuitOpened(provider);
+                        }
                     } else {
                         circuit.cancelProbe();
                     }
@@ -70,6 +85,7 @@ public final class ProviderCallExecutor implements AutoCloseable {
                 if (!exception.retryable() || attempt == policy.maxRetries()) {
                     throw exception;
                 }
+                metrics.retry(provider);
                 pause(provider, policy.retryBackoff());
             }
         }
@@ -98,9 +114,11 @@ public final class ProviderCallExecutor implements AutoCloseable {
     private void admitRateAndQuota(ProviderKind provider, ProviderPolicy policy) {
         Instant now = clock.instant();
         if (!rateWindows.get(provider).allow(now, Duration.ofSeconds(1), policy.rateLimitPerSecond())) {
+            metrics.localRateLimited(provider);
             throw new ProviderException(provider, ProviderErrorCode.RATE_LIMITED, "供应商请求频率受限");
         }
         if (!quotaWindows.get(provider).allow(now, policy.quotaWindow(), policy.quotaPerWindow())) {
+            metrics.quotaExceeded(provider);
             throw new ProviderException(provider, ProviderErrorCode.QUOTA_EXCEEDED, "供应商配额已用尽");
         }
     }
@@ -127,14 +145,15 @@ public final class ProviderCallExecutor implements AutoCloseable {
         private Instant openUntil;
         private boolean probeInFlight;
 
-        synchronized void admit(ProviderKind provider, Instant now) {
+        synchronized boolean admit(ProviderKind provider, Instant now) {
             if (openUntil == null) {
-                return;
+                return false;
             }
             if (now.isBefore(openUntil) || probeInFlight) {
                 throw new ProviderException(provider, ProviderErrorCode.CIRCUIT_OPEN, "供应商熔断中");
             }
             probeInFlight = true;
+            return true;
         }
 
         synchronized void success() {
@@ -161,10 +180,13 @@ public final class ProviderCallExecutor implements AutoCloseable {
             probeInFlight = false;
         }
 
-        synchronized void openIfNeeded(ProviderPolicy policy, Instant now) {
-            if (failures >= policy.circuitFailureThreshold()) {
+        synchronized boolean openIfNeeded(ProviderPolicy policy, Instant now) {
+            if (failures >= policy.circuitFailureThreshold()
+                    && (openUntil == null || !now.isBefore(openUntil))) {
                 openUntil = now.plus(policy.circuitOpenDuration());
+                return true;
             }
+            return false;
         }
     }
 

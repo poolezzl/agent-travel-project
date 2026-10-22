@@ -1,6 +1,8 @@
 package com.agenttravel.backend.adapter;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -32,6 +34,7 @@ public class AdapterProperties {
     private String qweatherApiKey = "";
     private int qweatherForecastDays = 3;
     private String qweatherZoneId = "Asia/Shanghai";
+    private Map<String, ProviderCityMappingProperties> cities = new LinkedHashMap<>();
 
     public ProviderPolicy policy() {
         return policy(Duration.ofSeconds(routeCacheTtlSeconds));
@@ -242,5 +245,13 @@ public class AdapterProperties {
 
     public void setQweatherZoneId(String qweatherZoneId) {
         this.qweatherZoneId = qweatherZoneId;
+    }
+
+    public Map<String, ProviderCityMappingProperties> getCities() {
+        return cities;
+    }
+
+    public void setCities(Map<String, ProviderCityMappingProperties> cities) {
+        this.cities = cities;
     }
 }

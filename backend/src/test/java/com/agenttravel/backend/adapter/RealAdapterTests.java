@@ -27,6 +27,7 @@ class RealAdapterTests {
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 22);
     private static final URI BASE_URI = URI.create("https://provider.example");
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final AdapterCityRegistry CITY_REGISTRY = cityRegistry();
 
     @Test
     void amapRouteParsesSupplierValuesAndPreservesSource() {
@@ -120,16 +121,17 @@ class RealAdapterTests {
         try (ProviderCallExecutor calls = executor(policy)) {
             RealAmapAdapter adapter = amap(policy, calls, transport);
             ProviderResponse<List<PoiRecord>> response =
-                    adapter.search(new PoiSearchRequest("北京市", "故宫", "110200", 1));
+                    adapter.search(new PoiSearchRequest("beijing", "故宫", "110200", 1));
 
             assertThat(response.value()).hasSize(1);
             assertThat(response.value().get(0).poiId()).isEqualTo("poi-1");
-            assertThat(response.value().get(0).cityId()).isEqualTo("北京市");
+            assertThat(response.value().get(0).cityId()).isEqualTo("beijing");
             assertThat(response.value().get(0).coordinateSystem()).isEqualTo("GCJ02");
             assertThat(response.value().get(0).source().estimated()).isFalse();
             assertThat(response.degraded()).isTrue();
             assertThat(response.degradationCode()).isEqualTo(ProviderErrorCode.DIRTY_DATA);
             assertThat(transport.requests.get(0).uri().getQuery())
+                    .contains("city=110000")
                     .contains("city_limit=true")
                     .contains("types=110200");
         }
@@ -141,7 +143,7 @@ class RealAdapterTests {
         StubTransport empty = StubTransport.json("{\"status\":\"1\",\"pois\":[]}");
         try (ProviderCallExecutor calls = executor(policy)) {
             RealAmapAdapter adapter = amap(policy, calls, empty);
-            PoiSearchRequest request = new PoiSearchRequest("北京市", "空结果", "any", 1);
+            PoiSearchRequest request = new PoiSearchRequest("beijing", "空结果", "any", 1);
             assertProviderCode(() -> adapter.search(request), ProviderErrorCode.EMPTY_RESULT);
             assertProviderCode(() -> adapter.search(request), ProviderErrorCode.EMPTY_RESULT);
             assertThat(empty.requests).hasSize(1);
@@ -150,7 +152,7 @@ class RealAdapterTests {
         StubTransport dirty = StubTransport.json("{not-json");
         try (ProviderCallExecutor calls = executor(policy)) {
             RealAmapAdapter adapter = amap(policy, calls, dirty);
-            PoiSearchRequest request = new PoiSearchRequest("北京市", "脏数据", "any", 1);
+            PoiSearchRequest request = new PoiSearchRequest("beijing", "脏数据", "any", 1);
             assertProviderCode(() -> adapter.search(request), ProviderErrorCode.INVALID_RESPONSE);
             assertProviderCode(() -> adapter.search(request), ProviderErrorCode.INVALID_RESPONSE);
             assertThat(dirty.requests).hasSize(1);
@@ -170,7 +172,7 @@ class RealAdapterTests {
         try (ProviderCallExecutor calls = executor(policy)) {
             RealAmapAdapter adapter = amap(policy, calls, transport);
             assertProviderCode(
-                    () -> adapter.search(new PoiSearchRequest("北京市", "故宫", "110200", 1)),
+                    () -> adapter.search(new PoiSearchRequest("beijing", "故宫", "110200", 1)),
                     ProviderErrorCode.DIRTY_DATA);
         }
     }
@@ -181,7 +183,7 @@ class RealAdapterTests {
         ProviderPolicy policy = policy(Duration.ofSeconds(1), 0, 30, 100);
         try (ProviderCallExecutor calls = executor(policy)) {
             RealQWeatherAdapter adapter = weather(policy, calls, transport, 3);
-            WeatherRequest request = new WeatherRequest("101010100", TODAY, TODAY.plusDays(2), 3);
+            WeatherRequest request = new WeatherRequest("beijing", TODAY, TODAY.plusDays(2), 3);
             ProviderResponse<List<WeatherRecord>> first = adapter.forecast(request);
             ProviderResponse<List<WeatherRecord>> second = adapter.forecast(request);
 
@@ -193,6 +195,8 @@ class RealAdapterTests {
             assertThat(second.cacheHit()).isTrue();
             assertThat(second.source().retrievedAt()).isEqualTo(first.source().retrievedAt());
             assertThat(second.source().validUntil()).isEqualTo(first.source().validUntil());
+            assertThat(first.value().get(0).sourceRecordId())
+                    .isEqualTo("qweather:beijing:2026-10-22:qweather:3d");
             assertThat(transport.requests).hasSize(1);
             assertThat(transport.requests.get(0).uri().getPath()).isEqualTo("/v7/weather/3d");
             assertThat(transport.requests.get(0).uri().getQuery()).contains("location=101010100");
@@ -206,7 +210,7 @@ class RealAdapterTests {
         try (ProviderCallExecutor calls = executor(policy)) {
             RealQWeatherAdapter adapter = weather(policy, calls, transport, 3);
             WeatherRequest partial =
-                    new WeatherRequest("101010100", TODAY, TODAY.plusDays(3), 3);
+                    new WeatherRequest("beijing", TODAY, TODAY.plusDays(3), 3);
             ProviderResponse<List<WeatherRecord>> response = adapter.forecast(partial);
 
             assertThat(response.value()).hasSize(3);
@@ -216,7 +220,7 @@ class RealAdapterTests {
                     .isEqualTo(ProviderErrorCode.FORECAST_WINDOW_OUTSIDE);
 
             WeatherRequest outside =
-                    new WeatherRequest("101010100", TODAY.plusDays(5), TODAY.plusDays(6), 3);
+                    new WeatherRequest("beijing", TODAY.plusDays(5), TODAY.plusDays(6), 3);
             assertProviderCode(
                     () -> adapter.forecast(outside), ProviderErrorCode.FORECAST_WINDOW_OUTSIDE);
         }
@@ -269,11 +273,105 @@ class RealAdapterTests {
         try (ProviderCallExecutor calls = executor(policy)) {
             RealQWeatherAdapter adapter = weather(policy, calls, dirty, 3);
             ProviderResponse<List<WeatherRecord>> response =
-                    adapter.forecast(new WeatherRequest("101010100", TODAY, TODAY.plusDays(2), 3));
+                    adapter.forecast(new WeatherRequest("beijing", TODAY, TODAY.plusDays(2), 3));
 
             assertThat(response.value()).hasSize(2);
             assertThat(response.degraded()).isTrue();
             assertThat(response.degradationCode()).isEqualTo(ProviderErrorCode.DIRTY_DATA);
+        }
+    }
+
+    @Test
+    void weatherRecordsExpireIndividuallyAcrossMidnight() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-10-22T15:55:00Z"));
+        AtomicInteger attempts = new AtomicInteger();
+        StubTransport transport =
+                new StubTransport(
+                        () ->
+                                attempts.getAndIncrement() == 0
+                                        ? new ProviderHttpResponse(200, qweatherBody(TODAY))
+                                        : new ProviderHttpResponse(503, "{}"));
+        ProviderPolicy policy = policy(Duration.ofSeconds(1), 0, 30, 100, Duration.ofHours(1));
+        try (ProviderCallExecutor calls = executor(policy, clock)) {
+            RealQWeatherAdapter adapter = weather(policy, calls, transport, 3, clock);
+            WeatherRequest request = new WeatherRequest("beijing", TODAY, TODAY.plusDays(2), 3);
+            ProviderResponse<List<WeatherRecord>> first = adapter.forecast(request);
+            assertThat(first.value()).allMatch(
+                    record -> record.freshnessStatus() == FreshnessStatus.FRESH);
+
+            clock.advance(Duration.ofMinutes(10));
+            ProviderResponse<List<WeatherRecord>> second = adapter.forecast(request);
+
+            assertThat(second.cacheHit()).isTrue();
+            assertThat(second.value().get(0).freshnessStatus())
+                    .as("第二条天气为 %s", second.value().get(0))
+                    .isEqualTo(FreshnessStatus.STALE);
+            assertThat(second.value().get(1).freshnessStatus()).isEqualTo(FreshnessStatus.FRESH);
+            assertThat(second.source().freshnessStatus()).isEqualTo(FreshnessStatus.STALE);
+            assertThat(second.source().validUntil()).isEqualTo(second.value().get(0).validUntil());
+            assertThat(second.degraded()).isTrue();
+        }
+    }
+
+    @Test
+    void weatherUnknownDailyValidityIsNeverReportedFresh() {
+        ProviderPolicy policy = policy(Duration.ofSeconds(1), 0, 30, 100, Duration.ofHours(1));
+        WeatherRequest request = new WeatherRequest("beijing", TODAY, TODAY, 3);
+        InMemoryProviderCache<List<WeatherRecord>> cache = new InMemoryProviderCache<>();
+        String key =
+                AdapterCacheKeys.weather(
+                        policy.cacheVersion(), "qweather", request, "101010100", 3);
+        WeatherRecord record =
+                new WeatherRecord(
+                        TODAY,
+                        15,
+                        25,
+                        0.2,
+                        "晴",
+                        "forecast",
+                        "qweather:beijing:2026-10-22:qweather:3d",
+                        NOW,
+                        null,
+                        FreshnessStatus.UNKNOWN);
+        ProviderSource source =
+                new ProviderSource(
+                        "qweather",
+                        "unknown-weather",
+                        NOW,
+                        null,
+                        FreshnessStatus.UNKNOWN,
+                        false);
+        cache.restore(key, CacheEntry.value(List.of(record), source, NOW.plusSeconds(3600)));
+        StubTransport unavailable = StubTransport.status(503, "{}");
+
+        try (ProviderCallExecutor calls = executor(policy)) {
+            RealQWeatherAdapter adapter =
+                    weather(policy, calls, unavailable, 3, CLOCK, cache);
+            ProviderResponse<List<WeatherRecord>> response = adapter.forecast(request);
+
+            assertThat(response.cacheHit()).isTrue();
+            assertThat(response.value().get(0).freshnessStatus()).isEqualTo(FreshnessStatus.UNKNOWN);
+            assertThat(response.source().freshnessStatus()).isEqualTo(FreshnessStatus.UNKNOWN);
+            assertThat(response.source().validUntil()).isNull();
+            assertThat(response.degraded()).isTrue();
+        }
+    }
+
+    @Test
+    void missingStandardCityMappingFailsBeforeProviderAccess() {
+        ProviderPolicy policy = policy(Duration.ofSeconds(1), 0, 30, 100);
+        StubTransport transport = StubTransport.json("{}");
+        try (ProviderCallExecutor calls = executor(policy)) {
+            RealAmapAdapter amap = amap(policy, calls, transport);
+            assertProviderCode(
+                    () -> amap.search(new PoiSearchRequest("shanghai", "外滩", "any", 1)),
+                    ProviderErrorCode.INVALID_REQUEST);
+
+            RealQWeatherAdapter weather = weather(policy, calls, transport, 3);
+            assertProviderCode(
+                    () -> weather.forecast(new WeatherRequest("shanghai", TODAY, TODAY, 3)),
+                    ProviderErrorCode.INVALID_REQUEST);
+            assertThat(transport.requests).isEmpty();
         }
     }
 
@@ -307,6 +405,7 @@ class RealAdapterTests {
                             CLOCK,
                             calls,
                             unavailable,
+                            CITY_REGISTRY,
                             MAPPER,
                             routeCache,
                             new InMemoryProviderCache<>());
@@ -374,6 +473,7 @@ class RealAdapterTests {
                 CLOCK,
                 calls,
                 transport,
+                CITY_REGISTRY,
                 MAPPER,
                 new InMemoryProviderCache<>(),
                 new InMemoryProviderCache<>());
@@ -384,6 +484,31 @@ class RealAdapterTests {
             ProviderCallExecutor calls,
             ProviderHttpTransport transport,
             int forecastDays) {
+        return weather(policy, calls, transport, forecastDays, CLOCK);
+    }
+
+    private RealQWeatherAdapter weather(
+            ProviderPolicy policy,
+            ProviderCallExecutor calls,
+            ProviderHttpTransport transport,
+            int forecastDays,
+            Clock clock) {
+        return weather(
+                policy,
+                calls,
+                transport,
+                forecastDays,
+                clock,
+                new InMemoryProviderCache<>());
+    }
+
+    private RealQWeatherAdapter weather(
+            ProviderPolicy policy,
+            ProviderCallExecutor calls,
+            ProviderHttpTransport transport,
+            int forecastDays,
+            Clock clock,
+            InMemoryProviderCache<List<WeatherRecord>> cache) {
         return new RealQWeatherAdapter(
                 "qweather",
                 BASE_URI,
@@ -392,10 +517,11 @@ class RealAdapterTests {
                 "Asia/Shanghai",
                 MAPPER,
                 policy,
-                CLOCK,
+                clock,
                 calls,
                 transport,
-                new InMemoryProviderCache<>());
+                CITY_REGISTRY,
+                cache);
     }
 
     private RouteRequest route(String coordinateSystem, String mode) {
@@ -408,10 +534,26 @@ class RealAdapterTests {
     }
 
     private WeatherRequest todayRequest() {
-        return new WeatherRequest("101010100", TODAY, TODAY, 3);
+        return new WeatherRequest("beijing", TODAY, TODAY, 3);
+    }
+
+    private static AdapterCityRegistry cityRegistry() {
+        return new AdapterCityRegistry(
+                Map.of(
+                        "beijing",
+                        new ProviderCityMappingProperties("110000", "010", "101010100")));
     }
 
     private ProviderPolicy policy(Duration timeout, int retries, int rateLimit, int quota) {
+        return policy(timeout, retries, rateLimit, quota, Duration.ofMinutes(5));
+    }
+
+    private ProviderPolicy policy(
+            Duration timeout,
+            int retries,
+            int rateLimit,
+            int quota,
+            Duration cacheTtl) {
         return new ProviderPolicy(
                 timeout,
                 retries,
@@ -421,17 +563,21 @@ class RealAdapterTests {
                 rateLimit,
                 quota,
                 Duration.ofHours(1),
-                Duration.ofMinutes(5),
+                cacheTtl,
                 Duration.ofSeconds(10),
                 "v1");
     }
 
     private ProviderCallExecutor executor(ProviderPolicy policy) {
+        return executor(policy, CLOCK);
+    }
+
+    private ProviderCallExecutor executor(ProviderPolicy policy, Clock clock) {
         Map<ProviderKind, ProviderPolicy> policies = new EnumMap<>(ProviderKind.class);
         for (ProviderKind kind : ProviderKind.values()) {
             policies.put(kind, policy);
         }
-        return new ProviderCallExecutor(policies, CLOCK);
+        return new ProviderCallExecutor(policies, clock);
     }
 
     private void assertProviderCode(ThrowingCall call, ProviderErrorCode expected) {
@@ -455,6 +601,34 @@ class RealAdapterTests {
     @FunctionalInterface
     private interface ThrowingCall {
         void run();
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        private void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+
+        @Override
+        public ZoneOffset getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(java.time.ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 
     private static final class StubTransport implements ProviderHttpTransport {
