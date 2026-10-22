@@ -3,9 +3,11 @@ package com.agenttravel.backend.adapter;
 public enum ProviderErrorCode {
     TIMEOUT(true),
     RATE_LIMITED(true),
+    PROVIDER_RATE_LIMITED(true),
     QUOTA_EXCEEDED(false),
     AUTHENTICATION_FAILED(false),
     EMPTY_RESULT(false),
+    FORECAST_WINDOW_OUTSIDE(false),
     INVALID_RESPONSE(false),
     DIRTY_DATA(false),
     INVALID_REQUEST(false),

@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 public final class InMemoryProviderCache<T> {
 
     private final ConcurrentMap<String, CacheEntry<T>> entries = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, CompletableFuture<T>> inFlight = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, CompletableFuture<Object>> inFlight = new ConcurrentHashMap<>();
 
     public CacheLookup<T> get(String key, Instant now) {
         CacheEntry<T> entry = entries.get(key);
@@ -51,14 +51,14 @@ public final class InMemoryProviderCache<T> {
         AdapterCacheKeys.versionNamespaces(version).forEach(this::invalidateNamespace);
     }
 
-    public T singleFlight(String key, Supplier<T> loader) {
-        CompletableFuture<T> created = new CompletableFuture<>();
-        CompletableFuture<T> current = inFlight.putIfAbsent(key, created);
+    public <R> R singleFlight(String key, Supplier<R> loader) {
+        CompletableFuture<Object> created = new CompletableFuture<>();
+        CompletableFuture<Object> current = inFlight.putIfAbsent(key, created);
         if (current != null) {
             return join(current);
         }
         try {
-            T value = loader.get();
+            R value = loader.get();
             created.complete(value);
             return value;
         } catch (RuntimeException | Error throwable) {
@@ -79,12 +79,14 @@ public final class InMemoryProviderCache<T> {
 
     private boolean isNegativeCacheable(ProviderErrorCode code) {
         return code == ProviderErrorCode.EMPTY_RESULT || code == ProviderErrorCode.INVALID_RESPONSE
-                || code == ProviderErrorCode.DIRTY_DATA;
+                || code == ProviderErrorCode.DIRTY_DATA
+                || code == ProviderErrorCode.FORECAST_WINDOW_OUTSIDE;
     }
 
-    private T join(CompletableFuture<T> future) {
+    @SuppressWarnings("unchecked")
+    private <R> R join(CompletableFuture<Object> future) {
         try {
-            return future.join();
+            return (R) future.join();
         } catch (CompletionException exception) {
             Throwable cause = exception.getCause();
             if (cause instanceof RuntimeException runtimeException) {
