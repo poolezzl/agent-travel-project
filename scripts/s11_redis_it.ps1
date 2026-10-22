@@ -33,14 +33,8 @@ $port = ([Net.IPEndPoint]$listener.LocalEndpoint).Port
 $listener.Stop()
 
 try {
-    $arguments = @(
-        "--port", "$port",
-        "--bind", "127.0.0.1",
-        "--dir", $dataDir,
-        "--save", "",
-        "--appendonly", "no"
-    )
-    $redisProcess = Start-Process -FilePath $redisServer -ArgumentList $arguments -WindowStyle Hidden `
+    $argumentLine = "--port $port --bind 127.0.0.1 --dir `"$dataDir`" --save `"`" --appendonly no"
+    $redisProcess = Start-Process -FilePath $redisServer -ArgumentList $argumentLine -WindowStyle Hidden `
         -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
     $ready = $false
     for ($attempt = 0; $attempt -lt 40; $attempt++) {

@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.agenttravel.backend.common.ApiException;
@@ -517,7 +518,7 @@ class S11TaskUnitTests {
     }
 
     @Test
-    void concurrentPollsSendEachEventOnlyOnceForOneSubscriber() throws Exception {
+    void concurrentPollsFromSameCursorAdvanceOnceAndSendOnce() throws Exception {
         TaskRepository repository = mock(TaskRepository.class);
         TaskService taskService = mock(TaskService.class);
         TaskProperties properties = new TaskProperties();
@@ -529,10 +530,13 @@ class S11TaskUnitTests {
         TaskRepository.TaskRow task = task(taskId, userId, TaskStatus.PARSING, 3, 10);
         TaskModels.TaskEventView event = new TaskModels.TaskEventView(1, "TASK_STATUS_CHANGED",
                 "PARSING", "parse", 1, "开始", List.of(), Instant.now());
+        AtomicBoolean initialPoll = new AtomicBoolean();
         when(taskService.requireVisible(userId, "USER", taskId)).thenReturn(task);
         when(repository.findTask(taskId)).thenReturn(task);
         when(repository.eventsAfter(eq(taskId), eq(0L), eq(properties.getSseBatchSize())))
-                .thenReturn(List.of(), List.of(event), List.of());
+                .thenAnswer(invocation -> initialPoll.getAndSet(true) ? List.of(event) : List.of());
+        when(repository.eventsAfter(eq(taskId), eq(1L), eq(properties.getSseBatchSize())))
+                .thenReturn(List.of());
 
         stream.subscribe(userId, "USER", taskId, 0);
         CountDownLatch start = new CountDownLatch(1);
@@ -556,6 +560,9 @@ class S11TaskUnitTests {
         }
 
         assertThat(emitter.sendCount()).isEqualTo(1);
+        verify(repository, org.mockito.Mockito.times(2)).eventsAfter(eq(taskId), eq(0L),
+                eq(properties.getSseBatchSize()));
+        verify(repository).eventsAfter(eq(taskId), eq(1L), eq(properties.getSseBatchSize()));
     }
 
     @Test
