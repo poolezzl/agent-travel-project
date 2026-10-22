@@ -24,6 +24,14 @@ public class AdapterProperties {
     private int poiCacheTtlSeconds = 2592000;
     private int negativeCacheTtlSeconds = 15;
     private String cacheVersion = "v1";
+    private int connectTimeoutMs = 1000;
+    private int httpMaxResponseBytes = 1_048_576;
+    private String amapBaseUrl = "https://restapi.amap.com";
+    private String amapWebKey = "";
+    private String qweatherApiHost = "";
+    private String qweatherApiKey = "";
+    private int qweatherForecastDays = 3;
+    private String qweatherZoneId = "Asia/Shanghai";
 
     public ProviderPolicy policy() {
         return policy(Duration.ofSeconds(routeCacheTtlSeconds));
@@ -170,5 +178,69 @@ public class AdapterProperties {
 
     public void setCacheVersion(String cacheVersion) {
         this.cacheVersion = cacheVersion;
+    }
+
+    public int getConnectTimeoutMs() {
+        return connectTimeoutMs;
+    }
+
+    public void setConnectTimeoutMs(int connectTimeoutMs) {
+        this.connectTimeoutMs = connectTimeoutMs;
+    }
+
+    public int getHttpMaxResponseBytes() {
+        return httpMaxResponseBytes;
+    }
+
+    public void setHttpMaxResponseBytes(int httpMaxResponseBytes) {
+        this.httpMaxResponseBytes = httpMaxResponseBytes;
+    }
+
+    public String getAmapBaseUrl() {
+        return amapBaseUrl;
+    }
+
+    public void setAmapBaseUrl(String amapBaseUrl) {
+        this.amapBaseUrl = amapBaseUrl;
+    }
+
+    public String getAmapWebKey() {
+        return amapWebKey;
+    }
+
+    public void setAmapWebKey(String amapWebKey) {
+        this.amapWebKey = amapWebKey;
+    }
+
+    public String getQweatherApiHost() {
+        return qweatherApiHost;
+    }
+
+    public void setQweatherApiHost(String qweatherApiHost) {
+        this.qweatherApiHost = qweatherApiHost;
+    }
+
+    public String getQweatherApiKey() {
+        return qweatherApiKey;
+    }
+
+    public void setQweatherApiKey(String qweatherApiKey) {
+        this.qweatherApiKey = qweatherApiKey;
+    }
+
+    public int getQweatherForecastDays() {
+        return qweatherForecastDays;
+    }
+
+    public void setQweatherForecastDays(int qweatherForecastDays) {
+        this.qweatherForecastDays = qweatherForecastDays;
+    }
+
+    public String getQweatherZoneId() {
+        return qweatherZoneId;
+    }
+
+    public void setQweatherZoneId(String qweatherZoneId) {
+        this.qweatherZoneId = qweatherZoneId;
     }
 }

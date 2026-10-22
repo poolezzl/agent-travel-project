@@ -41,6 +41,14 @@ app:
     poi-cache-ttl-seconds: "${ADAPTER_POI_CACHE_TTL_SECONDS:2592000}"
     negative-cache-ttl-seconds: "${ADAPTER_NEGATIVE_CACHE_TTL_SECONDS:15}"
     cache-version: "${ADAPTER_CACHE_VERSION:v1}"
+    connect-timeout-ms: "${ADAPTER_CONNECT_TIMEOUT_MS:1000}"
+    http-max-response-bytes: "${ADAPTER_HTTP_MAX_RESPONSE_BYTES:1048576}"
+    amap-base-url: "${AMAP_BASE_URL:https://restapi.amap.com}"
+    amap-web-key: "${AMAP_WEB_KEY:}"
+    qweather-api-host: "${QWEATHER_API_HOST:}"
+    qweather-api-key: "${QWEATHER_API_KEY:}"
+    qweather-forecast-days: "${QWEATHER_FORECAST_DAYS:3}"
+    qweather-zone-id: "${QWEATHER_ZONE_ID:Asia/Shanghai}"
   database:
     mode: mysql
     charset: utf8mb4
