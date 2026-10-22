@@ -56,4 +56,11 @@ class BackendApplicationTests {
                 .andExpect(jsonPath("$.components.db").doesNotExist())
                 .andExpect(jsonPath("$.components.flyway").doesNotExist());
     }
+
+    @Test
+    void metricsEndpointIsExposed() throws Exception {
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.names").isArray());
+    }
 }

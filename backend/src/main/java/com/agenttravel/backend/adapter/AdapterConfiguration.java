@@ -1,6 +1,7 @@
 package com.agenttravel.backend.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.time.Clock;
 import java.util.EnumMap;
@@ -23,8 +24,8 @@ public class AdapterConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(ProviderCallMetrics.class)
-    ProviderCallMetrics providerCallMetrics() {
-        return ProviderCallMetrics.noop();
+    ProviderCallMetrics providerCallMetrics(MeterRegistry meterRegistry) {
+        return new MicrometerProviderCallMetrics(meterRegistry);
     }
 
     @Bean
