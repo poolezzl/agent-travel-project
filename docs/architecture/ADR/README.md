@@ -15,3 +15,4 @@
 | [0009](0009-object-storage.md) | 受控对象文件 | Accepted |
 | [0010](0010-bare-metal-deployment.md) | 裸机主部署 | Accepted |
 | [0011](0011-constraint-and-confirmation-policy.md) | 硬约束与人工确认 | Accepted |
+| [0012](0012-python-llm-gateway-provider-boundary.md) | Python 统一 LLM Gateway 的供应商访问边界 | Accepted |
