@@ -2,6 +2,7 @@ package com.agenttravel.backend.adapter;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -11,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.zip.GZIPInputStream;
 
 public final class JavaProviderHttpTransport implements ProviderHttpTransport {
 
@@ -72,10 +74,27 @@ public final class JavaProviderHttpTransport implements ProviderHttpTransport {
                 throw new ProviderTransportException(
                         ProviderErrorCode.INVALID_RESPONSE, "供应商响应超过大小上限", null);
             }
-            return new String(bytes, StandardCharsets.UTF_8);
+            return new String(decodeBody(bytes, maxResponseBytes), StandardCharsets.UTF_8);
         } catch (IOException exception) {
             throw new ProviderTransportException(
                     ProviderErrorCode.UNAVAILABLE, "读取供应商响应失败", exception);
+        }
+    }
+
+    static byte[] decodeBody(byte[] body, int maxDecodedBytes) {
+        if (body.length < 2 || (body[0] & 0xff) != 0x1f || (body[1] & 0xff) != 0x8b) {
+            return body;
+        }
+        try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(body))) {
+            byte[] decoded = gzip.readNBytes(maxDecodedBytes + 1);
+            if (decoded.length > maxDecodedBytes) {
+                throw new ProviderTransportException(
+                        ProviderErrorCode.INVALID_RESPONSE, "供应商解压响应超过大小上限", null);
+            }
+            return decoded;
+        } catch (IOException exception) {
+            throw new ProviderTransportException(
+                    ProviderErrorCode.INVALID_RESPONSE, "供应商压缩响应无效", exception);
         }
     }
 
