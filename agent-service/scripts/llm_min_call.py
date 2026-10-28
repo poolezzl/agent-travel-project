@@ -6,11 +6,14 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from app.core.config import get_llm_settings
-from app.llm.factory import create_llm_provider
-from app.llm.models import LLMRequest
-from app.llm.openai_provider import LLMProviderError
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.core.config import get_llm_settings  # noqa: E402
+from app.llm.factory import create_llm_provider  # noqa: E402
+from app.llm.models import LLMRequest  # noqa: E402
+from app.llm.openai_provider import LLMProviderError  # noqa: E402
 
 MAX_OUTPUT_TOKENS = 16
 PROMPT = "请只回复 OK"

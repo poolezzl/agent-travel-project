@@ -19,6 +19,14 @@ spring:
     validate-on-migrate: true
     baseline-on-migrate: false
     clean-disabled: true
+  data:
+    redis:
+      host: "${REDIS_HOST:127.0.0.1}"
+      port: "${REDIS_PORT:6379}"
+      password: "${REDIS_PASSWORD:}"
+      database: "${REDIS_DATABASE:0}"
+      timeout: "${REDIS_TIMEOUT:2s}"
+      connect-timeout: "${REDIS_CONNECT_TIMEOUT:2s}"
 
 app:
   external-services:
@@ -99,6 +107,32 @@ app:
     jwt-secret: "${JWT_SECRET:}"
     access-token-seconds: "${ACCESS_TOKEN_SECONDS:900}"
     refresh-token-days: "${REFRESH_TOKEN_DAYS:30}"
+  s11:
+    enabled: "${S11_ENABLED:true}"
+    operation-timeout-seconds: "${S11_OPERATION_TIMEOUT_SECONDS:180}"
+    confirmation-timeout-hours: "${S11_CONFIRMATION_TIMEOUT_HOURS:24}"
+    lease-seconds: "${S11_LEASE_SECONDS:30}"
+    heartbeat-seconds: "${S11_HEARTBEAT_SECONDS:10}"
+    heartbeat-interval-ms: "${S11_HEARTBEAT_INTERVAL_MS:10000}"
+    max-step-attempts: "${S11_MAX_STEP_ATTEMPTS:3}"
+    outbox-batch-size: "${S11_OUTBOX_BATCH_SIZE:20}"
+    outbox-max-attempts: "${S11_OUTBOX_MAX_ATTEMPTS:5}"
+    relay-interval-ms: "${S11_RELAY_INTERVAL_MS:500}"
+    relay-enabled: "${S11_RELAY_ENABLED:true}"
+    consumer-enabled: "${S11_CONSUMER_ENABLED:true}"
+    heartbeat-scheduler-enabled: "${S11_HEARTBEAT_SCHEDULER_ENABLED:true}"
+    sse-scheduler-enabled: "${S11_SSE_SCHEDULER_ENABLED:true}"
+    replay-interval-seconds: "${S11_REPLAY_INTERVAL_SECONDS:30}"
+    replay-after-seconds: "${S11_REPLAY_AFTER_SECONDS:10}"
+    consumer-interval-ms: "${S11_CONSUMER_INTERVAL_MS:250}"
+    consumer-batch-size: "${S11_CONSUMER_BATCH_SIZE:10}"
+    reconnect-source-freshness-seconds: "${S11_RECONNECT_SOURCE_FRESHNESS_SECONDS:3600}"
+    sse-timeout-ms: "${S11_SSE_TIMEOUT_MS:120000}"
+    sse-poll-interval-ms: "${S11_SSE_POLL_INTERVAL_MS:500}"
+    sse-batch-size: "${S11_SSE_BATCH_SIZE:100}"
+    sse-max-subscribers: "${S11_SSE_MAX_SUBSCRIBERS:100}"
+    worker-group: "${S11_WORKER_GROUP:s11-workers-v1}"
+    worker-name: "${S11_WORKER_NAME:backend-worker}"
 
 management:
   endpoints:
