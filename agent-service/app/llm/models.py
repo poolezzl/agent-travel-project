@@ -43,7 +43,11 @@ class LLMCallMetadata(BaseModel):
     status: Literal["success", "error", "timeout", "rate_limited"] = Field(
         ..., description="Call outcome"
     )
-    error_message: str | None = Field(default=None, description="Error if failed")
+    error_code: str | None = Field(
+        default=None,
+        description="Stable sanitized provider error code",
+    )
+    error_message: str | None = Field(default=None, description="Sanitized error if failed")
     prompt_tokens: int | None = Field(default=None, ge=0)
     completion_tokens: int | None = Field(default=None, ge=0)
     total_tokens: int | None = Field(default=None, ge=0)

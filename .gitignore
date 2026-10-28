@@ -25,6 +25,7 @@ __pycache__/
 .venv/
 .venv-*/
 venv/
+/agent-service/.llm_min_call.used
 
 # Frontend
 frontend/node_modules/
