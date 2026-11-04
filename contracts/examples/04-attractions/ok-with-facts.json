@@ -1,0 +1,40 @@
+{
+  "schema_version": "agent-contract-v1",
+  "task_id": "task-r3-demo",
+  "trace_id": "trace-r3-demo",
+  "request_id": "req-04-facts",
+  "generated_at": "2026-10-29T00:00:00Z",
+  "status": "ok",
+  "source_metadata": [
+    {
+      "source_type": "knowledge_base",
+      "source_record_id": "SRC-BJ-001",
+      "retrieved_at": "2026-10-20T09:00:00+08:00",
+      "valid_until": "2027-12-31T23:59:59+08:00",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "cards": [
+    {
+      "point_id": "POI-BJ-001",
+      "source": "knowledge_base",
+      "knowledge_id": "KN-BJ-001",
+      "chunk_ids": ["CHUNK-BJ-001-01", "CHUNK-BJ-001-02"],
+      "retrieved_at": "2026-10-20T09:00:00+08:00",
+      "valid_until": "2027-12-31T23:59:59+08:00",
+      "freshness_status": "fresh",
+      "highlights": ["中轴线上的宫殿群适合按午门—太和殿—御花园的顺序参观。"],
+      "avoid_tips": ["周一通常闭馆，节假日安排请以官方公告为准。"],
+      "suggested_duration": "建议预留 3 到 4 小时，旺季适当增加排队时间。",
+      "facts": [
+        {
+          "fact_type": "highlights",
+          "value": "中轴线上的宫殿群适合按午门—太和殿—御花园的顺序参观。",
+          "chunk_id": "CHUNK-BJ-001-01",
+          "source_record_id": "SRC-BJ-001"
+        }
+      ]
+    }
+  ]
+}

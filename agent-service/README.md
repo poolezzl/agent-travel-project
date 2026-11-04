@@ -52,8 +52,25 @@ Windows Git Bash 激活命令：
 | `AGENT_SERVICE_NAME` | `travelstar-agent-service` | 服务名称 |
 | `AGENT_SERVICE_HOST` | `127.0.0.1` | 监听地址 |
 | `AGENT_SERVICE_PORT` | `8000` | 端口范围 1-65535 |
+| `AGENT_KNOWLEDGE_CATALOG` | `resources/published_catalog.json` | S15 已发布知识/规则快照 |
+| `KNOWLEDGE_SERVICE_BASE_URL` | `http://127.0.0.1:8080` | Java S15 内部只读接口地址 |
 
 不得提交本地 `.env`、API Key、访问令牌或供应商原始响应。
+
+## S15-S17 R3 Agent API
+
+- `POST /v1/agents/attractions/invoke`：景点资讯 Agent（S16），只读已发布知识快照并返回 `knowledge_id/chunk_ids/facts/source_metadata`。
+- `POST /v1/agents/reservation-rules/invoke`：预约规则 Agent（S17），只读已发布规则并生成可去重提醒；`stale`、缺规则、已错过放票时间均显式降级。
+- `GET /v1/agents/catalog`：仅返回快照版本与数量，不返回事实正文。
+- 请求体可直接使用 `input.schema.json`，也可包在 `{task_id, trace_id, request_id, input}` 中；Agent 不会修改网关注入的封套字段。
+- 本地离线快照来自 `resources/published_catalog.json`，全部为合成样例，不代表真实票价或政策。生产环境应切换到 Java S15 已发布数据/Chroma 索引。
+
+R3 测试（不依赖 FastAPI/httpx）：
+
+    python -m unittest discover -s tests -p "test_catalog.py"
+    python -m unittest discover -s tests -p "test_attractions_agent.py"
+    python -m unittest discover -s tests -p "test_reservation_agent.py"
+    python -m unittest discover -s tests -p "test_rag.py"
 
 ## R4 一次性真实模型最小调用
 

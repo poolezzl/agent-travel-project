@@ -31,6 +31,54 @@
     "cards": {
       "items": {
         "properties": {
+          "avoid_tips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "best_time": {
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "chunk_id": {
+                  "type": "string"
+                },
+                "fact_type": {
+                  "type": "string"
+                },
+                "source_record_id": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "fact_type",
+                "value",
+                "chunk_id",
+                "source_record_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "highlights": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "popularity": {
+            "type": "string"
+          },
+          "suggested_duration": {
+            "type": "string"
+          },
           "knowledge_id": {
             "type": "string"
           },

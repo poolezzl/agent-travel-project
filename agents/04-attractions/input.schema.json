@@ -11,6 +11,10 @@
     }
   },
   "properties": {
+    "city_id": {
+      "minLength": 1,
+      "type": "string"
+    },
     "preference_tags": {
       "items": {
         "type": "string"

@@ -27,7 +27,10 @@
 | S09 | 进行中（待独立整体验收） | [S09.md](S09.md) |
 | S10 | 已完成 | [S10.md](S10.md)、[S10-Gate.md](S10-Gate.md) |
 | S11 | 已完成 | [S11.md](S11.md)、[S11-Gate.md](S11-Gate.md) |
-| S12-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
+| S15 | 进行中（Python RAG/快照已完成；Java 运营接口与真实 MySQL 验证 PENDING） | [S15.md](S15.md) |
+| S16 | 已完成（离线 Agent；Chroma/Java 联调 PENDING） | [S16.md](S16.md) |
+| S17 | 已完成（离线 Agent；Java 规则库联调 PENDING） | [S17.md](S17.md) |
+| S12-S14、S18-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容
 

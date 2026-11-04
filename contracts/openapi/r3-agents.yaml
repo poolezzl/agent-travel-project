@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: R3 Attractions and Reservation Agent API
+  version: agent-contract-v1
+  description: >
+    Local Agent service endpoints for S16 (attractions) and S17 (reservation
+    rules). Responses follow the frozen agent envelope in
+    agents/04-attractions/output.schema.json and
+    agents/06-reservation-rules/output.schema.json.
+servers:
+  - url: http://127.0.0.1:8000
+paths:
+  /v1/agents/attractions/invoke:
+    post:
+      operationId: invokeAttractionsAgent
+      tags: [r3-agents]
+      summary: Return cited attraction cards from the published knowledge snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInvocation'
+      responses:
+        '200':
+          description: Agent envelope (status is ok/partial/degraded/failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentEnvelope'
+  /v1/agents/reservation-rules/invoke:
+    post:
+      operationId: invokeReservationRulesAgent
+      tags: [r3-agents]
+      summary: Return reservation cards and reminder candidates from published rules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInvocation'
+      responses:
+        '200':
+          description: Agent envelope (status is ok/partial/degraded/failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentEnvelope'
+  /v1/agents/catalog:
+    get:
+      operationId: getCatalogStatus
+      tags: [r3-agents]
+      summary: Non-sensitive published snapshot metadata
+      responses:
+        '200':
+          description: Catalog version and counts only
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [catalog_version, poi_count, published_entry_count, published_rule_count]
+                properties:
+                  catalog_version: { type: string }
+                  poi_count: { type: integer, minimum: 0 }
+                  published_entry_count: { type: integer, minimum: 0 }
+                  published_rule_count: { type: integer, minimum: 0 }
+components:
+  schemas:
+    AgentInvocation:
+      type: object
+      description: >
+        Either the bare input.schema.json object, or a gateway wrapper with
+        task/trace/request identifiers. Agents never invent or overwrite these.
+      properties:
+        schema_version: { type: string, pattern: '^agent-contract-v[0-9]+$' }
+        task_id: { type: string }
+        trace_id: { type: string }
+        request_id: { type: string }
+        generated_at: { type: string, format: date-time }
+        input:
+          type: object
+          description: Input matching agents/0x-*/input.schema.json
+      additionalProperties: true
+    SourceMetadata:
+      type: object
+      additionalProperties: false
+      required: [source_type, source_record_id, retrieved_at]
+      properties:
+        source_type:
+          type: string
+          enum: [map, weather, knowledge_base, reservation_rule, poi, user_input, system]
+        source_record_id: { type: string }
+        retrieved_at: { type: string, format: date-time }
+        valid_until: { type: string, format: date-time, nullable: true }
+        freshness_status: { type: string, enum: [fresh, stale, unknown] }
+        is_estimated: { type: boolean }
+    AgentEnvelope:
+      type: object
+      required:
+        - schema_version
+        - task_id
+        - trace_id
+        - request_id
+        - generated_at
+        - status
+        - source_metadata
+      properties:
+        schema_version: { type: string, pattern: '^agent-contract-v[0-9]+$' }
+        task_id: { type: string }
+        trace_id: { type: string }
+        request_id: { type: string }
+        generated_at: { type: string, format: date-time }
+        status: { type: string, enum: [ok, partial, degraded, failed] }
+        message: { type: string }
+        error_code: { type: string, pattern: '^[A-Z][A-Z0-9_]*$' }
+        degraded_fields:
+          type: array
+          minItems: 1
+          items: { type: string }
+        source_metadata:
+          type: array
+          items: { $ref: '#/components/schemas/SourceMetadata' }
+        cards:
+          type: array
+          items: { type: object, additionalProperties: true }
+        reservations:
+          type: array
+          items: { type: object, additionalProperties: true }
+        timeline:
+          type: array
+          items: { type: object, additionalProperties: true }
+      additionalProperties: true

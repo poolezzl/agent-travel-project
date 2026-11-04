@@ -70,6 +70,21 @@
           },
           "stale": {
             "type": "boolean"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "reservation_required": {
+            "type": "boolean"
+          },
+          "free_condition": {
+            "type": "string"
+          },
+          "holiday_exception": {
+            "type": "string"
           }
         }
       }
@@ -107,7 +122,56 @@
       "type": "string"
     },
     "timeline": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "point_id",
+          "policy_id",
+          "action",
+          "release_at",
+          "advance_days",
+          "timezone",
+          "dedupe_key",
+          "status"
+        ],
+        "properties": {
+          "point_id": {
+            "type": "string"
+          },
+          "policy_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "reserve"
+            ]
+          },
+          "release_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "advance_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "dedupe_key": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "missed"
+            ]
+          }
+        }
+      }
     }
   },
   "required": [

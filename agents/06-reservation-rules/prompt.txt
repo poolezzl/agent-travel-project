@@ -2,6 +2,7 @@
 
 【本次输入】（由总控注入）
 - 景点列表 points：{{points}}
+- 城市 ID city_id（可选）：{{city_id}}
 - 游玩日期 date：{{date}}
 
 【职责与边界】
@@ -17,7 +18,9 @@
 【输出】
 - 你只生成 status/message/error_code/degraded_fields 与 reservations/timeline；schema_version/task_id/trace_id/request_id/generated_at 由系统封装后再执行最终 Schema 校验。
 - 严格按 output.schema.json 输出。
-- 每个已命中规则的景点输出预约信息卡（point_id、policy_id、票种、currency/最小货币单位金额、生效期、时区、last_verified、stale），并生成可去重的 timeline 候选。
+- 每个已命中规则的景点输出预约信息卡（point_id、policy_id、票种、适用人群、currency/最小货币单位金额、生效期、时区、last_verified、stale），并生成可去重的 timeline 候选。
+- timeline 每项给出 point_id、policy_id、action、release_at、advance_days、timezone、dedupe_key、status；已错过的放票时间不得生成提醒。
+- 缺价时省略 currency/amount_minor，禁止用 0 或猜测值代替未知。
 
 【降级/停止条件】
 - 某景点规则库未收录：status 标 partial/degraded，message 写「暂未收录预约信息」。

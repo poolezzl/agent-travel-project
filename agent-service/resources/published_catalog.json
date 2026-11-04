@@ -1,0 +1,199 @@
+{
+  "catalog_version": "r3-catalog-v1",
+  "generated_at": "2026-10-29T00:00:00+08:00",
+  "sample_only": true,
+  "notice": "Synthetic S06-style Beijing fixtures for contract/demo purposes. Not real travel facts. Every fact carries a source record; no external scraping.",
+  "pois": [
+    {
+      "poi_id": "POI-BJ-001",
+      "city_id": "beijing",
+      "name": "故宫博物院",
+      "aliases": ["紫禁城", "故宫"],
+      "district": "东城区",
+      "category": "attraction"
+    },
+    {
+      "poi_id": "POI-BJ-002",
+      "city_id": "beijing",
+      "name": "中国国家博物馆",
+      "aliases": ["国博", "国家博物馆"],
+      "district": "东城区",
+      "category": "attraction"
+    },
+    {
+      "poi_id": "POI-BJ-003",
+      "city_id": "beijing",
+      "name": "天坛公园",
+      "aliases": ["天坛"],
+      "district": "东城区",
+      "category": "attraction"
+    }
+  ],
+  "entries": [
+    {
+      "knowledge_id": "KN-BJ-001",
+      "poi_id": "POI-BJ-001",
+      "city_id": "beijing",
+      "title": "故宫博物院参观资讯（合成样例）",
+      "status": "PUBLISHED",
+      "fact_type": "highlights",
+      "effective_from": "2026-01-01T00:00:00+08:00",
+      "effective_until": "2027-12-31T23:59:59+08:00",
+      "last_verified_at": "2026-10-20T09:00:00+08:00",
+      "source": {
+        "source_record_id": "SRC-BJ-001",
+        "source_type": "knowledge_base",
+        "retrieved_at": "2026-10-20T09:00:00+08:00",
+        "valid_until": "2027-12-31T23:59:59+08:00",
+        "freshness_status": "fresh"
+      },
+      "chunks": [
+        {
+          "chunk_id": "CHUNK-BJ-001-01",
+          "fact_type": "highlights",
+          "text": "中轴线上的宫殿群适合按午门—太和殿—御花园的顺序参观。"
+        },
+        {
+          "chunk_id": "CHUNK-BJ-001-02",
+          "fact_type": "suggested_duration",
+          "text": "建议预留 3 到 4 小时，旺季适当增加排队时间。"
+        },
+        {
+          "chunk_id": "CHUNK-BJ-001-03",
+          "fact_type": "best_time",
+          "text": "工作日上午开馆后一小时人流相对较少。"
+        },
+        {
+          "chunk_id": "CHUNK-BJ-001-04",
+          "fact_type": "avoid_tips",
+          "text": "周一通常闭馆，节假日安排请以官方公告为准。"
+        },
+        {
+          "chunk_id": "CHUNK-BJ-001-05",
+          "fact_type": "popularity",
+          "text": "长期处于北京热门景点前列，建议提前规划。"
+        }
+      ]
+    },
+    {
+      "knowledge_id": "KN-BJ-001-OLD",
+      "poi_id": "POI-BJ-001",
+      "city_id": "beijing",
+      "title": "故宫博物院旧版资讯（已过期，仅用于降级测试）",
+      "status": "PUBLISHED",
+      "fact_type": "highlights",
+      "effective_from": "2025-01-01T00:00:00+08:00",
+      "effective_until": "2026-09-30T23:59:59+08:00",
+      "last_verified_at": "2026-08-01T09:00:00+08:00",
+      "source": {
+        "source_record_id": "SRC-BJ-001-OLD",
+        "source_type": "knowledge_base",
+        "retrieved_at": "2026-08-01T09:00:00+08:00",
+        "valid_until": "2026-09-30T23:59:59+08:00",
+        "freshness_status": "stale"
+      },
+      "chunks": [
+        {
+          "chunk_id": "CHUNK-BJ-001-OLD-01",
+          "fact_type": "highlights",
+          "text": "这条过期内容不得被检索或展示。"
+        }
+      ]
+    },
+    {
+      "knowledge_id": "KN-BJ-002",
+      "poi_id": "POI-BJ-002",
+      "city_id": "beijing",
+      "title": "中国国家博物馆参观资讯（合成样例）",
+      "status": "PUBLISHED",
+      "fact_type": "highlights",
+      "effective_from": "2026-01-01T00:00:00+08:00",
+      "effective_until": "2027-06-30T23:59:59+08:00",
+      "last_verified_at": "2026-10-10T09:00:00+08:00",
+      "source": {
+        "source_record_id": "SRC-BJ-002",
+        "source_type": "knowledge_base",
+        "retrieved_at": "2026-10-10T09:00:00+08:00",
+        "valid_until": "2027-06-30T23:59:59+08:00",
+        "freshness_status": "fresh"
+      },
+      "chunks": [
+        {
+          "chunk_id": "CHUNK-BJ-002-01",
+          "fact_type": "highlights",
+          "text": "常设展与临时展分层布置，建议先看当日展览公告。"
+        },
+        {
+          "chunk_id": "CHUNK-BJ-002-02",
+          "fact_type": "suggested_duration",
+          "text": "建议预留 2 到 3 小时，重点展览可再增加时间。"
+        },
+        {
+          "chunk_id": "CHUNK-BJ-002-03",
+          "fact_type": "avoid_tips",
+          "text": "大件行李需寄存，安检排队时间可能较长。"
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "policy_id": "POLICY-BJ-001-V2",
+      "poi_id": "POI-BJ-001",
+      "city_id": "beijing",
+      "status": "PUBLISHED",
+      "ticket_type": "standard",
+      "audience": "general",
+      "reservation_required": true,
+      "channel": "official",
+      "release_time": "20:00",
+      "release_timezone": "Asia/Shanghai",
+      "advance_days": 7,
+      "currency": "CNY",
+      "amount_minor": 6000,
+      "free_condition": null,
+      "effective_from": "2026-01-01T00:00:00+08:00",
+      "effective_until": "2026-12-31T23:59:59+08:00",
+      "holiday_exception": "周一闭馆及法定节假日安排以官方公告为准",
+      "last_verified_at": "2026-10-20T09:00:00+08:00",
+      "stale_after_days": 30,
+      "version": 2,
+      "source": {
+        "source_record_id": "SRC-RULE-BJ-001-V2",
+        "source_type": "reservation_rule",
+        "retrieved_at": "2026-10-20T09:00:00+08:00",
+        "valid_until": "2026-12-31T23:59:59+08:00",
+        "freshness_status": "fresh"
+      }
+    },
+    {
+      "policy_id": "POLICY-BJ-002-V1",
+      "poi_id": "POI-BJ-002",
+      "city_id": "beijing",
+      "status": "PUBLISHED",
+      "ticket_type": "free",
+      "audience": "general",
+      "reservation_required": true,
+      "channel": "official",
+      "release_time": "09:00",
+      "release_timezone": "Asia/Shanghai",
+      "advance_days": 1,
+      "currency": null,
+      "amount_minor": null,
+      "free_condition": "免费预约，需实名",
+      "effective_from": "2026-01-01T00:00:00+08:00",
+      "effective_until": "2026-12-31T23:59:59+08:00",
+      "holiday_exception": "闭馆日以官方公告为准",
+      "last_verified_at": "2026-09-01T09:00:00+08:00",
+      "stale_after_days": 30,
+      "version": 1,
+      "source": {
+        "source_record_id": "SRC-RULE-BJ-002-V1",
+        "source_type": "reservation_rule",
+        "retrieved_at": "2026-09-01T09:00:00+08:00",
+        "valid_until": "2026-12-31T23:59:59+08:00",
+        "freshness_status": "stale"
+      }
+    }
+  ]
+}
