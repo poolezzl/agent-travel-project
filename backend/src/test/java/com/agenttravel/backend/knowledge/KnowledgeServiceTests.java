@@ -1,18 +1,15 @@
 package com.agenttravel.backend.knowledge;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 import com.agenttravel.backend.common.ApiException;
@@ -587,8 +584,13 @@ class KnowledgeServiceTests {
         @Override
         public List<RuleRow> findRulesByCity(String city) {
             return rules.values().stream()
-                    .filter(row -> city.equals(row.cityCode()))
+                    .filter(row -> city.equals(row.cityCode()) || city.equals(cityName(row.poiId())))
                     .toList();
+        }
+
+        private String cityName(UUID poiId) {
+            PoiRow poi = pois.get(poiId);
+            return poi == null ? null : cityNames.get(poi.cityId());
         }
 
         @Override

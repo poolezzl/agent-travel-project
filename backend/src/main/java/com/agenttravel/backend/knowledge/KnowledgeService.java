@@ -78,7 +78,7 @@ public class KnowledgeService {
             "suggested_duration", "accessibility", "best_time", "popularity");
     private static final Set<String> SOURCE_TYPES = Set.of("MAP", "WEATHER", "KNOWLEDGE_BASE",
             "RESERVATION_RULE", "POI", "USER_INPUT", "SYSTEM");
-    private static final Set<String> IMPORT_TYPES = Set.of("ATTRACTION_KNOWLEDGE", "RESERVATION_RULE", "POI");
+    private static final Set<String> IMPORT_TYPES = Set.of("ATTRACTION_KNOWLEDGE");
     private static final double COORDINATE_TOLERANCE = 0.001d;
 
     private final KnowledgeRepository repository;
@@ -292,6 +292,8 @@ public class KnowledgeService {
         if (request.parentEntryId() != null && repository.findEntry(request.parentEntryId()) == null) {
             throw notFound("PARENT_NOT_FOUND", "父知识条目不存在");
         }
+        UUID parentEntryId = request.parentEntryId() != null ? request.parentEntryId()
+                : existing == null ? null : existing.parentEntryId();
         String entryKey = existing != null ? existing.entryKey()
                 : blank(request.entryKey()) ? "kb-" + UUID.randomUUID() : request.entryKey();
         int versionNo = existing != null ? existing.versionNo() : repository.nextEntryVersion(entryKey);
@@ -300,7 +302,7 @@ public class KnowledgeService {
         for (ChunkRequest chunk : request.chunks()) {
             chunks.add(new ChunkDraft(chunkNo++, chunk.text(), chunk.vectorRecordId()));
         }
-        return new KnowledgeDraft(entryKey, poi.poiId(), cityId, request.parentEntryId(), versionNo,
+        return new KnowledgeDraft(entryKey, poi.poiId(), cityId, parentEntryId, versionNo,
                 request.title(), request.factType(), json(request.factValue()), request.effectiveFrom(),
                 request.effectiveUntil(), request.lastVerifiedAt(), request.sourceSnapshotId(), actor, chunks);
     }
@@ -464,7 +466,11 @@ public class KnowledgeService {
     public ImportPreviewResponse previewImport(UUID actor, ImportPreviewRequest request) {
         requireImportType(request.importType());
         List<ImportError> errors = validateRows(request.importType(), request.rows());
-        int valid = request.rows().size() - errors.size();
+        Set<Integer> invalidRows = new LinkedHashSet<>();
+        for (ImportError error : errors) {
+            invalidRows.add(error.rowNo());
+        }
+        int valid = request.rows().size() - invalidRows.size();
         audit.write(actor, "KNOWLEDGE_IMPORT_PREVIEW", "IMPORT_BATCH", null, errors.isEmpty() ? "SUCCESS" : "REJECTED",
                 errors.isEmpty() ? null : "IMPORT_VALIDATION_FAILED");
         return new ImportPreviewResponse(request.rows().size(), valid, errors.size(), errors);
@@ -546,8 +552,14 @@ public class KnowledgeService {
                         && row.effectiveUntil().isBefore(row.effectiveFrom())) {
                     errors.add(new ImportError(rowNo, "INVALID_VALIDITY", "生效结束时间早于开始时间"));
                 }
-                if (resolveImportPoi(row) == null) {
+                PoiRow poi = resolveImportPoi(row);
+                if (poi == null) {
                     errors.add(new ImportError(rowNo, "POI_NOT_FOUND", "无法唯一确定 POI"));
+                } else {
+                    UUID cityId = repository.findCityId(row.city());
+                    if (cityId != null && !cityId.equals(poi.cityId())) {
+                        errors.add(new ImportError(rowNo, "CITY_MISMATCH", "POI 与导入行城市不一致"));
+                    }
                 }
             }
         }
@@ -642,7 +654,7 @@ public class KnowledgeService {
             if (poiId != null && poiId.equals(point.poiId())) {
                 return point;
             }
-            if (poiId == null && !blank(point.name()) && point.name().equals(name)) {
+            if (!blank(point.name()) && point.name().equals(name)) {
                 return point;
             }
         }
