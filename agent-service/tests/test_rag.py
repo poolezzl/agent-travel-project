@@ -99,5 +99,42 @@ class LexicalRagTests(unittest.TestCase):
         self.assertEqual(hits[0].source_record_id, "S1")
 
 
+class _FakeChromaCollection:
+    def __init__(self) -> None:
+        self.last_query: dict[str, object] = {}
+
+    def query(self, **kwargs: object) -> dict[str, object]:
+        self.last_query = kwargs
+        return {
+            "ids": [["CHUNK-1"]],
+            "documents": [["建议预留三小时"]],
+            "metadatas": [[{"knowledge_id": "KN-1", "fact_type": "suggested_duration", "source_record_id": "SRC-1"}]],
+            "distances": [[0.12]],
+        }
+
+
+class ChromaRagAdapterTests(unittest.TestCase):
+    def test_adapter_filters_published_and_keeps_citations(self) -> None:
+        from app.knowledge.rag import ChromaRag
+
+        collection = _FakeChromaCollection()
+        hits = ChromaRag(collection).search(
+            point_id="POI-1",
+            name="A",
+            city_id="beijing",
+            query="时长",
+            moment=MOMENT,
+        )
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].chunk_id, "CHUNK-1")
+        self.assertEqual(hits[0].knowledge_id, "KN-1")
+        self.assertEqual(hits[0].source_record_id, "SRC-1")
+        self.assertEqual(hits[0].score, 0.88)
+        self.assertEqual(
+            collection.last_query["where"],
+            {"status": "PUBLISHED", "point_id": "POI-1", "city_id": "beijing"},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
