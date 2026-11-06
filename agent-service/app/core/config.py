@@ -82,6 +82,10 @@ class LLMSettings(BaseSettings):
         le=3,
         validation_alias="LLM_MAX_RETRIES",
     )
+    llm_min_call_approved: bool = Field(
+        default=False,
+        validation_alias="LLM_MIN_CALL_APPROVED",
+    )
 
 
 @lru_cache

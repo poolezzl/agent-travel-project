@@ -1,0 +1,9 @@
+{
+  "task_type": "GENERATION",
+  "plan_count": 1,
+  "request": {
+    "city": "北京",
+    "days": 3,
+    "preferences": "希望少走路并安排室内备选"
+  }
+}

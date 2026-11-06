@@ -55,6 +55,23 @@ Windows Git Bash 激活命令：
 
 不得提交本地 `.env`、API Key、访问令牌或供应商原始响应。
 
+## R4 一次性真实模型最小调用
+
+真实模型验收使用 `scripts/llm_min_call.py`，只允许在项目负责人批准一次测试预算后执行。脚本要求：
+
+- `LLM_MIN_CALL_APPROVED=true`；
+- `LLM_PROVIDER=openai-compatible`；
+- `LLM_MAX_RETRIES=0`，禁止失败重试造成重复扣费；
+- 脚本第一次尝试前会创建 `agent-service/.llm_min_call.used` 标记，重复执行会阻断；
+- 固定短提示、`temperature=0`、最大输出 16 tokens；
+- 只输出供应商、模型、状态、时间、token、耗时和费用摘要，不输出 API Key、完整提示词或完整响应。
+
+在 `agent-service` 目录执行：
+
+    python scripts/llm_min_call.py
+
+脚本只提供技术调用上限，不能替代供应商账户余额或项目负责人对费用的批准。
+
 ## 启动和健康检查
 
 在 `agent-service` 目录启动；该入口会使用 `AGENT_SERVICE_HOST` 和 `AGENT_SERVICE_PORT`：
