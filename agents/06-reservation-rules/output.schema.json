@@ -167,8 +167,12 @@
             "type": "string",
             "enum": [
               "pending",
-              "missed"
+              "missed",
+              "needs_verification"
             ]
+          },
+          "warning": {
+            "type": "string"
           }
         }
       }

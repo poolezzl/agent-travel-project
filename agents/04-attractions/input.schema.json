@@ -21,6 +21,10 @@
       },
       "type": "array"
     },
+    "query": {
+      "minLength": 1,
+      "type": "string"
+    },
     "points": {
       "minItems": 1,
       "items": {

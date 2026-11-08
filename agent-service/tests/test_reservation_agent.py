@@ -31,6 +31,44 @@ class ReservationAgentTests(unittest.TestCase):
     def _run(self, inputs: dict[str, object], moment: datetime = MOMENT) -> dict[str, object]:
         return reservation_rules.run(inputs, self.catalog, CONTEXT, moment=moment)
 
+    def _single_rule_catalog(self, **overrides: object) -> PublishedCatalog:
+        rule: dict[str, object] = {
+            "policy_id": "POLICY-TEST-V1",
+            "poi_id": "POI-BJ-001",
+            "city_id": "beijing",
+            "status": "PUBLISHED",
+            "ticket_type": "standard",
+            "reservation_required": True,
+            "release_time": "20:00",
+            "release_timezone": "Asia/Shanghai",
+            "advance_days": 0,
+            "currency": "CNY",
+            "amount_minor": 100,
+            "effective_from": "2026-01-01",
+            "last_verified_at": "2026-10-01T00:00:00+08:00",
+            "source": {
+                "source_record_id": "SRC-TEST-1",
+                "source_type": "reservation_rule",
+                "retrieved_at": "2026-10-01T00:00:00+08:00",
+            },
+        }
+        rule.update(overrides)
+        return PublishedCatalog.from_payload(
+            {
+                "catalog_version": "test",
+                "pois": [
+                    {
+                        "poi_id": "POI-BJ-001",
+                        "city_id": "beijing",
+                        "name": "故宫博物院",
+                        "aliases": [],
+                    }
+                ],
+                "entries": [],
+                "rules": [rule],
+            }
+        )
+
     def test_ok_rule_builds_reminder(self) -> None:
         result = self._run({"points": [_point("POI-BJ-001", "故宫博物院")], "date": "2026-11-10"})
         self.assertEqual(result["status"], "ok")
@@ -112,6 +150,72 @@ class ReservationAgentTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "degraded")
         self.assertEqual(result["reservations"], [])
+
+    def test_city_mismatch_never_uses_other_city_rule(self) -> None:
+        result = self._run(
+            {
+                "points": [_point("POI-BJ-001", "故宫博物院")],
+                "date": "2026-11-10",
+                "city_id": "shanghai",
+            }
+        )
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["reservations"], [])
+        self.assertEqual(result["timeline"], [])
+        self.assertIn("暂未收录", result["message"])
+
+    def test_invalid_timezone_degrades_without_reminder(self) -> None:
+        catalog = self._single_rule_catalog(release_timezone="Not/AZone")
+        result = reservation_rules.run(
+            {"points": [_point("POI-BJ-001", "故宫博物院")], "date": "2026-11-10"},
+            catalog,
+            CONTEXT,
+            moment=MOMENT,
+        )
+        self.assertEqual(result["timeline"], [])
+        self.assertEqual(result["status"], "partial")
+        self.assertIn("timeline[0].timezone", result["degraded_fields"])
+        self.assertIn("时区无效", result["message"])
+
+    def test_release_time_with_seconds_is_supported(self) -> None:
+        catalog = self._single_rule_catalog(release_time="20:00:30")
+        result = reservation_rules.run(
+            {"points": [_point("POI-BJ-001", "故宫博物院")], "date": "2026-11-10"},
+            catalog,
+            CONTEXT,
+            moment=MOMENT,
+        )
+        self.assertEqual(result["timeline"][0]["release_at"], "2026-11-10T20:00:30+08:00")
+        self.assertEqual(result["status"], "ok")
+
+    def test_weekend_release_is_flagged_for_verification(self) -> None:
+        catalog = self._single_rule_catalog(advance_days=1)
+        result = reservation_rules.run(
+            {"points": [_point("POI-BJ-001", "故宫博物院")], "date": "2026-11-09"},
+            catalog,
+            CONTEXT,
+            moment=MOMENT,
+        )
+        item = result["timeline"][0]
+        self.assertEqual(item["status"], "needs_verification")
+        self.assertIn("warning", item)
+        self.assertEqual(result["status"], "partial")
+        self.assertIn("timeline[0].non_working_day", result["degraded_fields"])
+
+    def test_weekday_closure_note_warns_on_matching_visit_day(self) -> None:
+        catalog = self._single_rule_catalog(
+            advance_days=7,
+            holiday_exception="周一闭馆及法定节假日安排以官方公告为准",
+        )
+        result = reservation_rules.run(
+            {"points": [_point("POI-BJ-001", "故宫博物院")], "date": "2026-11-09"},
+            catalog,
+            CONTEXT,
+            moment=MOMENT,
+        )
+        self.assertEqual(result["status"], "partial")
+        self.assertIn("reservations[0].holiday_exception", result["degraded_fields"])
+        self.assertIn("可能闭馆", result["message"])
 
 
 if __name__ == "__main__":

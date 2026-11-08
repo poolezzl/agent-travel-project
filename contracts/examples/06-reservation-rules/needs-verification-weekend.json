@@ -1,0 +1,51 @@
+{
+  "schema_version": "agent-contract-v1",
+  "task_id": "task-r3-demo",
+  "trace_id": "trace-r3-demo",
+  "request_id": "req-06-weekend",
+  "generated_at": "2026-10-29T00:00:00Z",
+  "status": "partial",
+  "message": "放票日为非工作日，实际安排请以官方渠道为准",
+  "degraded_fields": ["timeline[0].non_working_day"],
+  "source_metadata": [
+    {
+      "source_type": "reservation_rule",
+      "source_record_id": "SRC-RULE-BJ-001-V2",
+      "retrieved_at": "2026-10-20T09:00:00+08:00",
+      "valid_until": "2026-12-31T23:59:59+08:00",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "reservations": [
+    {
+      "point_id": "POI-BJ-001",
+      "policy_id": "POLICY-BJ-001-V2",
+      "ticket_type": "standard",
+      "audience": "general",
+      "channel": "official",
+      "reservation_required": true,
+      "currency": "CNY",
+      "amount_minor": 6000,
+      "effective_from": "2026-01-01T00:00:00+08:00",
+      "effective_until": "2026-12-31T23:59:59+08:00",
+      "timezone": "Asia/Shanghai",
+      "last_verified": "2026-10-20T09:00:00+08:00",
+      "stale": false,
+      "holiday_exception": "周一闭馆及法定节假日安排以官方公告为准"
+    }
+  ],
+  "timeline": [
+    {
+      "point_id": "POI-BJ-001",
+      "policy_id": "POLICY-BJ-001-V2",
+      "action": "reserve",
+      "release_at": "2026-11-08T20:00:00+08:00",
+      "advance_days": 1,
+      "timezone": "Asia/Shanghai",
+      "dedupe_key": "POI-BJ-001|POLICY-BJ-001-V2|2026-11-08T20:00:00+08:00",
+      "status": "needs_verification",
+      "warning": "放票日为非工作日，实际放票安排请以官方渠道为准"
+    }
+  ]
+}

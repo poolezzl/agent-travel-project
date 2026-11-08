@@ -87,6 +87,54 @@ class AttractionsAgentTests(unittest.TestCase):
         self.assertEqual(result["cards"][0]["knowledge_id"], "KN-BJ-001")
         self.assertTrue(result["cards"][0]["avoid_tips"])
 
+    def test_city_mismatch_never_leaks_known_poi(self) -> None:
+        result = self._run(
+            {
+                "points": [_point("POI-BJ-001", "故宫博物院")],
+                "city_id": "shanghai",
+            }
+        )
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["cards"][0], {"point_id": "POI-BJ-001", "source": "unknown"})
+
+    def test_every_fact_has_chunk_and_source_citation(self) -> None:
+        result = self._run({"points": [_point("POI-BJ-001", "故宫博物院")]})
+        card = result["cards"][0]
+        self.assertEqual(
+            {fact["chunk_id"] for fact in card["facts"]},
+            set(card["chunk_ids"]),
+        )
+        source_ids = {source["source_record_id"] for source in result["source_metadata"]}
+        for fact in card["facts"]:
+            self.assertTrue(fact["source_record_id"])
+            self.assertIn(fact["source_record_id"], source_ids)
+        self.assertTrue(card["retrieved_at"])
+
+    def test_query_uses_rag_and_keeps_only_matching_chunks(self) -> None:
+        result = self._run(
+            {
+                "points": [_point("POI-BJ-001", "故宫博物院")],
+                "query": "预留",
+            }
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["cards"][0]["chunk_ids"], ["CHUNK-BJ-001-02"])
+        self.assertEqual(
+            [fact["chunk_id"] for fact in result["cards"][0]["facts"]],
+            ["CHUNK-BJ-001-02"],
+        )
+
+    def test_low_confidence_query_returns_unknown_card(self) -> None:
+        result = self._run(
+            {
+                "points": [_point("POI-BJ-001", "故宫博物院")],
+                "query": "量子物理",
+            }
+        )
+        self.assertEqual(result["status"], "degraded")
+        self.assertEqual(result["cards"][0], {"point_id": "POI-BJ-001", "source": "unknown"})
+        self.assertIn("cards[0].source", result["degraded_fields"])
+
 
 if __name__ == "__main__":
     unittest.main()

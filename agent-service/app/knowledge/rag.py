@@ -90,8 +90,9 @@ class ChromaRag:
     events; Chroma is never the status/source of truth.
     """
 
-    def __init__(self, collection: object) -> None:
+    def __init__(self, collection: object, *, min_score: float = DEFAULT_MIN_SCORE) -> None:
         self.collection = collection
+        self.min_score = min_score
 
     def search(
         self,
@@ -103,15 +104,23 @@ class ChromaRag:
         moment: datetime,
         top_k: int = 4,
     ) -> list[RagHit]:
-        filters: dict[str, object] = {"status": "PUBLISHED", "point_id": point_id}
+        conditions: list[dict[str, object]] = [
+            {"status": "PUBLISHED"},
+            {"point_id": point_id},
+            {"effective_until_epoch": {"$gt": moment.timestamp()}},
+        ]
         if city_id:
-            filters["city_id"] = city_id
+            conditions.append({"city_id": city_id})
+        where: dict[str, object] = (
+            conditions[0] if len(conditions) == 1 else {"$and": conditions}
+        )
         result = self.collection.query(  # type: ignore[attr-defined]
             query_texts=[query],
             n_results=top_k,
-            where=filters,
+            where=where,
         )
-        return _hits_from_chroma(result, point_id)
+        hits = _hits_from_chroma(result, point_id)
+        return [hit for hit in hits if hit.score >= self.min_score]
 
 
 def _hit(entry: KnowledgeEntry, chunk: object, score: float) -> RagHit:
@@ -154,4 +163,4 @@ def _hits_from_chroma(result: dict[str, object], point_id: str) -> list[RagHit]:
                 score=round(max(0.0, 1.0 - float(distance)), 4),
             )
         )
-    return [hit for hit in hits if hit.knowledge_id and hit.chunk_id]
+    return [hit for hit in hits if hit.knowledge_id and hit.chunk_id and hit.source_record_id]

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.knowledge.catalog import PublishedCatalog
+from app.knowledge.index import index_records
 from app.knowledge.rag import DEFAULT_MIN_SCORE, LexicalRag
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "resources" / "published_catalog.json"
@@ -100,21 +101,30 @@ class LexicalRagTests(unittest.TestCase):
 
 
 class _FakeChromaCollection:
-    def __init__(self) -> None:
+    def __init__(self, distance: float = 0.12) -> None:
         self.last_query: dict[str, object] = {}
+        self.distance = distance
 
     def query(self, **kwargs: object) -> dict[str, object]:
         self.last_query = kwargs
         return {
             "ids": [["CHUNK-1"]],
             "documents": [["建议预留三小时"]],
-            "metadatas": [[{"knowledge_id": "KN-1", "fact_type": "suggested_duration", "source_record_id": "SRC-1"}]],
-            "distances": [[0.12]],
+            "metadatas": [
+                [
+                    {
+                        "knowledge_id": "KN-1",
+                        "fact_type": "suggested_duration",
+                        "source_record_id": "SRC-1",
+                    }
+                ]
+            ],
+            "distances": [[self.distance]],
         }
 
 
 class ChromaRagAdapterTests(unittest.TestCase):
-    def test_adapter_filters_published_and_keeps_citations(self) -> None:
+    def test_adapter_filters_published_expiry_city_and_keeps_citations(self) -> None:
         from app.knowledge.rag import ChromaRag
 
         collection = _FakeChromaCollection()
@@ -132,8 +142,43 @@ class ChromaRagAdapterTests(unittest.TestCase):
         self.assertEqual(hits[0].score, 0.88)
         self.assertEqual(
             collection.last_query["where"],
-            {"status": "PUBLISHED", "point_id": "POI-1", "city_id": "beijing"},
+            {
+                "$and": [
+                    {"status": "PUBLISHED"},
+                    {"point_id": "POI-1"},
+                    {"effective_until_epoch": {"$gt": MOMENT.timestamp()}},
+                    {"city_id": "beijing"},
+                ]
+            },
         )
+
+    def test_adapter_drops_low_confidence_hits(self) -> None:
+        from app.knowledge.rag import ChromaRag
+
+        collection = _FakeChromaCollection(distance=0.99)
+        hits = ChromaRag(collection, min_score=0.15).search(
+            point_id="POI-1",
+            name="A",
+            city_id="beijing",
+            query="量子物理",
+            moment=MOMENT,
+        )
+        self.assertEqual(hits, [])
+
+
+class IndexRecordTests(unittest.TestCase):
+    def test_only_published_unexpired_chunks_are_indexed(self) -> None:
+        catalog = PublishedCatalog.load(CATALOG_PATH)
+        records = index_records(catalog, moment=MOMENT)
+        ids = [record["id"] for record in records]
+        self.assertIn("CHUNK-BJ-001-01", ids)
+        self.assertNotIn("CHUNK-BJ-001-OLD-01", ids)
+        first = next(record for record in records if record["id"] == "CHUNK-BJ-001-01")
+        self.assertEqual(first["metadata"]["status"], "PUBLISHED")
+        self.assertEqual(first["metadata"]["city_id"], "beijing")
+        self.assertEqual(first["metadata"]["source_record_id"], "SRC-BJ-001")
+        self.assertGreater(first["metadata"]["effective_until_epoch"], MOMENT.timestamp())
+        self.assertEqual(first["metadata"]["catalog_version"], catalog.catalog_version)
 
 
 if __name__ == "__main__":

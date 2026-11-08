@@ -1,4 +1,4 @@
-﻿"""Tests for the published catalog and retrieval filters."""
+"""Tests for the published catalog and retrieval filters."""
 from __future__ import annotations
 
 import unittest
@@ -22,6 +22,17 @@ class PublishedCatalogTests(unittest.TestCase):
     def test_unknown_poi_returns_empty(self) -> None:
         candidates, entries = self.catalog.knowledge_for(
             point_id="missing", name="不存在", city_id="beijing", query="", moment=MOMENT
+        )
+        self.assertEqual(candidates, ())
+        self.assertEqual(entries, ())
+
+    def test_city_mismatch_with_known_poi_id_returns_empty(self) -> None:
+        candidates, entries = self.catalog.knowledge_for(
+            point_id="POI-BJ-001",
+            name="故宫博物院",
+            city_id="shanghai",
+            query="",
+            moment=MOMENT,
         )
         self.assertEqual(candidates, ())
         self.assertEqual(entries, ())

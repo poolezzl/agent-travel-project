@@ -225,6 +225,10 @@ class PublishedCatalog:
         """
         by_id = [poi for poi in self.pois if poi.poi_id == point_id]
         if by_id:
+            # An explicit internal id must still respect the requested city:
+            # otherwise a caller can read another city's facts by passing its id.
+            if city_id:
+                by_id = [poi for poi in by_id if poi.city_id == city_id]
             return tuple(by_id)
         normalized = (name or "").strip().lower()
         if not normalized:

@@ -22,6 +22,7 @@ from app.knowledge.catalog import (
     parse_datetime,
     tokens,
 )
+from app.knowledge.rag import LexicalRag
 
 
 def run(
@@ -44,8 +45,13 @@ def run(
     tags = inputs.get("preference_tags") or []
     if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
         return failure(context, ERROR_INVALID_INPUT, "preference_tags 必须是字符串数组")
+    raw_query = inputs.get("query")
+    if raw_query is not None and (not isinstance(raw_query, str) or not raw_query.strip()):
+        return failure(context, ERROR_INVALID_INPUT, "query 必须是非空字符串")
+    query = raw_query.strip() if isinstance(raw_query, str) else ""
 
     current = moment or now_utc()
+    retriever = LexicalRag(catalog) if query else None
     cards: list[dict[str, Any]] = []
     sources: list[dict[str, Any]] = []
     degraded: list[str] = []
@@ -72,13 +78,30 @@ def run(
             degraded.append(f"cards[{index}].source")
             continue
 
-        entry = entries[0]
         chunks = [chunk for item in entries for chunk in item.chunks]
         if not chunks:
             cards.append({"point_id": point["point_id"], "source": "unknown"})
             missing += 1
             degraded.append(f"cards[{index}].chunks")
             continue
+
+        if retriever is not None:
+            hits = retriever.search(
+                point_id=point["point_id"],
+                name=point["name"],
+                city_id=city,
+                query=query,
+                moment=current,
+                top_k=max(4, len(chunks)),
+            )
+            hit_ids = {hit.chunk_id for hit in hits}
+            chunks = [chunk for chunk in chunks if chunk.chunk_id in hit_ids]
+            if not chunks:
+                # Low-confidence query: never fall back to unrelated text.
+                cards.append({"point_id": point["point_id"], "source": "unknown"})
+                missing += 1
+                degraded.append(f"cards[{index}].source")
+                continue
 
         stale = any(item.freshness(current) == "stale" for item in entries)
         stale_seen = stale_seen or stale
@@ -179,4 +202,4 @@ def _earliest_valid_until(entries: tuple[KnowledgeEntry, ...]) -> str | None:
     return isoformat(min(present)) if present else None
 
 
-__all__ = ["run", "SourceRef"]
+__all__ = ["run"]
