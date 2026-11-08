@@ -30,13 +30,17 @@
 | S12 | 进行中（真实高德适配器已接入，契约冻结项 PENDING） | [S12.md](S12.md) |
 | S13 | 进行中（真实和风天气适配器已接入，契约冻结项 PENDING） | [S13.md](S13.md) |
 | S15 | 进行中（Java 编译/19 项 JUnit/Flyway/MySQL 已验证；Chroma 真实运行时、Maven 全量、S06 真实库导入 PENDING） | [S15.md](S15.md) |
-| S16 | 进行中（离线 Agent 完成；Chroma/Java 联调、HTTP 测试 PENDING） | [S16.md](S16.md) |
-| S17 | 进行中（离线 Agent 完成；Java 规则库联调、HTTP 测试 PENDING） | [S17.md](S17.md) |
+| S16 | 进行中（离线 Agent 完成；Chroma/Java 联调 PENDING） | [S16.md](S16.md) |
+| S17 | 进行中（离线 Agent 完成；Java 规则库联调 PENDING） | [S17.md](S17.md) |
 | S14、S18-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容
 
 每个 `Sxx.md` 必须记录：依赖检查、需求编号、修改文件、接口/Schema/迁移影响、关键设计、实际执行的命令与结果、边界场景、来源/权限/幂等/并发/降级/隐私/日志/回滚检查、风险和 `PENDING`。测试未运行时必须说明原因。
+
+## R3 合并后复核
+
+2026-11-09 在本地 `.venv` 中执行 `python -m pytest tests/ --disable-warnings`：**214 passed**（S12/S13 原有 166 项 + R3 新增 48 项，其中 4 项为真实 FastAPI/TestClient HTTP）。该结果只证明当前 Python 套件通过，不改变 S12-S17 各自的冻结项或 PENDING。
 
 ## R4 合并补充
 
