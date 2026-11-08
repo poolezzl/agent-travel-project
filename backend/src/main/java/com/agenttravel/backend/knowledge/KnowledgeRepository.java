@@ -41,7 +41,13 @@ public interface KnowledgeRepository {
 
     UUID insertPoiConflict(PoiConflictDraft draft);
 
+    PoiConflictRow findPoiConflict(UUID conflictId);
+
     List<PoiConflictRow> listOpenPoiConflicts();
+
+    int resolvePoiConflict(UUID conflictId, String status, UUID resolvedBy, Instant at);
+
+    int setPoiMergeGroup(UUID poiId, UUID mergeGroupId);
 
     // -------------------------------------------------------------- knowledge
 

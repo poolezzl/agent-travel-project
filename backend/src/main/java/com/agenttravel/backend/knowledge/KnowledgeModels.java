@@ -113,6 +113,10 @@ public final class KnowledgeModels {
             @JsonProperty("created_at") Instant createdAt) {
     }
 
+    public record PoiConflictResolveRequest(
+            @JsonProperty("decision") @NotBlank @Size(max = 16) String decision) {
+    }
+
     // -------------------------------------------------------------- knowledge
 
     public record ChunkRequest(
@@ -240,7 +244,35 @@ public final class KnowledgeModels {
             @JsonProperty("effective_until") Instant effectiveUntil,
             @JsonProperty("last_verified_at") Instant lastVerifiedAt,
             @JsonProperty("source_snapshot_id") UUID sourceSnapshotId,
-            @JsonProperty("chunks") List<String> chunks) {
+            @JsonProperty("chunks") List<String> chunks,
+            @JsonProperty("poi_category") @Size(max = 64) String poiCategory,
+            @JsonProperty("district") @Size(max = 128) String district,
+            @JsonProperty("longitude") Double longitude,
+            @JsonProperty("latitude") Double latitude,
+            @JsonProperty("coordinate_system") @Size(max = 16) String coordinateSystem,
+            @JsonProperty("aliases") List<String> aliases,
+            @JsonProperty("rule_key") @Size(max = 128) String ruleKey,
+            @JsonProperty("ticket_type") @Size(max = 128) String ticketType,
+            @JsonProperty("audience") @Size(max = 128) String audience,
+            @JsonProperty("reservation_required") Boolean reservationRequired,
+            @JsonProperty("channel") @Size(max = 128) String channel,
+            @JsonProperty("release_time") String releaseTime,
+            @JsonProperty("release_timezone") @Size(max = 64) String releaseTimezone,
+            @JsonProperty("advance_days") @Min(0) Integer advanceDays,
+            @JsonProperty("currency") @Size(min = 3, max = 3) String currency,
+            @JsonProperty("amount_minor") @Min(0) Long amountMinor,
+            @JsonProperty("free_condition") @Size(max = 1000) String freeCondition,
+            @JsonProperty("holiday_exception") @Size(max = 1000) String holidayException,
+            @JsonProperty("stale_after_days") @Min(1) Integer staleAfterDays) {
+
+        /** Backward-compatible constructor for knowledge-only import tests/callers. */
+        public ImportRow(Integer rowNo, String city, UUID poiId, String poiName, String entryKey, String title,
+                String factType, Object factValue, Instant effectiveFrom, Instant effectiveUntil,
+                Instant lastVerifiedAt, UUID sourceSnapshotId, List<String> chunks) {
+            this(rowNo, city, poiId, poiName, entryKey, title, factType, factValue, effectiveFrom,
+                    effectiveUntil, lastVerifiedAt, sourceSnapshotId, chunks, null, null, null, null, null,
+                    null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        }
     }
 
     public record ImportPreviewRequest(
@@ -265,6 +297,7 @@ public final class KnowledgeModels {
             @JsonProperty("import_batch_id") UUID importBatchId,
             @JsonProperty("created_count") int createdCount,
             @JsonProperty("knowledge_ids") List<UUID> knowledgeIds,
+            @JsonProperty("created_ids") List<UUID> createdIds,
             @JsonProperty("errors") List<ImportError> errors) {
     }
 

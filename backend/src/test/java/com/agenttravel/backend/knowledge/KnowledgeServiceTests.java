@@ -70,6 +70,49 @@ class KnowledgeServiceTests {
     }
 
     @Test
+    void mergeConflictIsManualAuditedAndKeepsBothPois() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView first = service.createPoi(ADMIN, poiRequest("故宫", 116.397, 39.918, sourceId));
+        KnowledgeModels.PoiView second = service.createPoi(ADMIN, poiRequest("故宫", 116.500, 39.700, sourceId));
+
+        KnowledgeModels.PoiConflictView resolved = service.resolvePoiConflict(ADMIN, second.conflictIds().get(0),
+                new KnowledgeModels.PoiConflictResolveRequest("merge"));
+
+        assertThat(resolved.status()).isEqualTo("MERGED");
+        assertThat(repository.pois.get(first.poiId()).mergeGroupId())
+                .isNotNull()
+                .isEqualTo(repository.pois.get(second.poiId()).mergeGroupId());
+        assertThat(service.listPoiConflicts()).isEmpty();
+        assertThat(auditActions).contains("KNOWLEDGE_POI_MERGE:SUCCESS");
+    }
+
+    @Test
+    void rejectConflictKeepsPoisSeparateAndAudits() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView first = service.createPoi(ADMIN, poiRequest("故宫", 116.397, 39.918, sourceId));
+        KnowledgeModels.PoiView second = service.createPoi(ADMIN, poiRequest("故宫", 116.500, 39.700, sourceId));
+
+        KnowledgeModels.PoiConflictView resolved = service.resolvePoiConflict(ADMIN, second.conflictIds().get(0),
+                new KnowledgeModels.PoiConflictResolveRequest("REJECT"));
+
+        assertThat(resolved.status()).isEqualTo("REJECTED");
+        assertThat(repository.pois.get(first.poiId()).mergeGroupId()).isNull();
+        assertThat(repository.pois.get(second.poiId()).mergeGroupId()).isNull();
+        assertThat(service.listPoiConflicts()).isEmpty();
+        assertThat(auditActions).contains("KNOWLEDGE_POI_CONFLICT_REJECT:SUCCESS");
+    }
+
+    @Test
+    void invalidConflictDecisionIsRejected() {
+        UUID sourceId = source();
+        service.createPoi(ADMIN, poiRequest("故宫", 116.397, 39.918, sourceId));
+        KnowledgeModels.PoiView second = service.createPoi(ADMIN, poiRequest("故宫", 116.500, 39.700, sourceId));
+
+        assertThrows(ApiException.class, () -> service.resolvePoiConflict(ADMIN, second.conflictIds().get(0),
+                new KnowledgeModels.PoiConflictResolveRequest("SPLIT")));
+    }
+
+    @Test
     void aliasConflictIsRecordedAndDoesNotMergePois() {
         UUID sourceId = source();
         KnowledgeModels.PoiView first = service.createPoi(ADMIN,
@@ -266,6 +309,57 @@ class KnowledgeServiceTests {
         assertThat(auditActions).contains("KNOWLEDGE_IMPORT_COMMIT:SUCCESS");
     }
 
+    @Test
+    void importPoiCreatesDraftPoiWithAlias() throws Exception {
+        UUID sourceId = source();
+        String json = """
+                {"row_no":1,"city":"北京","poi_name":"导入景点","poi_category":"MUSEUM",
+                 "district":"东城","longitude":116.4,"latitude":39.9,"coordinate_system":"WGS84",
+                 "source_snapshot_id":"%s","aliases":["导入别名"]}
+                """.formatted(sourceId);
+        KnowledgeModels.ImportRow row = new ObjectMapper().findAndRegisterModules()
+                .readValue(json, KnowledgeModels.ImportRow.class);
+        KnowledgeModels.ImportPreviewRequest request = new KnowledgeModels.ImportPreviewRequest("POI",
+                List.of(row));
+
+        assertThat(service.previewImport(ADMIN, request).errorCount()).isZero();
+        KnowledgeModels.ImportCommitResponse response = service.commitImport(ADMIN, request);
+
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(response.createdIds()).hasSize(1);
+        UUID poiId = response.createdIds().get(0);
+        assertThat(repository.pois.get(poiId).status()).isEqualTo("DRAFT");
+        assertThat(repository.findAliases(poiId)).contains("导入别名");
+        assertThat(auditActions).contains("KNOWLEDGE_POI_CREATE:SUCCESS");
+    }
+
+    @Test
+    void importReservationRuleCreatesDraftRule() throws Exception {
+        UUID sourceId = source();
+        UUID poiId = createPoi(sourceId);
+        String json = """
+                {"row_no":1,"city":"北京","poi_id":"%s","ticket_type":"standard",
+                 "release_time":"20:00","release_timezone":"Asia/Shanghai","advance_days":7,
+                 "currency":"CNY","amount_minor":6000,
+                 "effective_from":"2026-01-01T00:00:00Z","last_verified_at":"2026-10-01T00:00:00Z",
+                 "stale_after_days":30,"source_snapshot_id":"%s"}
+                """.formatted(poiId, sourceId);
+        KnowledgeModels.ImportRow row = new ObjectMapper().findAndRegisterModules()
+                .readValue(json, KnowledgeModels.ImportRow.class);
+        KnowledgeModels.ImportPreviewRequest request = new KnowledgeModels.ImportPreviewRequest(
+                "RESERVATION_RULE", List.of(row));
+
+        assertThat(service.previewImport(ADMIN, request).errorCount()).isZero();
+        KnowledgeModels.ImportCommitResponse response = service.commitImport(ADMIN, request);
+
+        assertThat(response.createdCount()).isEqualTo(1);
+        assertThat(response.createdIds()).hasSize(1);
+        KnowledgeRepository.RuleRow created = repository.rules.get(response.createdIds().get(0));
+        assertThat(created.status()).isEqualTo(ReviewStatus.DRAFT);
+        assertThat(created.amountMinor()).isEqualTo(6000L);
+        assertThat(auditActions).contains("RESERVATION_RULE_CREATE:SUCCESS");
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private UUID source() {
@@ -448,8 +542,44 @@ class KnowledgeServiceTests {
         }
 
         @Override
+        public PoiConflictRow findPoiConflict(UUID conflictId) {
+            return conflicts.values().stream()
+                    .filter(row -> row.candidateId().equals(conflictId))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        @Override
         public List<PoiConflictRow> listOpenPoiConflicts() {
-            return conflicts.values().stream().toList();
+            return conflicts.values().stream()
+                    .filter(row -> "OPEN".equals(row.status()))
+                    .toList();
+        }
+
+        @Override
+        public int resolvePoiConflict(UUID conflictId, String status, UUID resolvedBy, Instant at) {
+            for (Map.Entry<String, PoiConflictRow> entry : conflicts.entrySet()) {
+                PoiConflictRow row = entry.getValue();
+                if (row.candidateId().equals(conflictId) && "OPEN".equals(row.status())) {
+                    entry.setValue(new PoiConflictRow(row.candidateId(), row.cityCode(), row.candidatePoiId(),
+                            row.candidateName(), row.existingPoiId(), row.existingName(), row.conflictType(),
+                            status, row.createdAt()));
+                    return 1;
+                }
+            }
+            return 0;
+        }
+
+        @Override
+        public int setPoiMergeGroup(UUID poiId, UUID mergeGroupId) {
+            PoiRow row = pois.get(poiId);
+            if (row == null) {
+                return 0;
+            }
+            pois.put(poiId, new PoiRow(row.poiId(), row.cityId(), row.cityCode(), row.externalPoiId(),
+                    row.name(), row.category(), row.status(), row.district(), mergeGroupId, row.latitude(),
+                    row.longitude(), row.coordinateSystem(), row.currentSnapshotId()));
+            return 1;
         }
 
         @Override

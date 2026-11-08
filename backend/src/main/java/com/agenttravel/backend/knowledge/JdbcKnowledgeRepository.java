@@ -261,6 +261,20 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
     }
 
     @Override
+    public PoiConflictRow findPoiConflict(UUID conflictId) {
+        List<PoiConflictRow> rows = jdbc.query("""
+                SELECT BIN_TO_UUID(m.id),c.city_code,BIN_TO_UUID(m.candidate_poi_id),cp.name,
+                  BIN_TO_UUID(m.existing_poi_id),ep.name,m.conflict_type,m.status,m.created_at
+                FROM poi_merge_candidate m
+                JOIN city c ON c.id=m.city_id
+                JOIN poi cp ON cp.id=m.candidate_poi_id
+                JOIN poi ep ON ep.id=m.existing_poi_id
+                WHERE m.id=UUID_TO_BIN(?)
+                """, JdbcKnowledgeRepository::poiConflict, conflictId.toString());
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    @Override
     public List<PoiConflictRow> listOpenPoiConflicts() {
         return jdbc.query("""
                 SELECT BIN_TO_UUID(m.id),c.city_code,BIN_TO_UUID(m.candidate_poi_id),cp.name,
@@ -271,9 +285,29 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
                 JOIN poi ep ON ep.id=m.existing_poi_id
                 WHERE m.status='OPEN'
                 ORDER BY m.created_at
-                """, (rs, rowNum) -> new PoiConflictRow(UUID.fromString(rs.getString(1)), rs.getString(2),
+                """, JdbcKnowledgeRepository::poiConflict);
+    }
+
+    @Override
+    public int resolvePoiConflict(UUID conflictId, String status, UUID resolvedBy, Instant at) {
+        return jdbc.update("""
+                UPDATE poi_merge_candidate
+                SET status=?,resolved_by=UUID_TO_BIN(?),resolved_at=?
+                WHERE id=UUID_TO_BIN(?) AND status='OPEN'
+                """, status, resolvedBy.toString(), Timestamp.from(at), conflictId.toString());
+    }
+
+    @Override
+    public int setPoiMergeGroup(UUID poiId, UUID mergeGroupId) {
+        return jdbc.update("""
+                UPDATE poi SET merge_group_id=UUID_TO_BIN(?) WHERE id=UUID_TO_BIN(?)
+                """, mergeGroupId.toString(), poiId.toString());
+    }
+
+    private static PoiConflictRow poiConflict(ResultSet rs, int rowNum) throws SQLException {
+        return new PoiConflictRow(UUID.fromString(rs.getString(1)), rs.getString(2),
                 UUID.fromString(rs.getString(3)), rs.getString(4), UUID.fromString(rs.getString(5)),
-                rs.getString(6), rs.getString(7), rs.getString(8), instant(rs.getTimestamp(9))));
+                rs.getString(6), rs.getString(7), rs.getString(8), rs.getTimestamp(9).toInstant());
     }
 
     // -------------------------------------------------------------- knowledge

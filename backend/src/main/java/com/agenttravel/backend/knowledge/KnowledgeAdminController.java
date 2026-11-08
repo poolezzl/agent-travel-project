@@ -60,6 +60,12 @@ public class KnowledgeAdminController {
         return service.listPoiConflicts();
     }
 
+    @PostMapping("/pois/conflicts/{conflictId}/resolve")
+    public KnowledgeModels.PoiConflictView resolveConflict(@PathVariable UUID conflictId,
+            @Valid @RequestBody KnowledgeModels.PoiConflictResolveRequest request) {
+        return service.resolvePoiConflict(admin(), conflictId, request);
+    }
+
     @PostMapping("/entries")
     public KnowledgeModels.KnowledgeView createEntry(
             @Valid @RequestBody KnowledgeModels.EntryDraftRequest request) {

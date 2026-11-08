@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -29,6 +30,7 @@ import com.agenttravel.backend.knowledge.KnowledgeModels.ImportPreviewRequest;
 import com.agenttravel.backend.knowledge.KnowledgeModels.ImportPreviewResponse;
 import com.agenttravel.backend.knowledge.KnowledgeModels.ImportRow;
 import com.agenttravel.backend.knowledge.KnowledgeModels.KnowledgeView;
+import com.agenttravel.backend.knowledge.KnowledgeModels.PoiConflictResolveRequest;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiConflictView;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiDraftRequest;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiView;
@@ -78,7 +80,8 @@ public class KnowledgeService {
             "suggested_duration", "accessibility", "best_time", "popularity");
     private static final Set<String> SOURCE_TYPES = Set.of("MAP", "WEATHER", "KNOWLEDGE_BASE",
             "RESERVATION_RULE", "POI", "USER_INPUT", "SYSTEM");
-    private static final Set<String> IMPORT_TYPES = Set.of("ATTRACTION_KNOWLEDGE");
+    private static final Set<String> IMPORT_TYPES = Set.of("ATTRACTION_KNOWLEDGE", "POI",
+            "RESERVATION_RULE");
     private static final double COORDINATE_TOLERANCE = 0.001d;
 
     private final KnowledgeRepository repository;
@@ -171,6 +174,49 @@ public class KnowledgeService {
                     row.status(), row.createdAt()));
         }
         return views;
+    }
+
+    @Transactional
+    public PoiConflictView resolvePoiConflict(UUID actor, UUID conflictId, PoiConflictResolveRequest request) {
+        PoiConflictRow conflict = repository.findPoiConflict(conflictId);
+        if (conflict == null) {
+            throw notFound("CONFLICT_NOT_FOUND", "冲突记录不存在");
+        }
+        if (!"OPEN".equals(conflict.status())) {
+            throw conflict("CONFLICT_ALREADY_RESOLVED", "冲突记录已处理");
+        }
+        if (request.decision() == null || blank(request.decision())) {
+            throw badRequest("DECISION_INVALID", "decision 只能是 MERGE 或 REJECT");
+        }
+        String decision = request.decision().trim().toUpperCase(Locale.ROOT);
+        switch (decision) {
+            case "MERGE" -> {
+                PoiRow candidate = requirePoi(conflict.candidatePoiId());
+                PoiRow existing = requirePoi(conflict.existingPoiId());
+                UUID mergeGroupId = existing.mergeGroupId() != null ? existing.mergeGroupId()
+                        : candidate.mergeGroupId() != null ? candidate.mergeGroupId() : UUID.randomUUID();
+                if (repository.setPoiMergeGroup(candidate.poiId(), mergeGroupId) != 1
+                        || repository.setPoiMergeGroup(existing.poiId(), mergeGroupId) != 1) {
+                    throw notFound("POI_NOT_FOUND", "冲突关联的 POI 不存在");
+                }
+                if (repository.resolvePoiConflict(conflictId, "MERGED", actor, Instant.now()) != 1) {
+                    throw conflict("CONCURRENCY_CONFLICT", "冲突记录已变化");
+                }
+                audit.write(actor, "KNOWLEDGE_POI_MERGE", "POI_MERGE_CANDIDATE", conflictId, "SUCCESS", null);
+            }
+            case "REJECT" -> {
+                if (repository.resolvePoiConflict(conflictId, "REJECTED", actor, Instant.now()) != 1) {
+                    throw conflict("CONCURRENCY_CONFLICT", "冲突记录已变化");
+                }
+                audit.write(actor, "KNOWLEDGE_POI_CONFLICT_REJECT", "POI_MERGE_CANDIDATE", conflictId,
+                        "SUCCESS", null);
+            }
+            default -> throw badRequest("DECISION_INVALID", "decision 只能是 MERGE 或 REJECT");
+        }
+        PoiConflictRow resolved = repository.findPoiConflict(conflictId);
+        return new PoiConflictView(resolved.candidateId(), resolved.cityCode(), resolved.candidatePoiId(),
+                resolved.candidateName(), resolved.existingPoiId(), resolved.existingName(),
+                resolved.conflictType(), resolved.status(), resolved.createdAt());
     }
 
     private List<UUID> recordAliasConflicts(UUID cityId, UUID candidatePoiId, String alias) {
@@ -486,29 +532,55 @@ public class KnowledgeService {
                     importType, "FAILED", request.rows().size(), errors.size(), errorsJson, null, Instant.now()));
             audit.write(actor, "KNOWLEDGE_IMPORT_COMMIT", "IMPORT_BATCH", batchId, "REJECTED",
                     "IMPORT_VALIDATION_FAILED");
-            return new ImportCommitResponse(batchId, 0, List.of(), errors);
+            return new ImportCommitResponse(batchId, 0, List.of(), List.of(), errors);
         }
         List<UUID> knowledgeIds = new ArrayList<>();
-        for (ImportRow row : request.rows()) {
-            PoiRow poi = resolveImportPoi(row);
-            UUID cityId = requireCity(row.city());
-            String entryKey = blank(row.entryKey()) ? "kb-" + UUID.randomUUID() : row.entryKey();
-            List<ChunkDraft> chunks = new ArrayList<>();
-            for (int index = 0; index < row.chunks().size(); index++) {
-                chunks.add(new ChunkDraft(index + 1, row.chunks().get(index), null));
+        List<UUID> createdIds = new ArrayList<>();
+        if ("ATTRACTION_KNOWLEDGE".equals(importType)) {
+            for (ImportRow row : request.rows()) {
+                PoiRow poi = resolveImportPoi(row);
+                UUID cityId = requireCity(row.city());
+                String entryKey = blank(row.entryKey()) ? "kb-" + UUID.randomUUID() : row.entryKey();
+                List<ChunkDraft> chunks = new ArrayList<>();
+                for (int index = 0; index < row.chunks().size(); index++) {
+                    chunks.add(new ChunkDraft(index + 1, row.chunks().get(index), null));
+                }
+                KnowledgeRow created = repository.insertEntry(new KnowledgeDraft(entryKey, poi.poiId(), cityId,
+                        null, repository.nextEntryVersion(entryKey), row.title(), row.factType(),
+                        json(row.factValue()), row.effectiveFrom(), row.effectiveUntil(), row.lastVerifiedAt(),
+                        row.sourceSnapshotId(), actor, chunks));
+                knowledgeIds.add(created.knowledgeId());
+                createdIds.add(created.knowledgeId());
             }
-            KnowledgeRow created = repository.insertEntry(new KnowledgeDraft(entryKey, poi.poiId(), cityId, null,
-                    repository.nextEntryVersion(entryKey), row.title(), row.factType(), json(row.factValue()),
-                    row.effectiveFrom(), row.effectiveUntil(), row.lastVerifiedAt(), row.sourceSnapshotId(), actor,
-                    chunks));
-            knowledgeIds.add(created.knowledgeId());
+        } else if ("POI".equals(importType)) {
+            for (ImportRow row : request.rows()) {
+                PoiView created = createPoi(actor, new PoiDraftRequest(row.city(), null, row.poiName(),
+                        row.poiCategory(), row.district(), row.longitude(), row.latitude(),
+                        row.coordinateSystem(), row.sourceSnapshotId(), null, row.aliases()));
+                createdIds.add(created.poiId());
+            }
+        } else if ("RESERVATION_RULE".equals(importType)) {
+            for (ImportRow row : request.rows()) {
+                PoiRow poi = resolveImportPoi(row);
+                if (poi == null) {
+                    throw badRequest("POI_NOT_FOUND", "无法唯一确定 POI");
+                }
+                ReservationRuleView created = createRule(actor, new ReservationRuleDraftRequest(poi.poiId(),
+                        row.ruleKey(), row.ticketType(), row.audience(), row.channel(), row.reservationRequired(),
+                        row.releaseTime(), row.releaseTimezone(), row.advanceDays(), row.currency(),
+                        row.amountMinor(), row.freeCondition(), row.effectiveFrom(), row.effectiveUntil(),
+                        row.holidayException(), row.lastVerifiedAt(), row.staleAfterDays(),
+                        row.sourceSnapshotId()));
+                createdIds.add(created.policyId());
+            }
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("knowledge_ids", knowledgeIds);
+        result.put("created_ids", createdIds);
         UUID batchId = repository.insertImportBatch(new ImportBatchDraft("import-" + UUID.randomUUID(), actor,
                 importType, "COMMITTED", request.rows().size(), 0, null, json(result), Instant.now()));
         audit.write(actor, "KNOWLEDGE_IMPORT_COMMIT", "IMPORT_BATCH", batchId, "SUCCESS", null);
-        return new ImportCommitResponse(batchId, knowledgeIds.size(), knowledgeIds, List.of());
+        return new ImportCommitResponse(batchId, createdIds.size(), knowledgeIds, createdIds, List.of());
     }
 
     private String requireImportType(String importType) {
@@ -551,6 +623,67 @@ public class KnowledgeService {
                 if (row.effectiveFrom() != null && row.effectiveUntil() != null
                         && row.effectiveUntil().isBefore(row.effectiveFrom())) {
                     errors.add(new ImportError(rowNo, "INVALID_VALIDITY", "生效结束时间早于开始时间"));
+                }
+                PoiRow poi = resolveImportPoi(row);
+                if (poi == null) {
+                    errors.add(new ImportError(rowNo, "POI_NOT_FOUND", "无法唯一确定 POI"));
+                } else {
+                    UUID cityId = repository.findCityId(row.city());
+                    if (cityId != null && !cityId.equals(poi.cityId())) {
+                        errors.add(new ImportError(rowNo, "CITY_MISMATCH", "POI 与导入行城市不一致"));
+                    }
+                }
+            } else if ("POI".equals(importType)) {
+                if (blank(row.poiName())) {
+                    errors.add(new ImportError(rowNo, "POI_NAME_REQUIRED", "POI 名称不能为空"));
+                }
+                if (row.longitude() == null || row.longitude() < -180 || row.longitude() > 180) {
+                    errors.add(new ImportError(rowNo, "LONGITUDE_INVALID", "经度必须在 -180 到 180 之间"));
+                }
+                if (row.latitude() == null || row.latitude() < -90 || row.latitude() > 90) {
+                    errors.add(new ImportError(rowNo, "LATITUDE_INVALID", "纬度必须在 -90 到 90 之间"));
+                }
+                if (row.sourceSnapshotId() == null
+                        || repository.findSourceSnapshot(row.sourceSnapshotId()) == null) {
+                    errors.add(new ImportError(rowNo, "SOURCE_NOT_FOUND", "来源快照不存在"));
+                }
+                if (row.aliases() != null
+                        && row.aliases().stream().anyMatch(alias -> alias == null || alias.isBlank())) {
+                    errors.add(new ImportError(rowNo, "ALIAS_INVALID", "别名不能为空"));
+                }
+            } else if ("RESERVATION_RULE".equals(importType)) {
+                if (blank(row.ticketType())) {
+                    errors.add(new ImportError(rowNo, "TICKET_TYPE_REQUIRED", "票种不能为空"));
+                }
+                if (row.effectiveFrom() == null) {
+                    errors.add(new ImportError(rowNo, "EFFECTIVE_FROM_REQUIRED", "生效开始时间不能为空"));
+                }
+                if (row.lastVerifiedAt() == null) {
+                    errors.add(new ImportError(rowNo, "LAST_VERIFIED_REQUIRED", "核验时间不能为空"));
+                }
+                if (blank(row.releaseTimezone())) {
+                    errors.add(new ImportError(rowNo, "TIMEZONE_REQUIRED", "放票时区不能为空"));
+                }
+                if (row.effectiveFrom() != null && row.effectiveUntil() != null
+                        && row.effectiveUntil().isBefore(row.effectiveFrom())) {
+                    errors.add(new ImportError(rowNo, "INVALID_VALIDITY", "生效结束时间早于开始时间"));
+                }
+                if ((row.currency() == null) != (row.amountMinor() == null)) {
+                    errors.add(new ImportError(rowNo, "PRICE_INCOMPLETE", "币种和价格必须同时提供或同时为空"));
+                }
+                if (!blank(row.releaseTime())) {
+                    try {
+                        LocalTime.parse(row.releaseTime());
+                    } catch (RuntimeException exception) {
+                        errors.add(new ImportError(rowNo, "RELEASE_TIME_INVALID", "放票时间格式不合法"));
+                    }
+                }
+                if (row.staleAfterDays() != null && row.staleAfterDays() <= 0) {
+                    errors.add(new ImportError(rowNo, "STALE_WINDOW_INVALID", "过期天数必须大于 0"));
+                }
+                if (row.sourceSnapshotId() == null
+                        || repository.findSourceSnapshot(row.sourceSnapshotId()) == null) {
+                    errors.add(new ImportError(rowNo, "SOURCE_NOT_FOUND", "来源快照不存在"));
                 }
                 PoiRow poi = resolveImportPoi(row);
                 if (poi == null) {
