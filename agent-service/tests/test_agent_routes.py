@@ -1,8 +1,7 @@
-"""Route-level tests without requiring FastAPI/httpx at runtime.
+"""Fast, dependency-light route tests using a minimal FastAPI stub.
 
-The repository's HTTP layer is still exercised through a minimal FastAPI stub:
-the route functions, catalog wiring and failure envelope are real, while the
-ASGI server itself remains covered by the HTTP PENDING item in S16/S17.
+The real ASGI/TestClient contract is covered by ``test_r3_http.py``.  Keep this
+file as the offline fallback for environments without fastapi/httpx installed.
 """
 
 from __future__ import annotations
