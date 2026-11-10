@@ -29,7 +29,7 @@
 | S11 | 已完成 | [S11.md](S11.md)、[S11-Gate.md](S11-Gate.md) |
 | S12 | 进行中（真实高德适配器已接入，契约冻结项 PENDING） | [S12.md](S12.md) |
 | S13 | 进行中（真实和风天气适配器已接入，契约冻结项 PENDING） | [S13.md](S13.md) |
-| S15 | 进行中（Java 编译/19 项 JUnit/Flyway/MySQL 已验证；Chroma 真实运行时、Maven 全量、S06 真实库导入 PENDING） | [S15.md](S15.md) |
+| S15 | 进行中（Maven 135 项测试/Flyway/MySQL/S06 导入/Chroma 运行时已验证；bge 生产索引、Java-Python 联调 PENDING） | [S15.md](S15.md) |
 | S16 | 进行中（离线 Agent 完成；Chroma/Java 联调 PENDING） | [S16.md](S16.md) |
 | S17 | 进行中（离线 Agent 完成；Java 规则库联调 PENDING） | [S17.md](S17.md) |
 | S14、S18-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
@@ -41,6 +41,8 @@
 ## R3 合并后复核
 
 2026-11-09 在本地 `.venv` 中执行 `python -m pytest tests/ --disable-warnings`：**214 passed**（S12/S13 原有 166 项 + R3 新增 48 项，其中 4 项为真实 FastAPI/TestClient HTTP）。该结果只证明当前 Python 套件通过，不改变 S12-S17 各自的冻结项或 PENDING。
+
+2026-11-10 在 JDK 21 + Maven 3.9.9 下执行 `mvn test`：**135 tests, 0 failures, 12 skipped**；另跑 S11 MySQL 6/6、Redis 2/2、S15 真实库导入 1/1。Chroma 运行时用确定性 embedding 验证通过，bge 生产索引仍 PENDING。
 
 ## R4 合并补充
 
