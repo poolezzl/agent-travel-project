@@ -596,7 +596,7 @@ class KnowledgeServiceTests {
             entries.put(id, row);
             List<ChunkRow> list = new ArrayList<>();
             for (ChunkDraft chunk : draft.chunks()) {
-                list.add(new ChunkRow(UUID.randomUUID(), id, chunk.chunkNo(), chunk.text(), "hash", 
+                list.add(new ChunkRow(UUID.randomUUID(), id, chunk.chunkNo(), chunk.text(), "hash",
                         chunk.vectorRecordId()));
             }
             chunks.put(id, list);

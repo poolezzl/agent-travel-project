@@ -554,7 +554,10 @@ public class KnowledgeService {
             }
         } else if ("POI".equals(importType)) {
             for (ImportRow row : request.rows()) {
-                PoiView created = createPoi(actor, new PoiDraftRequest(row.city(), null, row.poiName(),
+                String externalPoiId = blank(row.externalPoiId())
+                        ? "import-" + UUID.randomUUID()
+                        : row.externalPoiId();
+                PoiView created = createPoi(actor, new PoiDraftRequest(row.city(), externalPoiId, row.poiName(),
                         row.poiCategory(), row.district(), row.longitude(), row.latitude(),
                         row.coordinateSystem(), row.sourceSnapshotId(), null, row.aliases()));
                 createdIds.add(created.poiId());

@@ -236,6 +236,7 @@ public final class KnowledgeModels {
             @JsonProperty("city") @NotBlank String city,
             @JsonProperty("poi_id") UUID poiId,
             @JsonProperty("poi_name") @Size(max = 255) String poiName,
+            @JsonProperty("external_poi_id") @Size(max = 255) String externalPoiId,
             @JsonProperty("entry_key") @Size(max = 128) String entryKey,
             @JsonProperty("title") @Size(max = 255) String title,
             @JsonProperty("fact_type") @Size(max = 32) String factType,
@@ -269,7 +270,7 @@ public final class KnowledgeModels {
         public ImportRow(Integer rowNo, String city, UUID poiId, String poiName, String entryKey, String title,
                 String factType, Object factValue, Instant effectiveFrom, Instant effectiveUntil,
                 Instant lastVerifiedAt, UUID sourceSnapshotId, List<String> chunks) {
-            this(rowNo, city, poiId, poiName, entryKey, title, factType, factValue, effectiveFrom,
+            this(rowNo, city, poiId, poiName, null, entryKey, title, factType, factValue, effectiveFrom,
                     effectiveUntil, lastVerifiedAt, sourceSnapshotId, chunks, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }

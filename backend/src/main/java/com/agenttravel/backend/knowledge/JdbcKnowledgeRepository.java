@@ -316,7 +316,7 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
     public KnowledgeRow insertEntry(KnowledgeDraft draft) {
         UUID entryId = UUID.randomUUID();
         Instant now = Instant.now();
-        String contentHash = entryHash(draft);
+        byte[] contentHash = entryHash(draft);
         jdbc.update("""
                 INSERT INTO knowledge_entry(
                   id,entry_key,poi_id,city_id,parent_entry_id,version_no,title,status,
@@ -596,14 +596,14 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
         return summary;
     }
 
-    private String entryHash(KnowledgeDraft draft) {
+    private byte[] entryHash(KnowledgeDraft draft) {
         StringBuilder value = new StringBuilder();
         value.append(draft.entryKey()).append('|').append(draft.versionNo()).append('|').append(draft.title())
                 .append('|').append(draft.factValueJson());
         for (ChunkDraft chunk : draft.chunks()) {
             value.append('|').append(chunk.text());
         }
-        return java.util.Base64.getEncoder().encodeToString(hash(value.toString()));
+        return hash(value.toString());
     }
 
     private String json(Object value) {
