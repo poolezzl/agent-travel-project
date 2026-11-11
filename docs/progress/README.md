@@ -29,9 +29,9 @@
 | S11 | 已完成 | [S11.md](S11.md)、[S11-Gate.md](S11-Gate.md) |
 | S12 | 进行中（真实高德适配器已接入，契约冻结项 PENDING） | [S12.md](S12.md) |
 | S13 | 进行中（真实和风天气适配器已接入，契约冻结项 PENDING） | [S13.md](S13.md) |
-| S15 | 进行中（Maven 136 项测试/Flyway/MySQL/S06 导入/Chroma 运行时/bge 索引/Python-Java 联调已验证；R7 真实来源与节假日日历人工审核 PENDING） | [S15.md](S15.md)、[人工审核清单](S15-人工审核清单.md) |
-| S16 | 进行中（离线 Agent + Java 发布快照联调完成；真实北京数据人工审核 PENDING） | [S16.md](S16.md) |
-| S17 | 进行中（离线 Agent + Java 规则快照路径完成；真实节假日/规则人工核验 PENDING） | [S17.md](S17.md) |
+| S15 | 已完成（R3 已审核 2026-11-11；Maven 136 项测试/Flyway/MySQL/S06 导入/Chroma 运行时/bge 索引/Python-Java 联调均通过） | [S15.md](S15.md)、[人工审核清单](S15-人工审核清单.md) |
+| S16 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 发布快照联调通过） | [S16.md](S16.md) |
+| S17 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 规则快照路径通过） | [S17.md](S17.md) |
 | S14、S18-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容
