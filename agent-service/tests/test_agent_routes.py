@@ -58,10 +58,13 @@ class AgentRouteTests(unittest.TestCase):
 
     def setUp(self) -> None:
         os.environ["AGENT_KNOWLEDGE_CATALOG"] = "resources/published_catalog.json"
+        os.environ["AGENT_DINING_POI_SOURCE"] = "resources/dining_lodging_pois.json"
         self.module.get_catalog.cache_clear()
+        self.module.get_dining_source.cache_clear()
 
     def tearDown(self) -> None:
         self.module.get_catalog.cache_clear()
+        self.module.get_dining_source.cache_clear()
 
     def _point(self) -> dict[str, object]:
         return {
@@ -83,6 +86,59 @@ class AgentRouteTests(unittest.TestCase):
         result = self.module.invoke_reservation_rules(body)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(len(result["timeline"]), 1)
+
+    def _dining_input(self) -> dict[str, object]:
+        return {
+            "date": "2026-11-20",
+            "itinerary_draft": {
+                "city_id": "beijing",
+                "days": [
+                    {
+                        "date": "2026-11-20",
+                        "segments": [
+                            {
+                                "point_id": "POI-BJ-001",
+                                "name": "故宫博物院",
+                                "district": "东城区",
+                                "latitude": 39.916,
+                                "longitude": 116.397,
+                                "start_time": "09:00",
+                                "end_time": "11:30",
+                            },
+                            {
+                                "point_id": "POI-BJ-002",
+                                "name": "景山公园",
+                                "district": "东城区",
+                                "latitude": 39.928,
+                                "longitude": 116.396,
+                                "start_time": "14:00",
+                                "end_time": "17:30",
+                            },
+                        ],
+                    }
+                ],
+            },
+        }
+
+    def test_dining_lodging_route_returns_sorted_candidates(self) -> None:
+        result = self.module.invoke_dining_lodging(
+            {"task_id": "task-dining", "input": self._dining_input()}
+        )
+        self.assertEqual(result["task_id"], "task-dining")
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(len(result["meals"]), 2)
+        self.assertEqual(len(result["lodging"]), 1)
+        self.assertEqual(
+            [c["poi_id"] for c in result["meals"][0]["candidates"]],
+            ["DINING-BJ-001", "DINING-BJ-002", "DINING-BJ-003"],
+        )
+
+    def test_missing_dining_source_returns_source_unavailable(self) -> None:
+        os.environ["AGENT_DINING_POI_SOURCE"] = "resources/does-not-exist.json"
+        self.module.get_dining_source.cache_clear()
+        result = self.module.invoke_dining_lodging({"input": self._dining_input()})
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error_code"], "SOURCE_UNAVAILABLE")
 
     def test_catalog_status_hides_fact_text(self) -> None:
         result = self.module.catalog_status()

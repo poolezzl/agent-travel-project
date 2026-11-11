@@ -1,0 +1,174 @@
+{
+  "schema_version": "agent-contract-v1",
+  "task_id": "task-demo",
+  "trace_id": "trace-demo",
+  "request_id": "req-05-candidates",
+  "generated_at": "2026-11-11T10:00:00Z",
+  "status": "ok",
+  "message": "餐饮住宿候选来自合法 POI 检索，已按顺路性排序。",
+  "source_metadata": [
+    {
+      "source_type": "poi",
+      "source_record_id": "SRC-DINING-001",
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    },
+    {
+      "source_type": "poi",
+      "source_record_id": "SRC-LODGING-001",
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "meals": [
+    {
+      "date": "2026-11-20",
+      "meal": "lunch",
+      "anchor_point_id": "POI-BJ-001",
+      "candidates": [
+        {
+          "poi_id": "DINING-BJ-001",
+          "name": "示例餐厅一",
+          "city_id": "beijing",
+          "category": "restaurant",
+          "latitude": 39.916,
+          "longitude": 116.402,
+          "price": {
+            "basis": "per_person",
+            "kind": "exact",
+            "currency": "CNY",
+            "amount_minor": 6800,
+            "min_minor": null,
+            "max_minor": null
+          },
+          "retrieved_at": "2026-11-11T09:00:00Z",
+          "valid_until": "2027-11-11T00:00:00Z",
+          "freshness_status": "fresh",
+          "source_record_id": "SRC-DINING-001",
+          "detour_min": 6
+        },
+        {
+          "poi_id": "DINING-BJ-002",
+          "name": "示例餐厅二",
+          "city_id": "beijing",
+          "category": "restaurant",
+          "latitude": 39.918,
+          "longitude": 116.405,
+          "price": {
+            "basis": "per_person",
+            "kind": "range",
+            "currency": "CNY",
+            "amount_minor": null,
+            "min_minor": 5000,
+            "max_minor": 8000
+          },
+          "retrieved_at": "2026-11-11T09:00:00Z",
+          "freshness_status": "fresh",
+          "source_record_id": "SRC-DINING-001",
+          "detour_min": 9
+        },
+        {
+          "poi_id": "DINING-BJ-003",
+          "name": "示例餐厅三",
+          "city_id": "beijing",
+          "category": "restaurant",
+          "latitude": 39.920,
+          "longitude": 116.408,
+          "price": {
+            "basis": "per_person",
+            "kind": "unknown",
+            "currency": null,
+            "amount_minor": null,
+            "min_minor": null,
+            "max_minor": null
+          },
+          "retrieved_at": "2026-11-11T09:00:00Z",
+          "freshness_status": "fresh",
+          "source_record_id": "SRC-DINING-001",
+          "detour_min": 12
+        }
+      ]
+    },
+    {
+      "date": "2026-11-20",
+      "meal": "dinner",
+      "anchor_point_id": "POI-BJ-002",
+      "candidates": [
+        {
+          "poi_id": "DINING-BJ-001",
+          "name": "示例餐厅一",
+          "city_id": "beijing",
+          "category": "restaurant",
+          "latitude": 39.916,
+          "longitude": 116.402,
+          "price": {
+            "basis": "per_person",
+            "kind": "exact",
+            "currency": "CNY",
+            "amount_minor": 6800,
+            "min_minor": null,
+            "max_minor": null
+          },
+          "retrieved_at": "2026-11-11T09:00:00Z",
+          "valid_until": "2027-11-11T00:00:00Z",
+          "freshness_status": "fresh",
+          "source_record_id": "SRC-DINING-001",
+          "detour_min": 6
+        },
+        {
+          "poi_id": "DINING-BJ-002",
+          "name": "示例餐厅二",
+          "city_id": "beijing",
+          "category": "restaurant",
+          "latitude": 39.918,
+          "longitude": 116.405,
+          "price": {
+            "basis": "per_person",
+            "kind": "range",
+            "currency": "CNY",
+            "amount_minor": null,
+            "min_minor": 5000,
+            "max_minor": 8000
+          },
+          "retrieved_at": "2026-11-11T09:00:00Z",
+          "freshness_status": "fresh",
+          "source_record_id": "SRC-DINING-001",
+          "detour_min": 9
+        }
+      ]
+    }
+  ],
+  "lodging": [
+    {
+      "date": "2026-11-20",
+      "area": "东城区",
+      "anchor_point_id": "POI-BJ-002",
+      "candidates": [
+        {
+          "poi_id": "LODGING-BJ-001",
+          "name": "示例住宿一",
+          "city_id": "beijing",
+          "category": "lodging",
+          "latitude": 39.917,
+          "longitude": 116.403,
+          "price": {
+            "basis": "per_night",
+            "kind": "exact",
+            "currency": "CNY",
+            "amount_minor": 42000,
+            "min_minor": null,
+            "max_minor": null
+          },
+          "retrieved_at": "2026-11-11T09:00:00Z",
+          "freshness_status": "fresh",
+          "source_record_id": "SRC-LODGING-001",
+          "detour_min": 5
+        }
+      ]
+    }
+  ]
+}

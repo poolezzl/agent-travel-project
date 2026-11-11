@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
-  title: R3 Attractions and Reservation Agent API
+  title: R3 Attractions, Dining/Lodging and Reservation Agent API
   version: agent-contract-v1
   description: >
-    Local Agent service endpoints for S16 (attractions) and S17 (reservation
-    rules). Responses follow the frozen agent envelope in
-    agents/04-attractions/output.schema.json and
+    Local Agent service endpoints for S16 (attractions), S18 (dining/lodging)
+    and S17 (reservation rules). Responses follow the frozen agent envelope in
+    agents/04-attractions/output.schema.json,
+    agents/05-dining-lodging/output.schema.json and
     agents/06-reservation-rules/output.schema.json.
 servers:
   - url: http://127.0.0.1:8000
@@ -15,6 +16,24 @@ paths:
       operationId: invokeAttractionsAgent
       tags: [r3-agents]
       summary: Return cited attraction cards from the published knowledge snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInvocation'
+      responses:
+        '200':
+          description: Agent envelope (status is ok/partial/degraded/failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentEnvelope'
+  /v1/agents/dining-lodging/invoke:
+    post:
+      operationId: invokeDiningLodgingAgent
+      tags: [r3-agents]
+      summary: Return legal dining and lodging candidates sorted by detour
       requestBody:
         required: true
         content:
@@ -122,6 +141,12 @@ components:
           type: array
           items: { $ref: '#/components/schemas/SourceMetadata' }
         cards:
+          type: array
+          items: { type: object, additionalProperties: true }
+        meals:
+          type: array
+          items: { type: object, additionalProperties: true }
+        lodging:
           type: array
           items: { type: object, additionalProperties: true }
         reservations:

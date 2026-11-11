@@ -1,0 +1,90 @@
+{
+  "sample_only": true,
+  "notice": "Synthetic S18 dining/lodging POIs for local contract and demo tests. Not real venues or prices.",
+  "pois": [
+    {
+      "poi_id": "DINING-BJ-001",
+      "name": "示例餐厅·东华门",
+      "city_id": "beijing",
+      "category": "restaurant",
+      "latitude": 39.916,
+      "longitude": 116.401,
+      "price": {"kind": "exact", "currency": "CNY", "amount_minor": 6800},
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "source_record_id": "SRC-DINING-BJ-001",
+      "detour_min": 5
+    },
+    {
+      "poi_id": "DINING-BJ-002",
+      "name": "示例餐厅·景山",
+      "city_id": "beijing",
+      "category": "restaurant",
+      "latitude": 39.925,
+      "longitude": 116.399,
+      "price": {"kind": "range", "currency": "CNY", "min_minor": 5000, "max_minor": 8000},
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "source_record_id": "SRC-DINING-BJ-002",
+      "detour_min": 8
+    },
+    {
+      "poi_id": "DINING-BJ-003",
+      "name": "示例餐厅·王府井",
+      "city_id": "beijing",
+      "category": "restaurant",
+      "latitude": 39.913,
+      "longitude": 116.410,
+      "price": {"kind": "unknown"},
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "source_record_id": "SRC-DINING-BJ-003",
+      "detour_min": 12
+    },
+    {
+      "poi_id": "LODGING-BJ-001",
+      "name": "示例住宿·东城",
+      "city_id": "beijing",
+      "category": "lodging",
+      "latitude": 39.917,
+      "longitude": 116.403,
+      "price": {"kind": "exact", "currency": "CNY", "amount_minor": 42000},
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "source_record_id": "SRC-LODGING-BJ-001",
+      "detour_min": 5
+    },
+    {
+      "poi_id": "LODGING-BJ-002",
+      "name": "示例住宿·景山",
+      "city_id": "beijing",
+      "category": "lodging",
+      "latitude": 39.926,
+      "longitude": 116.398,
+      "price": {"kind": "range", "currency": "CNY", "min_minor": 35000, "max_minor": 52000},
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "source_record_id": "SRC-LODGING-BJ-002",
+      "detour_min": 10
+    },
+    {
+      "poi_id": "LODGING-BJ-003",
+      "name": "示例住宿·东单",
+      "city_id": "beijing",
+      "category": "lodging",
+      "latitude": 39.908,
+      "longitude": 116.418,
+      "price": {"kind": "unknown"},
+      "retrieved_at": "2026-11-11T09:00:00Z",
+      "valid_until": "2027-11-11T00:00:00Z",
+      "freshness_status": "fresh",
+      "source_record_id": "SRC-LODGING-BJ-003",
+      "detour_min": 20
+    }
+  ]
+}

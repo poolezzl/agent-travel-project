@@ -32,7 +32,8 @@
 | S15 | 已完成（R3 已审核 2026-11-11；Maven 136 项测试/Flyway/MySQL/S06 导入/Chroma 运行时/bge 索引/Python-Java 联调均通过） | [S15.md](S15.md)、[人工审核清单](S15-人工审核清单.md) |
 | S16 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 发布快照联调通过） | [S16.md](S16.md) |
 | S17 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 规则快照路径通过） | [S17.md](S17.md) |
-| S14、S18-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
+| S18 | 已完成（R3，2026-11-11；离线 Agent + 合法 POI 端口；本地合成样例） | [S18.md](S18.md) |
+| S14、S19-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容
 
@@ -40,7 +41,7 @@
 
 ## R3 合并后复核
 
-2026-11-11 在本地 `.venv` 中执行 `python -m pytest tests/ --disable-warnings`：**222 passed**（S12/S13 原有 166 项 + R3 新增 56 项，其中 4 项真实 FastAPI/TestClient HTTP、8 项 Python→Java 内部客户端）。该结果只证明当前 Python 套件通过，不改变 S12-S17 各自的冻结项或 PENDING。
+2026-11-11 在本地 `.venv` 中执行 `python -m pytest tests/ --disable-warnings`：**235 passed**（S12/S13 原有 166 项 + R3 新增 69 项，其中 5 项真实 FastAPI/TestClient HTTP、8 项 Python→Java 内部客户端）。该结果只证明当前 Python 套件通过，不改变 S12-S18 各自的冻结项或 PENDING。
 
 2026-11-10 在 JDK 21 + Maven 3.9.9 下执行 `mvn test`：**136 tests, 0 failures, 12 skipped**；另跑 S11 MySQL 6/6、Redis 2/2、S15 真实库导入 1/1。Chroma 运行时与 bge 生产索引（8 chunks）均已真实验证；Java 发布快照已导出并被 S16 加载。
 

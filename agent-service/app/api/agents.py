@@ -9,9 +9,10 @@ from typing import Any
 
 from fastapi import APIRouter, Body
 
-from app.agents import attractions, reservation_rules
-from app.agents.common import new_context
+from app.agents import attractions, dining_lodging, reservation_rules
+from app.agents.common import failure, new_context
 from app.knowledge.catalog import CatalogError, PublishedCatalog
+from app.knowledge.dining_lodging import JsonPoiSource, PoiSourceError
 
 router = APIRouter(prefix="/v1/agents", tags=["r3-agents"])
 
@@ -25,6 +26,15 @@ def get_catalog() -> PublishedCatalog:
     if not path.is_absolute():
         path = _SERVICE_ROOT / path
     return PublishedCatalog.load(path)
+
+
+@lru_cache(maxsize=1)
+def get_dining_source() -> JsonPoiSource:
+    configured = os.environ.get("AGENT_DINING_POI_SOURCE", "resources/dining_lodging_pois.json")
+    path = Path(configured)
+    if not path.is_absolute():
+        path = _SERVICE_ROOT / path
+    return JsonPoiSource.load(path)
 
 
 def _context(body: dict[str, Any]) -> dict[str, str]:
@@ -42,35 +52,37 @@ def _inputs(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _invoke(agent: str, body: dict[str, Any]) -> dict[str, Any]:
+    context = _context(body)
+    inputs = _inputs(body)
+    if agent == "dining-lodging":
+        try:
+            source = get_dining_source()
+        except PoiSourceError as exc:
+            return failure(context, "SOURCE_UNAVAILABLE", str(exc))
+        return dining_lodging.run(inputs, context, poi_source=source)
     try:
         catalog = get_catalog()
     except CatalogError as exc:
-        return {
-            "schema_version": "agent-contract-v1",
-            "task_id": body.get("task_id", "task-unavailable"),
-            "trace_id": body.get("trace_id", "trace-unavailable"),
-            "request_id": body.get("request_id", "req-unavailable"),
-            "generated_at": new_context()["generated_at"],
-            "status": "failed",
-            "error_code": "SOURCE_UNAVAILABLE",
-            "message": str(exc),
-            "source_metadata": [],
-        }
-    context = _context(body)
-    inputs = _inputs(body)
+        return failure(context, "SOURCE_UNAVAILABLE", str(exc))
     if agent == "attractions":
         return attractions.run(inputs, catalog, context)
     return reservation_rules.run(inputs, catalog, context)
 
 
 @router.post("/attractions/invoke")
-def invoke_attractions(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+def invoke_attractions(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
     """Run the S16 attractions agent against the published knowledge snapshot."""
     return _invoke("attractions", body)
 
 
+@router.post("/dining-lodging/invoke")
+def invoke_dining_lodging(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
+    """Run the S18 dining/lodging agent against legal POI records."""
+    return _invoke("dining-lodging", body)
+
+
 @router.post("/reservation-rules/invoke")
-def invoke_reservation_rules(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+def invoke_reservation_rules(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
     """Run the S17 reservation-rules agent against published rules."""
     return _invoke("reservation-rules", body)
 

@@ -18,6 +18,9 @@
       "type": "array"
     },
     "lodging": {
+      "items": {
+        "$ref": "#/definitions/lodging"
+      },
       "type": "array"
     },
     "error_code": {
@@ -32,6 +35,9 @@
       "$ref": "#/definitions/source_metadata"
     },
     "meals": {
+      "items": {
+        "$ref": "#/definitions/meal"
+      },
       "type": "array"
     },
     "generated_at": {
@@ -119,6 +125,285 @@
         ]
       },
       "type": "array"
+    },
+    "price": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "exact"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount_minor": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "range"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "max_minor": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "min_minor": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "amount_minor": {
+                "type": "null"
+              },
+              "max_minor": {
+                "type": "null"
+              },
+              "min_minor": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "amount_minor": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "per_person",
+            "per_night"
+          ],
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "exact",
+            "range",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "max_minor": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "min_minor": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "basis",
+        "kind",
+        "currency",
+        "amount_minor",
+        "min_minor",
+        "max_minor"
+      ],
+      "type": "object"
+    },
+    "candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "restaurant",
+            "lodging"
+          ],
+          "type": "string"
+        },
+        "city_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "detour_min": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "freshness_status": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "latitude": {
+          "maximum": 90,
+          "minimum": -90,
+          "type": "number"
+        },
+        "longitude": {
+          "maximum": 180,
+          "minimum": -180,
+          "type": "number"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "poi_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "price": {
+          "$ref": "#/definitions/price"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "source_record_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "valid_until": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "poi_id",
+        "name",
+        "city_id",
+        "category",
+        "latitude",
+        "longitude",
+        "price",
+        "retrieved_at",
+        "source_record_id",
+        "detour_min"
+      ],
+      "type": "object"
+    },
+    "meal": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor_point_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/definitions/candidate"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        "date": {
+          "format": "date",
+          "type": "string"
+        },
+        "meal": {
+          "enum": [
+            "lunch",
+            "dinner"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "meal",
+        "anchor_point_id",
+        "candidates"
+      ],
+      "type": "object"
+    },
+    "lodging": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor_point_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "area": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/definitions/candidate"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        "date": {
+          "format": "date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "anchor_point_id",
+        "candidates"
+      ],
+      "type": "object"
     },
     "envelope": {
       "properties": {
