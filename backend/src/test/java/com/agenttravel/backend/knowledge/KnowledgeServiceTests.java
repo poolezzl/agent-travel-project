@@ -166,6 +166,24 @@ class KnowledgeServiceTests {
     }
 
     @Test
+    void exportPublishedCatalogIncludesPoisEntriesChunksAndRules() {
+        UUID sourceId = source();
+        UUID poiId = createPoi(sourceId);
+        publishedEntry(poiId, sourceId, Instant.now().minus(Duration.ofDays(1)), null);
+        publishedRule(poiId, sourceId, Instant.now().minus(Duration.ofDays(1)), null,
+                Instant.now().minus(Duration.ofHours(1)), 30, "CNY", 100L);
+
+        Map<String, Object> catalog = service.exportPublishedCatalog("北京");
+
+        assertThat(catalog.get("pois")).asList().hasSize(1);
+        assertThat(catalog.get("entries")).asList().hasSize(1);
+        assertThat(catalog.get("rules")).asList().hasSize(1);
+        Map<String, Object> entry = (Map<String, Object>) ((List<?>) catalog.get("entries")).get(0);
+        assertThat(entry).containsKeys("knowledge_id", "source", "chunks");
+        assertThat((List<?>) entry.get("chunks")).hasSize(1);
+    }
+
+    @Test
     void invalidStateTransitionIsRejected() {
         UUID sourceId = source();
         UUID poiId = createPoi(sourceId);

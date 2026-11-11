@@ -753,6 +753,120 @@ public class KnowledgeService {
         return new AttractionQueryResponse(request.city(), cards, metadata, now);
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> exportPublishedCatalog(String city) {
+        requireCity(city);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("catalog_version", "java-" + Instant.now().toEpochMilli());
+        payload.put("generated_at", Instant.now().toString());
+        List<Map<String, Object>> pois = new ArrayList<>();
+        List<Map<String, Object>> entries = new ArrayList<>();
+        List<Map<String, Object>> rules = new ArrayList<>();
+        Set<UUID> seenPois = new LinkedHashSet<>();
+        for (KnowledgeRow row : repository.findEntriesByCity(city)) {
+            if (!row.status().retrievable()) {
+                continue;
+            }
+            SourceRow source = repository.findSourceSnapshot(row.sourceSnapshotId());
+            PoiRow poi = repository.findPoi(row.poiId());
+            if (source == null || poi == null) {
+                continue;
+            }
+            if (seenPois.add(poi.poiId())) {
+                pois.add(poiMap(poi, city));
+            }
+            List<Map<String, Object>> chunks = new ArrayList<>();
+            for (ChunkRow chunk : repository.findChunks(row.knowledgeId())) {
+                Map<String, Object> chunkMap = new LinkedHashMap<>();
+                chunkMap.put("chunk_id", chunk.chunkId().toString());
+                chunkMap.put("fact_type", row.factType());
+                chunkMap.put("text", chunk.contentText());
+                chunks.add(chunkMap);
+            }
+            if (chunks.isEmpty()) {
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("knowledge_id", row.knowledgeId().toString());
+            entry.put("poi_id", row.poiId().toString());
+            entry.put("city_id", city);
+            entry.put("title", row.title());
+            entry.put("status", row.status().name());
+            entry.put("fact_type", row.factType());
+            entry.put("effective_from", instantString(row.effectiveFrom()));
+            entry.put("effective_until", instantString(row.effectiveUntil()));
+            entry.put("last_verified_at", instantString(row.lastVerifiedAt()));
+            entry.put("source", sourceMap(source));
+            entry.put("chunks", chunks);
+            entries.add(entry);
+        }
+        for (RuleRow row : repository.findRulesByCity(city)) {
+            if (!row.status().retrievable()) {
+                continue;
+            }
+            SourceRow source = repository.findSourceSnapshot(row.sourceSnapshotId());
+            PoiRow poi = repository.findPoi(row.poiId());
+            if (source == null || poi == null) {
+                continue;
+            }
+            if (seenPois.add(poi.poiId())) {
+                pois.add(poiMap(poi, city));
+            }
+            Map<String, Object> rule = new LinkedHashMap<>();
+            rule.put("policy_id", row.policyId().toString());
+            rule.put("poi_id", row.poiId().toString());
+            rule.put("city_id", city);
+            rule.put("status", row.status().name());
+            rule.put("ticket_type", row.ticketType());
+            rule.put("audience", row.audience());
+            rule.put("reservation_required", row.reservationRequired());
+            rule.put("channel", row.channel());
+            rule.put("release_time", row.releaseTime() == null ? null : row.releaseTime().toString());
+            rule.put("release_timezone", row.releaseTimezone());
+            rule.put("advance_days", row.advanceDays());
+            rule.put("currency", row.currency());
+            rule.put("amount_minor", row.amountMinor());
+            rule.put("free_condition", row.freeCondition());
+            rule.put("effective_from", instantString(row.effectiveFrom()));
+            rule.put("effective_until", instantString(row.effectiveUntil()));
+            rule.put("holiday_exception", row.holidayException());
+            rule.put("last_verified_at", instantString(row.lastVerifiedAt()));
+            rule.put("stale_after_days", row.staleAfterDays());
+            rule.put("version", row.versionNo());
+            rule.put("source", sourceMap(source));
+            rules.add(rule);
+        }
+        payload.put("pois", pois);
+        payload.put("entries", entries);
+        payload.put("rules", rules);
+        return payload;
+    }
+
+    private Map<String, Object> poiMap(PoiRow poi, String city) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("poi_id", poi.poiId().toString());
+        value.put("city_id", city);
+        value.put("name", poi.name());
+        value.put("aliases", repository.findAliases(poi.poiId()));
+        value.put("district", poi.district());
+        value.put("category", poi.category());
+        return value;
+    }
+
+    private Map<String, Object> sourceMap(SourceRow source) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("source_type", source.sourceType().toLowerCase(Locale.ROOT));
+        value.put("source_record_id", source.sourceRecordId().toString());
+        value.put("retrieved_at", instantString(source.retrievedAt()));
+        value.put("valid_until", instantString(source.validUntil()));
+        value.put("freshness_status", source.freshnessStatus());
+        return value;
+    }
+
+    private String instantString(Instant value) {
+        return value == null ? null : value.toString();
+    }
+
     public ReservationQueryResponse queryReservations(ReservationQueryRequest request) {
         Instant now = Instant.now();
         int limit = request.limit() == null ? 10 : request.limit();

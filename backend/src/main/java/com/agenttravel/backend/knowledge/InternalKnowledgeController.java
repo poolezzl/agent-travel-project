@@ -1,11 +1,15 @@
 package com.agenttravel.backend.knowledge;
 
+import java.util.Map;
+
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -36,5 +40,10 @@ public class InternalKnowledgeController {
     public KnowledgeModels.ReservationQueryResponse queryReservations(
             @Valid @RequestBody KnowledgeModels.ReservationQueryRequest request) {
         return service.queryReservations(request);
+    }
+
+    @GetMapping("/catalog")
+    public Map<String, Object> publishedCatalog(@RequestParam String city) {
+        return service.exportPublishedCatalog(city);
     }
 }

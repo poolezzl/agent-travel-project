@@ -47,3 +47,4 @@ playwright-report/
 *.egg-info/
 build/
 dist/
+/agent-service/resources/published_catalog.java.json

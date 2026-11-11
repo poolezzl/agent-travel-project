@@ -32,6 +32,29 @@ def _point() -> dict[str, object]:
     }
 
 
+def test_catalog_success_returns_snapshot_sections() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/internal/v1/knowledge/catalog"
+        assert request.url.params["city"] == "北京"
+        return httpx.Response(
+            200,
+            json={
+                "catalog_version": "java-1",
+                "pois": [{"poi_id": "p1", "city_id": "北京", "name": "故宫博物院", "aliases": []}],
+                "entries": [{"knowledge_id": "k1", "poi_id": "p1", "chunks": []}],
+                "rules": [{"policy_id": "r1", "poi_id": "p1"}],
+            },
+        )
+
+    with _client(handler) as client:
+        catalog = client.fetch_catalog(city="北京")
+    assert catalog["catalog_version"] == "java-1"
+    assert len(catalog["pois"]) == 1
+    assert len(catalog["entries"]) == 1
+    assert len(catalog["rules"]) == 1
+
+
 def test_attractions_success_maps_request_and_returns_payload() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/internal/v1/knowledge/attractions/query"

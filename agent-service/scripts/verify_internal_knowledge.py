@@ -35,10 +35,14 @@ def main(argv: list[str] | None = None) -> int:
         point["poi_id"] = args.poi_id
 
     with InternalKnowledgeClient(args.base_url, timeout=5.0) as client:
+        catalog = client.fetch_catalog(city=args.city)
         attractions = client.query_attractions(city=args.city, points=[point])
         reservations = client.query_reservations(
             city=args.city, points=[point], day=date.fromisoformat(args.date)
         )
+    print(
+        f"catalog pois={len(catalog['pois'])} entries={len(catalog['entries'])} rules={len(catalog['rules'])}"
+    )
     print(f"attractions cards={len(attractions['cards'])} sources={len(attractions['source_metadata'])}")
     if attractions["cards"]:
         card = attractions["cards"][0]

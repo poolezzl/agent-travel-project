@@ -53,6 +53,13 @@ class InternalKnowledgeClient:
     def __exit__(self, *_: object) -> None:
         self.close()
 
+    def fetch_catalog(self, *, city: str) -> dict[str, Any]:
+        body = self._send("GET", "/internal/v1/knowledge/catalog", params={"city": city})
+        for key in ("pois", "entries", "rules"):
+            if not isinstance(body.get(key), list):
+                raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, f"catalog 响应缺少 {key} 数组")
+        return body
+
     def query_attractions(
         self,
         *,
@@ -67,7 +74,7 @@ class InternalKnowledgeClient:
             "preference_tags": list(preference_tags or []),
             "limit": limit,
         }
-        body = self._post("/internal/v1/knowledge/attractions/query", payload)
+        body = self._send("POST", "/internal/v1/knowledge/attractions/query", json=payload)
         cards = body.get("cards")
         if not isinstance(cards, list):
             raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, "attractions 响应缺少 cards 数组")
@@ -87,15 +94,15 @@ class InternalKnowledgeClient:
             "date": day.isoformat(),
             "limit": limit,
         }
-        body = self._post("/internal/v1/knowledge/reservations/query", payload)
+        body = self._send("POST", "/internal/v1/knowledge/reservations/query", json=payload)
         reservations = body.get("reservations")
         if not isinstance(reservations, list):
             raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, "reservations 响应缺少 reservations 数组")
         return body
 
-    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _send(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         try:
-            response = self._client.post(path, json=payload)
+            response = self._client.request(method, path, **kwargs)
         except httpx.TimeoutException as exc:
             raise InternalKnowledgeError(ERROR_TIMEOUT, "内部知识接口超时") from exc
         except httpx.HTTPError as exc:
