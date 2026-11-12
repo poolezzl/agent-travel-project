@@ -27,9 +27,9 @@ const routes = isMockProfile
   : [
       {
         path: '/',
-        name: 'home',
-        component: () => import('@/views/ScaffoldView.vue'),
-        meta: { title: '前端工程骨架' },
+        name: 'planning',
+        component: () => import('@/views/S14PlanningView.vue'),
+        meta: { title: 'S14 M1 真实端到端前端' },
       },
       {
         path: '/scaffold',

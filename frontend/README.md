@@ -1,8 +1,8 @@
 # Frontend
 
 S03 建立的 Vue 3 前端工程骨架（Vue 3、Vite、TypeScript、Pinia、Vue Router、Element Plus、Vitest），
-S07 在其上交付「开题演示前端」（明示 Mock 的演示页面）。本目录仍不含登录、真实 REST/SSE、任务持久化、
-积分账务、地图 SDK、供应商调用或社区写操作，这些属于 S08-S14/S21 等后续步骤。
+S07 在其上交付「开题演示前端」（明示 Mock 的演示页面）。S14 在 local/production 构建下将 `/` 切换为
+真实规划页（登录、报价、建任务、预扣、SSE 进度、取消/退款），mock 构建仍保留 S07 演示页。
 
 ## 先决条件
 
@@ -32,7 +32,7 @@ npm --prefix frontend run build
 开发服务器：
 
 ```powershell
-# development mode：profile = local，不启用 Mock 数据，只显示骨架回归页
+# development mode：profile = local，`/` 为 S14 规划页，走同源 /api 反代到后端 8080
 npm --prefix frontend run dev
 
 # mock mode：profile = mock 且 VITE_ENABLE_MOCK=true，显示 S07 演示页
@@ -47,11 +47,11 @@ npm --prefix frontend exec vite preview -- --host 127.0.0.1 --port 4173
 
 ## S07 演示页入口与内容
 
-| 路由                         | 视图                         | 说明                                                                                             |
-| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------ |
-| `/`（mock 构建）             | `src/views/S07DemoView.vue`  | S07 开题演示页（输入表单、模拟进度、时间轴、地图占位、方案对比、社区静态样张），仅 mock 构建注册 |
-| `/`（production/local 构建） | `src/views/ScaffoldView.vue` | 回到 S03 骨架页；演示路由不注册，fixture 不进入主包                                              |
-| `/scaffold`                  | `src/views/ScaffoldView.vue` | S03 骨架回归页，保留其单元测试价值，不属于 S07 演示流程                                          |
+| 路由                         | 视图                            | 说明                                                                                                |
+| ---------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `/`（mock 构建）             | `src/views/S07DemoView.vue`     | S07 开题演示页（输入表单、模拟进度、时间轴、地图占位、方案对比、社区静态样张），仅 mock 构建注册    |
+| `/`（production/local 构建） | `src/views/S14PlanningView.vue` | S14 真实规划页（认证、报价、建任务、预扣、SSE 进度、取消/退款）；演示路由不注册，fixture 不进入主包 |
+| `/scaffold`                  | `src/views/ScaffoldView.vue`    | S03 骨架回归页，保留其单元测试价值                                                                  |
 
 演示页的硬约束：
 
@@ -73,6 +73,41 @@ npm --prefix frontend exec vite preview -- --host 127.0.0.1 --port 4173
   （可用 `grep "北京三日" dist/assets/*.js` 复验，应为 0 命中）。
 - 单元测试与 Playwright 用例都覆盖「选择器只在显式 mock profile 下存在」这一约束；
   路由门禁由 `src/router/index.spec.ts` 覆盖两个分支。
+
+## S14 真实端到端前端（local/production）
+
+S14 将 local/production 构建的 `/` 切换为真实规划页 `S14PlanningView`，跑通
+「注册/登录 → 填表 → 服务端报价 → 建任务预扣 → SSE 进度 → 终态 → 取消/退款」链路。
+
+- API 层：`src/api/{http,types,auth,points,tasks,taskStatus}.ts`，字段严格 snake_case，对齐
+  `contracts/openapi/s08-public.yaml` 与 `s11-tasks.yaml`。
+- SSE 用 `fetch + ReadableStream` 手动解析（后端只接受 `Authorization: Bearer` 头，禁用 `EventSource`）。
+- 令牌只驻留 Pinia 内存，不写 `localStorage`/`sessionStorage`，刷新页面需重新登录。
+- 金额口径：积分用整数 `points`；预算用 `currency` + 整数 `amount_minor`（CNY 分）。
+
+### 本地联调
+
+后端（Java，默认 8080，需 MySQL/Redis）启动后：
+
+```powershell
+npm --prefix frontend run dev   # http://127.0.0.1:5173，/api 由 vite server.proxy 反代到 127.0.0.1:8080
+```
+
+生产构建使用相对 `/api`，由部署层反代；前端不直连跨域 `http://127.0.0.1:8080`（后端无 CORS 配置）。
+
+### 环境变量
+
+| 变量                | 说明                                                                              |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `VITE_APP_PROFILE`  | `local` / `mock`（与 `--mode` 对应）                                              |
+| `VITE_API_BASE_URL` | 为空时走同源 `/api`；`.env.mock` 中为占位 `http://127.0.0.1:8080`，仅供 mock 构建 |
+| `VITE_ENABLE_MOCK`  | 仅 `mock` mode 下为 `'true'` 时启用 S07 演示页                                    |
+
+### 已知 PENDING
+
+- `PENDING-S14-01`：后端未提供行程结果查询接口（`GET /v1/tasks/{id}` 只返回 TaskView），结果区为显式空态，不渲染 fixture。
+- `PENDING-002`（高德 Key）、`PENDING-003`（和风天气 Key）未关闭；本地后端用 `MockAgentExecutor`，
+  因此只能称「本地 Mock 供应商端到端」，未配置真实供应商时不宣称真实端到端通过。
 
 ## Playwright 演示证据
 
@@ -127,31 +162,41 @@ frontend/
     ├── App.vue
     ├── env.d.ts
     ├── main.ts
-    ├── components/s07/
-    │   ├── CommunitySamples.vue
-    │   ├── DemoNotice.vue
-    │   ├── EvidenceBadges.vue
-    │   ├── LoadingSkeleton.vue
-    │   ├── MapPlaceholder.vue
-    │   ├── MockProgress.vue
-    │   ├── MockStatusSelector.vue
-    │   ├── PlanComparison.vue
-    │   ├── PlanningForm.vue
-    │   ├── ResultState.vue
-    │   ├── ScheduleTimeline.vue
-    │   └── mockProgress.ts
+    ├── api/
+    │   ├── auth.ts
+    │   ├── http.ts
+    │   ├── points.ts
+    │   ├── taskStatus.ts
+    │   ├── tasks.ts
+    │   └── types.ts
+    ├── components/
+    │   ├── s07/
+    │   │   └── ...（S07 演示组件）
+    │   └── planning/
+    │       ├── AuthPanel.vue
+    │       ├── PlanningForm.vue
+    │       ├── QuoteSummary.vue
+    │       ├── TaskStatusBanner.vue
+    │       ├── TaskProgress.vue
+    │       ├── PlanResultPanel.vue
+    │       ├── SourceBadges.vue
+    │       └── ErrorPanel.vue
+    ├── composables/
+    │   ├── sseParser.ts
+    │   └── useTaskStream.ts
     ├── fixtures/
     │   ├── s02.ts        # 与 S02 公共信封一致的合成 envelope
-    │   ├── s07.ts        # S07 演示组合 view model 与默认场景
-    │   └── s07.spec.ts
+    │   └── s07.ts        # S07 演示组合 view model 与默认场景
     ├── router/index.ts
-    ├── stores/app.ts
+    ├── stores/
+    │   ├── app.ts
+    │   ├── planning.ts
+    │   └── session.ts
     ├── styles/index.css
     └── views/
         ├── ScaffoldView.vue
-        ├── ScaffoldView.spec.ts
         ├── S07DemoView.vue
-        └── S07DemoView.spec.ts
+        └── S14PlanningView.vue
 ```
 
 ## 边界

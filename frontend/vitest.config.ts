@@ -13,6 +13,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Node 24.14 + vite 8.3 + vitest 5.0.1 下默认进程池（forks/threads）在收集阶段
+    // 抛 "Cannot read properties of undefined (reading 'config')"，改用 VM 线程池规避。
+    pool: 'vmThreads',
     include: ['src/**/*.spec.ts'],
     restoreMocks: true,
     clearMocks: true,

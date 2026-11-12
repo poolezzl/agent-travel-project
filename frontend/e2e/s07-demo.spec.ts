@@ -1,8 +1,13 @@
+import { mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { expect, test } from '@playwright/test'
 
-const artifactDir = fileURLToPath(new URL('../../docs/progress/s07-artifacts/', import.meta.url))
+// 默认写入 frontend/test-results/s07-artifacts/（已被根 .gitignore 的 test-results/ 覆盖）。
+// 需要人工刷新证据时，用 S07_ARTIFACTS_DIR 指向 docs/progress/s07-artifacts/ 覆盖。
+const defaultArtifactDir = fileURLToPath(new URL('../test-results/s07-artifacts/', import.meta.url))
+const artifactDir = process.env.S07_ARTIFACTS_DIR ?? defaultArtifactDir
+mkdirSync(artifactDir, { recursive: true })
 
 test.describe('S07 开题演示页（Mock）', () => {
   test.beforeEach(async ({ page }) => {
