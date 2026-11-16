@@ -35,7 +35,54 @@
           }
         },
         "segments": {
-          "type": "array"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from_point_id",
+              "to_point_id",
+              "transport",
+              "distance_m",
+              "duration_min",
+              "source_record_id",
+              "retrieved_at",
+              "is_estimated"
+            ],
+            "properties": {
+              "from_point_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to_point_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "transport": {
+                "type": "string",
+                "minLength": 1
+              },
+              "distance_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "duration_min": {
+                "type": "number",
+                "minimum": 0
+              },
+              "source_record_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "retrieved_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "is_estimated": {
+                "type": "boolean"
+              }
+            }
+          }
         },
         "is_estimated": {
           "type": "boolean"

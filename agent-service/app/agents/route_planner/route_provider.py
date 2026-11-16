@@ -35,7 +35,10 @@ _NO_ESTIMATE_KINDS = frozenset(
 
 
 def route_key(query: RouteQuery) -> str:
-    """Deterministic cache key for a leg (ADR-0006). Exact format is PENDING (S10/R5)."""
+    """Deterministic cache key for a leg (ADR-0006), frozen 2026-11-16.
+
+    Supplier/version isolation is applied by the cache adapter's `key_prefix`.
+    """
     slot = query.time_slot or "any"
     return (
         f"route:v1:{query.coordinate_system}:{query.city_id}:"

@@ -17,11 +17,39 @@ _QUOTA_CODES = frozenset({"10003", "10044"})
 _RATE_CODES = frozenset({"10004", "10021", "10029", "10041"})
 _INVALID_REQUEST_CODES = frozenset({"20000", "20001", "20002", "20003"})
 
-# transport preference -> 高德 direction endpoint path. S10 only implements driving + walking;
-# transit / mixed are not yet supported by the backend adapter (PENDING-R5).
+AMAP_TRANSIT_PATH = "/v3/direction/transit/integrated"
+
+# Standard city id -> 高德 adcode for the transit API. The transit endpoint requires a city
+# code, unlike driving/walking which only need coordinates.
+AMAP_CITY_ADCODE: dict[str, str] = {
+    "beijing": "110000",
+    "shanghai": "310000",
+    "hangzhou": "330100",
+    "nanjing": "320100",
+    "suzhou": "320500",
+    "chengdu": "510100",
+    "xian": "610100",
+    "chongqing": "500000",
+    "guangzhou": "440100",
+    "xiamen": "350200",
+}
+
+
+def amap_city_code(city_id: str) -> str | None:
+    """Resolve a standard city id (or an explicit adcode) for transit requests."""
+    if city_id.isdigit() and len(city_id) == 6:
+        return city_id
+    return AMAP_CITY_ADCODE.get(city_id.strip().lower())
+
+
+# transport preference -> 高德 direction endpoint path. Transit covers bus/subway and the
+# mixed preference; driving/walking stay separate.
 ROUTE_PATH_BY_TRANSPORT: dict[str, str] = {
     "打车": "/v3/direction/driving",
     "步行": "/v3/direction/walking",
+    "公交": AMAP_TRANSIT_PATH,
+    "地铁": AMAP_TRANSIT_PATH,
+    "混合": AMAP_TRANSIT_PATH,
 }
 
 

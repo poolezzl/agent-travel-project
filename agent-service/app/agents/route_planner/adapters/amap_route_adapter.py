@@ -14,7 +14,9 @@ from datetime import UTC, datetime
 import httpx
 
 from app.agents.route_planner.adapters._amap import (
+    AMAP_TRANSIT_PATH,
     ROUTE_PATH_BY_TRANSPORT,
+    amap_city_code,
     parse_number,
     route_error_kind,
     source_record_id,
@@ -58,16 +60,24 @@ class AmapRouteAdapter:
                 message="missing authoritative coordinates for a leg endpoint",
             )
 
+        params = {
+            "origin": f"{origin[0]:.6f},{origin[1]:.6f}",
+            "destination": f"{destination[0]:.6f},{destination[1]:.6f}",
+            "key": self._api_key,
+        }
+        if path == AMAP_TRANSIT_PATH:
+            city_code = amap_city_code(query.city_id)
+            if city_code is None:
+                return RoutePortError(
+                    kind=RouteErrorKind.DIRTY,
+                    message=f"missing 高德 adcode for city {query.city_id!r}",
+                )
+            params.update({"city": city_code, "cityd": city_code, "strategy": "0"})
+        else:
+            params["extensions"] = "base"
+
         try:
-            response = self._client.get(
-                path,
-                params={
-                    "origin": f"{origin[0]:.6f},{origin[1]:.6f}",
-                    "destination": f"{destination[0]:.6f},{destination[1]:.6f}",
-                    "extensions": "base",
-                    "key": self._api_key,
-                },
-            )
+            response = self._client.get(path, params=params)
         except httpx.TimeoutException:
             return RoutePortError(kind=RouteErrorKind.TIMEOUT, message="高德 route timed out")
         except httpx.HTTPError as exc:
@@ -123,13 +133,19 @@ class AmapRouteAdapter:
         if not isinstance(route, dict):
             return None
         paths = route.get("paths")
-        if not isinstance(paths, list) or not paths:
-            return None
-        first = paths[0]
-        if not isinstance(first, dict):
-            return None
-        distance_m = parse_number(first.get("distance"))
-        duration_seconds = parse_number(first.get("duration"))
-        if distance_m is None or duration_seconds is None:
-            return None
-        return distance_m, duration_seconds / 60.0
+        if isinstance(paths, list) and paths and isinstance(paths[0], dict):
+            distance_m = parse_number(paths[0].get("distance"))
+            duration_seconds = parse_number(paths[0].get("duration"))
+            if distance_m is None or duration_seconds is None:
+                return None
+            return distance_m, duration_seconds / 60.0
+
+        # Transit returns route.transits[] instead of route.paths[].
+        transits = route.get("transits")
+        if isinstance(transits, list) and transits and isinstance(transits[0], dict):
+            distance_m = parse_number(transits[0].get("distance"))
+            duration_seconds = parse_number(transits[0].get("duration"))
+            if distance_m is None or duration_seconds is None:
+                return None
+            return distance_m, duration_seconds / 60.0
+        return None

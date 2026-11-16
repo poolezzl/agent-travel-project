@@ -204,6 +204,58 @@ def test_poi_unique_hit_passes_alg04() -> None:
     assert result.route.segments[0].source_record_id.startswith("amap-route:")
 
 
+@pytest.mark.parametrize(
+    ("transport", "city_id", "expected_city"),
+    [
+        ("公交", CITY, CITY),
+        ("地铁", "beijing", "110000"),
+        ("混合", "beijing", "110000"),
+    ],
+)
+def test_transit_route_uses_city_adcode_and_transits(
+    transport: str, city_id: str, expected_city: str
+) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v5/place/text":
+            keyword = request.url.params.get("keywords", "")
+            matched = [poi for poi in (POI_TIANANMEN, POI_HOTEL) if poi["name"] == keyword]
+            return httpx.Response(200, json={"status": "1", "pois": matched})
+        seen["path"] = request.url.path
+        seen["params"] = dict(request.url.params)
+        return httpx.Response(
+            200,
+            json={"status": "1", "route": {"transits": [{"distance": "7200", "duration": "1500"}]}},
+        )
+
+    client = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handler))
+    poi = AmapPoiAdapter(client, "test-key")
+    poi.lookup("天安门", CITY)
+    poi.lookup("酒店", CITY)
+    port = AmapRouteAdapter(poi, client, "test-key", now=lambda: FIXED_NOW)
+
+    result = port.route(
+        RouteQuery(
+            from_point_id="B000A2",
+            to_point_id="B000A1",
+            transport=transport,
+            city_id=city_id,
+        )
+    )
+
+    assert isinstance(result, RouteData)
+    assert result.is_estimated is False
+    assert result.distance_m == 7200.0
+    assert result.duration_min == 25.0
+    assert seen["path"] == "/v3/direction/transit/integrated"
+    params = seen["params"]
+    assert isinstance(params, dict)
+    assert params["city"] == expected_city
+    assert params["cityd"] == expected_city
+    assert params["strategy"] == "0"
+
+
 def test_poi_same_name_requires_clarification_without_merge() -> None:
     twin = {**POI_TIANANMEN, "id": "B000A9"}
     poi, provider = _stack(_handler(pois=[POI_TIANANMEN, twin, POI_HOTEL]))
@@ -367,7 +419,7 @@ def test_unknown_transport_maps_to_dirty_without_http() -> None:
     poi.lookup("酒店", CITY)
     poi.lookup("天安门", CITY)
 
-    result = port.route(_leg().model_copy(update={"transport": "地铁"}))
+    result = port.route(_leg().model_copy(update={"transport": "飞机"}))
 
     assert isinstance(result, RoutePortError)
     assert result.kind is RouteErrorKind.DIRTY
