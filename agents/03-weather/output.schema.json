@@ -92,7 +92,51 @@
       }
     },
     "travel_advice": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sensitive_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["point", "feasible"],
+            "properties": {
+              "point": {
+                "type": "string",
+                "minLength": 1
+              },
+              "feasible": {
+                "type": "boolean"
+              },
+              "risks": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          }
+        },
+        "clothing": {
+          "type": ["string", "null"]
+        }
+      }
     },
     "generated_at": {
       "type": "string",

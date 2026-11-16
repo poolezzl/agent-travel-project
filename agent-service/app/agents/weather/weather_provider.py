@@ -18,7 +18,10 @@ _NO_NEGATIVE_CACHE = frozenset({WeatherErrorKind.AUTH, WeatherErrorKind.QUOTA})
 
 
 def weather_key(city_id: str, day: date, data_type: str, timezone: str) -> str:
-    """Deterministic cache key for a single day. Exact format is PENDING (ALG-14)."""
+    """Deterministic cache key for a single day, frozen 2026-11-16 (ALG-14).
+
+    Supplier/version isolation is applied by the cache adapter's `key_prefix`.
+    """
     return f"weather:v1:{city_id}:{day.isoformat()}:{data_type}:{timezone}"
 
 
