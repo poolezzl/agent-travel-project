@@ -27,14 +27,14 @@
 | S09 | 已完成（真实 LLM 联通 4.1s/250 tokens；组长验收） | [S09.md](S09.md) |
 | S10 | 已完成 | [S10.md](S10.md)、[S10-Gate.md](S10-Gate.md) |
 | S11 | 已完成 | [S11.md](S11.md)、[S11-Gate.md](S11-Gate.md) |
-| S12 | 已完成（真实高德 driving/walking/transit；契约冻结、PoiPort.get、category 均关闭；待 R2/R5 签字） | [S12.md](S12.md) |
-| S13 | 已完成（真实和风 7d；travel_advice/阈值/forecast_published_at 冻结；待 R2/R5 签字） | [S13.md](S13.md) |
+| S12 | 已完成（课程口径：真实高德 driving/walking/transit；契约冻结、PoiPort.get、category 关闭；组长验收） | [S12.md](S12.md) |
+| S13 | 已完成（课程口径：真实和风 7d；travel_advice/阈值/forecast_published_at 冻结；组长验收） | [S13.md](S13.md) |
 | S15 | 已完成（R3 已审核 2026-11-11；Maven 136 项测试/Flyway/MySQL/S06 导入/Chroma 运行时/bge 索引/Python-Java 联调均通过） | [S15.md](S15.md)、[人工审核清单](S15-人工审核清单.md) |
 | S16 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 发布快照联调通过） | [S16.md](S16.md) |
 | S17 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 规则快照路径通过） | [S17.md](S17.md) |
 | S18 | 已完成（R3，2026-11-11；离线 Agent + 合法 POI 端口；本地合成样例） | [S18.md](S18.md) |
 | S14 | 已完成（课程口径：前端 + 真实供应商；10 并发探针 + 浏览器 e2e 4/4 mock + 1/1 真实；组长验收） | [S14.md](S14.md) |
-| S19 | 已完成（固定 DAG + 最终 Plan + `/plan`；真实 MySQL/Redis 9/9；10 并发 M1 探针通过；高德 exact 1/1、和风 3/3；M1/M2 Gate 未签字） | [S19.md](S19.md) |
+| S19 | 已完成（固定 DAG + 最终 Plan + `/plan`；真实 MySQL/Redis 9/9；10 并发 M1 探针 + 真实链路；高德 exact 1/1、和风 3/3；组长验收） | [S19.md](S19.md) |
 | S20-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容
