@@ -11,5 +11,6 @@
 | r3-evaluation-cases.md | 提供 R7 S05 的 R3 异常案例 | S05 配合 |
 | templates/*.csv | 空导入模板，不包含生产数据 | S06 |
 | samples/*.jsonl | 合成脱敏样例，仅用于契约和校验 | S06 |
+| samples/tianapi_beijing_scenic.jsonl | 天聚真实北京景点派生样例（课程用途，2 条，未提交原始响应） | S06 |
 
 R3 不在本目录实现数据库迁移、Java 写入服务、Chroma 运行时索引或 S15 之后的 Agent 业务逻辑。模板通过 scripts/validate_r3_data_templates.py 校验后，仍需经过 S04 数据模型评审和 R7 数据质量验收。
