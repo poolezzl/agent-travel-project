@@ -27,8 +27,8 @@
 | S09 | 已完成（真实 LLM 联通 4.1s/250 tokens；独立整体验收待 R7） | [S09.md](S09.md) |
 | S10 | 已完成 | [S10.md](S10.md)、[S10-Gate.md](S10-Gate.md) |
 | S11 | 已完成 | [S11.md](S11.md)、[S11-Gate.md](S11-Gate.md) |
-| S12 | 进行中（真实高德 driving/walking/transit + 契约冻结完成；仅剩 PoiPort.get/category/dataAt 非阻塞） | [S12.md](S12.md) |
-| S13 | 进行中（真实和风 7d + 契约冻结完成；仅剩 forecast_published_at 非阻塞） | [S13.md](S13.md) |
+| S12 | 已完成（真实高德 driving/walking/transit；契约冻结、PoiPort.get、category 均关闭；待 R2/R5 签字） | [S12.md](S12.md) |
+| S13 | 已完成（真实和风 7d；travel_advice/阈值/forecast_published_at 冻结；待 R2/R5 签字） | [S13.md](S13.md) |
 | S15 | 已完成（R3 已审核 2026-11-11；Maven 136 项测试/Flyway/MySQL/S06 导入/Chroma 运行时/bge 索引/Python-Java 联调均通过） | [S15.md](S15.md)、[人工审核清单](S15-人工审核清单.md) |
 | S16 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 发布快照联调通过） | [S16.md](S16.md) |
 | S17 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 规则快照路径通过） | [S17.md](S17.md) |
