@@ -2,27 +2,42 @@
   "schema_version": "evaluation-case-v1",
   "case_id": "CASE-26",
   "case_version": 1,
-  "status": "template",
+  "status": "ready",
   "city_code": "CN-CQ",
   "evaluation_date": "2026-10-05",
   "user_request": {
-    "summary": "待填充脱敏案例：missing_price",
-    "traveler_profile": "合成画像"
+    "summary": "合成用户：美食需求，重庆 3 日，必去 洪崖洞",
+    "traveler_profile": "脱敏成人画像，2 人同行"
   },
-  "allowed_source_record_ids": [],
+  "allowed_source_record_ids": [
+    "src-eval-26-1",
+    "src-eval-26-2"
+  ],
   "hard_constraints": [
     {
-      "id": "constraint-template",
-      "description": "待由 R7 填充并审核",
-      "expected": "pending"
+      "id": "constraint-must-visit",
+      "description": "必须保留 洪崖洞",
+      "expected": "satisfied"
+    },
+    {
+      "id": "constraint-source",
+      "description": "每个事实必须带来源",
+      "expected": "satisfied"
     }
   ],
-  "soft_preferences": [],
+  "soft_preferences": [
+    "美食",
+    "顺路安排 重庆中国三峡博物馆"
+  ],
   "expected_behaviors": [
-    "missing_price"
+    "stale_displayed",
+    "source_complete"
   ],
   "local_modification": null,
-  "expected_evidence": [],
+  "expected_evidence": [
+    "src-eval-26-1",
+    "src-eval-26-2"
+  ],
   "manual_score": {
     "status": "pending",
     "score_total": null

@@ -2,27 +2,51 @@
   "schema_version": "evaluation-case-v1",
   "case_id": "CASE-25",
   "case_version": 1,
-  "status": "template",
+  "status": "ready",
   "city_code": "CN-XA",
   "evaluation_date": "2026-10-05",
   "user_request": {
-    "summary": "待填充脱敏案例：holiday_exception",
-    "traveler_profile": "合成画像"
+    "summary": "合成用户：博物馆需求，西安 3 日，必去 大雁塔",
+    "traveler_profile": "脱敏成人画像，2 人同行"
   },
-  "allowed_source_record_ids": [],
+  "allowed_source_record_ids": [
+    "src-eval-25-1",
+    "src-eval-25-2"
+  ],
   "hard_constraints": [
     {
-      "id": "constraint-template",
-      "description": "待由 R7 填充并审核",
-      "expected": "pending"
+      "id": "constraint-must-visit",
+      "description": "必须保留 大雁塔",
+      "expected": "satisfied"
+    },
+    {
+      "id": "constraint-source",
+      "description": "每个事实必须带来源",
+      "expected": "satisfied"
     }
   ],
-  "soft_preferences": [],
-  "expected_behaviors": [
-    "holiday_exception"
+  "soft_preferences": [
+    "博物馆",
+    "顺路安排 秦始皇帝陵博物院"
   ],
-  "local_modification": null,
-  "expected_evidence": [],
+  "expected_behaviors": [
+    "budget_respected",
+    "local_modification_fidelity"
+  ],
+  "local_modification": {
+    "base_version_id": "version-eval-25",
+    "affected_blocks": [
+      "days[0].segments[2]"
+    ],
+    "unchanged_blocks": [
+      "days[1]",
+      "days[2]"
+    ]
+  },
+  "expected_evidence": [
+    "src-eval-25-1",
+    "src-eval-25-2"
+  ],
   "manual_score": {
     "status": "pending",
     "score_total": null
