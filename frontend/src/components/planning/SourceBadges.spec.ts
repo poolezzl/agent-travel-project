@@ -14,11 +14,10 @@ const sample: SourceMetadata = {
 }
 
 describe('SourceBadges', () => {
-  it('无来源时展示显式待接入空态，而非空壳', () => {
+  it('无来源时展示显式空态，而非空壳或默认值', () => {
     const wrapper = mount(SourceBadges, { props: { sources: [] } })
 
-    expect(wrapper.get('[data-testid="source-empty"]').text()).toContain('来源信息待接入')
-    expect(wrapper.get('[data-testid="source-empty"]').text()).toContain('PENDING-S14-01')
+    expect(wrapper.get('[data-testid="source-empty"]').text()).toContain('没有可展示的来源记录')
     expect(wrapper.text()).not.toContain('poi-1')
   })
 

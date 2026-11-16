@@ -34,6 +34,21 @@ class S11ContractTests {
     }
 
     @Test
+    void s19PlanReadModelIsAdditiveAndExposesNoSecrets() throws Exception {
+        String source = Files.readString(root.resolve("contracts/openapi/s11-tasks.yaml"));
+        Map<String, Object> spec = new Yaml().load(source);
+        Map<String, Object> paths = object(spec.get("paths"));
+        Map<String, Object> schemas = object(object(spec.get("components")).get("schemas"));
+        Map<String, Object> planView = object(schemas.get("PlanView"));
+
+        assertThat(paths).containsKey("/v1/tasks/{taskId}/plan");
+        assertThat(list(planView.get("required"))).contains("task_id", "version_id", "plan",
+                "source_metadata", "degraded_fields");
+        assertThat(source).doesNotContain("access_token=").doesNotContain("api_key")
+                .doesNotContain("client_secret");
+    }
+
+    @Test
     void allFrozenTaskStatesAreRepresented() throws Exception {
         Map<String, Object> spec = new Yaml().load(Files.readString(
                 root.resolve("contracts/openapi/s11-tasks.yaml")));

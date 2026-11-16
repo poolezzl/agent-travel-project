@@ -27,7 +27,8 @@ public class TaskRepository {
             SELECT BIN_TO_UUID(id),BIN_TO_UUID(owner_id),
               CASE WHEN quote_id IS NULL THEN NULL ELSE BIN_TO_UUID(quote_id) END,
               task_type,status,state_version,reserved_points,operation_deadline_at,
-              confirmation_deadline_at,created_at,updated_at
+              confirmation_deadline_at,created_at,updated_at,
+              CASE WHEN trip_id IS NULL THEN NULL ELSE BIN_TO_UUID(trip_id) END
             FROM planning_task
             """;
 
@@ -310,12 +311,27 @@ public class TaskRepository {
         try {
             Map<String, Object> result = objectMapper.readValue(rows.get(0), new TypeReference<>() {
             });
-            if (!(result.get("source") instanceof Map<?, ?> source)
-                    || !"FRESH".equals(String.valueOf(source.get("freshness_status")))
-                    || source.get("valid_until") == null) {
-                return false;
+            if (result.get("source") instanceof Map<?, ?> source) {
+                if (!"FRESH".equals(String.valueOf(source.get("freshness_status")))
+                        || source.get("valid_until") == null) {
+                    return false;
+                }
+                return Instant.parse(String.valueOf(source.get("valid_until"))).isAfter(now);
             }
-            return Instant.parse(String.valueOf(source.get("valid_until"))).isAfter(now);
+            if (result.get("source_metadata") instanceof List<?> metadata) {
+                // Orchestrator stage envelopes carry expiring facts in source_metadata. Steps
+                // without any expiring source (parse/schedule) are derived from the immutable
+                // request and stay reusable.
+                Instant latest = null;
+                for (Object item : metadata) {
+                    if (item instanceof Map<?, ?> entry && entry.get("valid_until") != null) {
+                        Instant value = Instant.parse(String.valueOf(entry.get("valid_until")));
+                        latest = latest == null || value.isAfter(latest) ? value : latest;
+                    }
+                }
+                return latest == null || latest.isAfter(now);
+            }
+            return false;
         } catch (Exception exception) {
             return false;
         }
@@ -355,12 +371,36 @@ public class TaskRepository {
                 String.class, taskId.toString());
     }
 
+    public String latestResultJson(UUID taskId, String stepName) {
+        List<String> rows = jdbc.query("""
+                SELECT r.result_json
+                FROM task_step s JOIN agent_result r ON r.id=s.output_result_id
+                WHERE s.task_id=UUID_TO_BIN(?) AND s.step_name=?
+                  AND s.status IN('SUCCEEDED','PARTIAL','DEGRADED')
+                ORDER BY s.attempt_no DESC
+                LIMIT 1
+                """,
+                (rs, rowNum) -> rs.getString(1), taskId.toString(), stepName);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public int bindTrip(UUID taskId, UUID tripId) {
+        return jdbc.update("UPDATE planning_task SET trip_id=UUID_TO_BIN(?),updated_at=? WHERE id=UUID_TO_BIN(?)",
+                tripId.toString(), Timestamp.from(Instant.now()), taskId.toString());
+    }
+
+    public int setConfirmationDeadline(UUID taskId, Instant deadline) {
+        return jdbc.update(
+                "UPDATE planning_task SET confirmation_deadline_at=?,updated_at=? WHERE id=UUID_TO_BIN(?)",
+                Timestamp.from(deadline), Timestamp.from(Instant.now()), taskId.toString());
+    }
+
     private TaskRow taskRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
         return new TaskRow(UUID.fromString(rs.getString(1)), UUID.fromString(rs.getString(2)),
                 rs.getString(3) == null ? null : UUID.fromString(rs.getString(3)), rs.getString(4),
                 TaskStatus.valueOf(rs.getString(5)), rs.getLong(6), rs.getLong(7),
                 rs.getTimestamp(8).toInstant(), timestamp(rs.getTimestamp(9)), rs.getTimestamp(10).toInstant(),
-                rs.getTimestamp(11).toInstant());
+                rs.getTimestamp(11).toInstant(), rs.getString(12) == null ? null : UUID.fromString(rs.getString(12)));
     }
 
     private StepRow stepRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
@@ -437,7 +477,14 @@ public class TaskRepository {
 
     public record TaskRow(UUID id, UUID ownerId, UUID quoteId, String taskType, TaskStatus status,
             long stateVersion, long reservedPoints, Instant operationDeadlineAt, Instant confirmationDeadlineAt,
-            Instant createdAt, Instant updatedAt) {
+            Instant createdAt, Instant updatedAt, UUID tripId) {
+
+        public TaskRow(UUID id, UUID ownerId, UUID quoteId, String taskType, TaskStatus status,
+                long stateVersion, long reservedPoints, Instant operationDeadlineAt,
+                Instant confirmationDeadlineAt, Instant createdAt, Instant updatedAt) {
+            this(id, ownerId, quoteId, taskType, status, stateVersion, reservedPoints, operationDeadlineAt,
+                    confirmationDeadlineAt, createdAt, updatedAt, null);
+        }
     }
 
     public record OutboxRow(UUID id, UUID taskId, String eventType, TaskModels.QueueMessage message,

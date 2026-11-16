@@ -44,6 +44,22 @@ public final class TaskModels {
             boolean reused) {
     }
 
+    public record PlanView(
+            @JsonProperty("task_id") UUID taskId,
+            String status,
+            @JsonProperty("trip_id") UUID tripId,
+            @JsonProperty("version_id") UUID versionId,
+            @JsonProperty("version_no") int versionNo,
+            String etag,
+            @JsonProperty("content_hash") String contentHash,
+            @JsonProperty("schema_version") String schemaVersion,
+            @JsonProperty("generated_at") Instant generatedAt,
+            Map<String, Object> plan,
+            Map<String, Object> summary,
+            @JsonProperty("source_metadata") List<Map<String, Object>> sourceMetadata,
+            @JsonProperty("degraded_fields") List<String> degradedFields) {
+    }
+
     public record TaskEventView(
             @JsonProperty("sequence_no") long sequenceNo,
             @JsonProperty("event_type") String eventType,
@@ -68,7 +84,13 @@ public final class TaskModels {
             UUID resultId,
             String status,
             Map<String, Object> result,
-            List<String> degradedFields) {
+            List<String> degradedFields,
+            String agentId) {
+
+        public WorkerResult(UUID resultId, String status, Map<String, Object> result,
+                List<String> degradedFields) {
+            this(resultId, status, result, degradedFields, "mock-agent");
+        }
     }
 
     public record EventData(

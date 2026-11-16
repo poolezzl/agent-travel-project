@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.nio.charset.StandardCharsets;
@@ -100,6 +101,13 @@ class S11MySqlIntegrationTests {
         jdbc.update("DELETE FROM task_step WHERE task_id IN(SELECT id FROM planning_task WHERE owner_id=UUID_TO_BIN(?))",
                 userId.toString());
         jdbc.update("DELETE FROM planning_task WHERE owner_id=UUID_TO_BIN(?)", userId.toString());
+        jdbc.update("""
+                DELETE FROM plan_snapshot WHERE trip_version_id IN(
+                  SELECT id FROM trip_version WHERE created_by=UUID_TO_BIN(?)
+                )
+                """, userId.toString());
+        jdbc.update("UPDATE trip SET current_version_id=NULL WHERE owner_id=UUID_TO_BIN(?)",
+                userId.toString());
         jdbc.update("DELETE FROM trip_version WHERE created_by=UUID_TO_BIN(?)", userId.toString());
         jdbc.update("DELETE FROM trip WHERE owner_id=UUID_TO_BIN(?)", userId.toString());
         jdbc.update("DELETE FROM user_session WHERE user_id=UUID_TO_BIN(?)", userId.toString());
@@ -108,7 +116,7 @@ class S11MySqlIntegrationTests {
     }
 
     @Test
-    void createTaskReserveAndOutboxAreAtomicAndWorkerUsesShortTransactions() {
+    void createTaskReserveAndOutboxAreAtomicAndWorkerUsesShortTransactions() throws Exception {
         TaskModels.TaskView created = createTask(null, null, "GENERATION");
 
         assertThat(created.status()).isEqualTo(TaskStatus.QUEUED);
@@ -125,18 +133,38 @@ class S11MySqlIntegrationTests {
 
         runMockWorkflow(created.taskId());
 
-        assertThat(repository.findTask(created.taskId()).status()).isEqualTo(TaskStatus.ASSEMBLING);
+        // S19 assemble commits an immutable version from the mock plan and confirms the reserve.
+        assertThat(repository.findTask(created.taskId()).status()).isEqualTo(TaskStatus.PARTIAL);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM trip_version WHERE trip_id=(SELECT trip_id FROM planning_task WHERE id=UUID_TO_BIN(?))",
+                Integer.class, created.taskId().toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM plan_snapshot",
+                Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT sequence_no) FROM task_event WHERE task_id=UUID_TO_BIN(?)",
                 Integer.class, created.taskId().toString())).isGreaterThanOrEqualTo(10);
         assertThat(jdbc.queryForObject("""
-                SELECT COUNT(*) FROM task_step WHERE task_id=UUID_TO_BIN(?) AND status='SUCCEEDED'
+                SELECT COUNT(*) FROM task_step WHERE task_id=UUID_TO_BIN(?) AND status IN('SUCCEEDED','PARTIAL')
                 """, Integer.class, created.taskId().toString())).isEqualTo(5);
+        assertThat(balance()).isEqualTo(90);
+
+        UUID sessionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO user_session(id,user_id,refresh_token_hash,issued_at,expires_at)
+                VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),?,?,?)
+                """, sessionId.toString(), userId.toString(), bytes(3), Timestamp.from(Instant.now()),
+                Timestamp.from(Instant.now().plusSeconds(600)));
+        String token = tokens.createAccessToken(userId, "USER", sessionId, Instant.now().getEpochSecond());
+        mockMvc.perform(get("/api/v1/tasks/{taskId}/plan", created.taskId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PARTIAL"))
+                .andExpect(jsonPath("$.version_no").value(1))
+                .andExpect(jsonPath("$.plan.plan_version").value("s19-plan-v1"));
 
         TaskRepository.TaskRow beforeCancel = repository.findTask(created.taskId());
         TaskModels.TaskView cancelled = taskService.cancel(userId, "USER", created.taskId(),
                 new TaskModels.CancelTaskRequest(beforeCancel.stateVersion()), "cancel-it");
-        assertThat(cancelled.status()).isEqualTo(TaskStatus.REFUNDED);
-        assertThat(balance()).isEqualTo(100);
+        assertThat(cancelled.status()).isEqualTo(TaskStatus.PARTIAL);
+        assertThat(balance()).isEqualTo(90);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM points_ledger WHERE user_id=UUID_TO_BIN(?)",
                 Integer.class, userId.toString())).isEqualTo(2);
     }

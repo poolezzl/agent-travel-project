@@ -30,3 +30,10 @@ The OpenAPI request/response envelope is in `contracts/openapi/agent-business.ya
 - The task create call uses the authenticated owner only; the client cannot supply identity, price, reserved points or task state.
 - Java creates the task, quote, reserve ledger and outbox in one database transaction. Redis only transports the queued command.
 - SSE event identifiers are persisted per-task `sequence_no` values. Reconnects use `Last-Event-ID` or `after_sequence_no`.
+
+## S19 orchestration and final plan
+
+- Stage API: `POST /v1/planning/steps/{step}` for `parse`, `collect`, `schedule`, `route`, `assemble`; the Java worker supplies the immutable task request plus persisted upstream stage envelopes.
+- Final plan document: `contracts/s19/plan.schema.json` (Draft-07), with examples in `contracts/examples/s19/`.
+- Task read model: `GET /v1/tasks/{taskId}/plan` in `contracts/openapi/s11-tasks.yaml` returns the immutable published `PlanView`; unreadable states return 409 `PLAN_NOT_READY` or `CONFIRMATION_REQUIRED`.
+- Blocking conflicts are persisted as `AWAITING_CONFIRMATION`; no version is written before confirmation.

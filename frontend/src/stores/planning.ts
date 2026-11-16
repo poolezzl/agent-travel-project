@@ -11,6 +11,7 @@ import { isTerminalStatus } from '@/api/taskStatus'
 import * as tasksApi from '@/api/tasks'
 import type {
   CreateTaskRequest,
+  PlanView,
   PlanningRequestPayload,
   QuoteResponse,
   TaskEvent,
@@ -79,6 +80,10 @@ export const usePlanningStore = defineStore('planning', () => {
   const taskError = ref<ErrorInfo | null>(null)
   const taskLoading = ref(false)
 
+  const plan = ref<PlanView | null>(null)
+  const planError = ref<ErrorInfo | null>(null)
+  const planLoading = ref(false)
+
   const events = ref<TaskEvent[]>([])
   const lastSequenceNo = ref(0)
   const streamConnected = ref(false)
@@ -115,6 +120,8 @@ export const usePlanningStore = defineStore('planning', () => {
     lastSequenceNo.value = 0
     degradedFields.value = []
     cancelError.value = null
+    plan.value = null
+    planError.value = null
   }
 
   function applyEvent(event: TaskEvent): void {
@@ -165,6 +172,8 @@ export const usePlanningStore = defineStore('planning', () => {
       lastSequenceNo.value = 0
       degradedFields.value = []
       cancelError.value = null
+      plan.value = null
+      planError.value = null
     } catch (error) {
       taskError.value = toErrorInfo(error)
       throw error
@@ -178,10 +187,28 @@ export const usePlanningStore = defineStore('planning', () => {
     try {
       const fresh = await tasksApi.get(task.value.task_id)
       task.value = fresh ?? task.value
+      if (task.value && isTerminalStatus(task.value.status)) {
+        await fetchPlan()
+      }
       return true
     } catch (error) {
       taskError.value = toErrorInfo(error)
       return false
+    }
+  }
+
+  async function fetchPlan(): Promise<void> {
+    if (planLoading.value) return
+    if (!task.value || !isTerminalStatus(task.value.status)) return
+    planLoading.value = true
+    planError.value = null
+    try {
+      plan.value = (await tasksApi.getPlan(task.value.task_id)) ?? null
+    } catch (error) {
+      plan.value = null
+      planError.value = toErrorInfo(error)
+    } finally {
+      planLoading.value = false
     }
   }
 
@@ -243,6 +270,9 @@ export const usePlanningStore = defineStore('planning', () => {
     lastSequenceNo,
     streamConnected,
     degradedFields,
+    plan,
+    planError,
+    planLoading,
     balancePoints,
     balanceError,
     cancelling,
@@ -256,5 +286,6 @@ export const usePlanningStore = defineStore('planning', () => {
     refreshTask,
     cancelTask,
     fetchBalance,
+    fetchPlan,
   }
 })

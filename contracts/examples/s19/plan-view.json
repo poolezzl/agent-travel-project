@@ -1,0 +1,84 @@
+{
+  "task_id": "5f0c6c2e-5a3b-4c1e-9a8f-2b7d4e1a9c11",
+  "status": "SUCCEEDED",
+  "trip_id": "d3a1f7b2-0c4e-4f6a-8b9d-1e2f3a4b5c6d",
+  "version_id": "9b8a7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d",
+  "version_no": 1,
+  "etag": "etag-9b8a7c6d",
+  "content_hash": "sha256:9f2c1a",
+  "schema_version": "s19-plan-v1",
+  "generated_at": "2026-11-16T06:40:00Z",
+  "plan": {
+    "plan_version": "s19-plan-v1",
+    "generated_at": "2026-11-16T06:40:00Z",
+    "sample_only": true,
+    "notice": "基于 S06 合成样例，不代表真实票价、开放时间或位置。",
+    "trip": {
+      "city_id": "beijing",
+      "city_name": "北京",
+      "start_date": "2026-11-20",
+      "end_date": "2026-11-20",
+      "day_count": 1,
+      "party_size": 2,
+      "transport_preference": "混合"
+    },
+    "summary": {
+      "point_count": 0,
+      "total_distance_m": 0,
+      "total_transport_min": 0,
+      "estimated_route_legs": 0,
+      "estimated_cost": {
+        "currency": "CNY",
+        "amount_minor": 0,
+        "basis": "known_ticket_rules"
+      },
+      "source_completeness": 0,
+      "degraded": true,
+      "stale_fields": [],
+      "unknown_fields": ["days[0].weather"]
+    },
+    "days": [
+      {
+        "date": "2026-11-20",
+        "weekday": "周五",
+        "city_id": "beijing",
+        "weather": {
+          "status": "unknown",
+          "date": "2026-11-20",
+          "message": "天气服务暂不可用，未生成天气事实"
+        },
+        "segments": [],
+        "meals": [],
+        "lodging": {
+          "date": "2026-11-20",
+          "candidates": []
+        },
+        "reservations": [],
+        "warnings": ["当日没有可安排的已发布景点"]
+      }
+    ],
+    "quality": {
+      "status": "warn",
+      "checks": [
+        {
+          "code": "WEATHER_AVAILABILITY",
+          "status": "warn",
+          "message": "天气服务暂不可用",
+          "fields": ["days[0].weather"]
+        }
+      ]
+    },
+    "conflicts": [],
+    "confirmation": {
+      "required": false
+    },
+    "sources": [],
+    "degraded_fields": ["days[0].weather"]
+  },
+  "summary": {
+    "point_count": 0,
+    "degraded": true
+  },
+  "source_metadata": [],
+  "degraded_fields": ["days[0].weather"]
+}

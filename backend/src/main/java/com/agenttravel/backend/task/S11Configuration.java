@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(TaskProperties.class)
+@EnableConfigurationProperties({TaskProperties.class, AgentServiceProperties.class})
 @ConditionalOnProperty(name = "app.database.mode", havingValue = "mysql")
 @ConditionalOnBooleanProperty(name = "app.s11.enabled", matchIfMissing = true)
 public class S11Configuration {

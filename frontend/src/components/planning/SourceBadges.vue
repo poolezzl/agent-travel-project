@@ -27,12 +27,11 @@ function timeLabel(value: string): string {
   <section class="source-badges" data-testid="source-badges" aria-labelledby="source-heading">
     <h2 id="source-heading">事实来源与时效</h2>
     <p>
-      事实数据应展示「来源 + 更新时间 +
-      预报/统计/估算/未知」；本步骤后端未提供行程结果接口，暂无来源可展示。
+      事实数据应展示「来源 + 更新时间 + 预报/统计/估算/未知」；来源随后端已发布行程版本一并返回。
     </p>
 
     <p v-if="sources.length === 0" class="source-badges__empty" data-testid="source-empty">
-      来源信息待接入（PENDING-S14-01）：后端未提供行程结果查询接口，暂无事实来源可展示。
+      当前行程版本没有可展示的来源记录；未收录的事实不会用默认值补齐。
     </p>
     <ul v-else class="source-badges__list">
       <li v-for="source in sources" :key="source.source_record_id">

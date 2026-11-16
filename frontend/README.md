@@ -2,7 +2,7 @@
 
 S03 建立的 Vue 3 前端工程骨架（Vue 3、Vite、TypeScript、Pinia、Vue Router、Element Plus、Vitest），
 S07 在其上交付「开题演示前端」（明示 Mock 的演示页面）。S14 在 local/production 构建下将 `/` 切换为
-真实规划页（登录、报价、建任务、预扣、SSE 进度、取消/退款），mock 构建仍保留 S07 演示页。
+真实规划页（登录、报价、建任务、预扣、SSE 进度、取消/退款、已发布行程结果展示），mock 构建仍保留 S07 演示页。
 
 ## 先决条件
 
@@ -84,6 +84,9 @@ S14 将 local/production 构建的 `/` 切换为真实规划页 `S14PlanningView
 - SSE 用 `fetch + ReadableStream` 手动解析（后端只接受 `Authorization: Bearer` 头，禁用 `EventSource`）。
 - 令牌只驻留 Pinia 内存，不写 `localStorage`/`sessionStorage`，刷新页面需重新登录。
 - 金额口径：积分用整数 `points`；预算用 `currency` + 整数 `amount_minor`（CNY 分）。
+- 结果读取：任务终态后调用 `GET /api/v1/tasks/{task_id}/plan`（S19 新增），只渲染后端已发布
+  版本；未就绪/待确认返回 409 时展示显式空态与 `traceId`，不渲染任何 fixture。
+  示例数据（`sample_only`）、过期/估算/未知字段和降级字段均在结果面板显式标注。
 
 ### 本地联调
 
@@ -105,8 +108,9 @@ npm --prefix frontend run dev   # http://127.0.0.1:5173，/api 由 vite server.p
 
 ### 已知 PENDING
 
-- `PENDING-S14-01`：后端未提供行程结果查询接口（`GET /v1/tasks/{id}` 只返回 TaskView），结果区为显式空态，不渲染 fixture。
-- `PENDING-002`（高德 Key）、`PENDING-003`（和风天气 Key）未关闭；本地后端用 `MockAgentExecutor`，
+- `PENDING-S14-01` 已由 S19 关闭：`GET /v1/tasks/{id}/plan` 返回已发布 `PlanView`；未终态返回
+  409 `PLAN_NOT_READY`，待确认返回 409 `CONFIRMATION_REQUIRED`，结果区均为显式空态。
+- 真实端到端仍未验证：`PENDING-002`（高德 Key）、`PENDING-003`（和风天气 Key）未关闭；本地后端用 `MockAgentExecutor`，
   因此只能称「本地 Mock 供应商端到端」，未配置真实供应商时不宣称真实端到端通过。
 
 ## Playwright 演示证据

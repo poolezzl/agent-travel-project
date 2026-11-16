@@ -52,6 +52,9 @@ class LLMSettings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        # Tests and composition roots pass the declared field names while production uses
+        # the env aliases; accept both instead of silently dropping the field-name kwargs.
+        populate_by_name=True,
     )
 
     llm_provider: Literal["mock", "openai-compatible"] = Field(

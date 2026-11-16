@@ -10,7 +10,12 @@
       "name": "故宫博物院",
       "aliases": ["紫禁城", "故宫"],
       "district": "东城区",
-      "category": "attraction"
+      "category": "attraction",
+      "latitude": 39.9163,
+      "longitude": 116.3972,
+      "open_time": "08:30",
+      "close_time": "17:00",
+      "closed_weekdays": [1]
     },
     {
       "poi_id": "POI-BJ-002",
@@ -18,7 +23,12 @@
       "name": "中国国家博物馆",
       "aliases": ["国博", "国家博物馆"],
       "district": "东城区",
-      "category": "attraction"
+      "category": "attraction",
+      "latitude": 39.9055,
+      "longitude": 116.4017,
+      "open_time": "09:00",
+      "close_time": "17:00",
+      "closed_weekdays": [1]
     },
     {
       "poi_id": "POI-BJ-003",
@@ -26,7 +36,12 @@
       "name": "天坛公园",
       "aliases": ["天坛"],
       "district": "东城区",
-      "category": "attraction"
+      "category": "attraction",
+      "latitude": 39.8822,
+      "longitude": 116.4066,
+      "open_time": "06:00",
+      "close_time": "22:00",
+      "closed_weekdays": []
     }
   ],
   "entries": [

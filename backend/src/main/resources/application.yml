@@ -29,6 +29,11 @@ spring:
       connect-timeout: "${REDIS_CONNECT_TIMEOUT:2s}"
 
 app:
+  agent-service:
+    enabled: "${AGENT_SERVICE_ENABLED:true}"
+    base-url: "${AGENT_SERVICE_BASE_URL:}"
+    connect-timeout: "${AGENT_SERVICE_CONNECT_TIMEOUT:2s}"
+    read-timeout: "${AGENT_SERVICE_READ_TIMEOUT:120s}"
   external-services:
     enabled: false
   adapters:

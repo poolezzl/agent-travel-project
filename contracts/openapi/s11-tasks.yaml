@@ -86,6 +86,37 @@ paths:
           $ref: '#/components/responses/Problem'
         '409':
           $ref: '#/components/responses/Problem'
+  /v1/tasks/{taskId}/plan:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      operationId: getFinalPlan
+      description: >-
+        S19 final plan read model. Only the task owner (or an administrator) can read it.
+        The task must have reached SUCCEEDED or PARTIAL and have an immutable published
+        version; otherwise the endpoint returns a stable PLAN_NOT_READY problem.
+      responses:
+        '200':
+          description: Published immutable plan version created by the assemble step
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanView'
+              examples:
+                ready:
+                  $ref: '../examples/s19/plan-view.json'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          description: Task has no published plan yet, or is awaiting confirmation
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
   /v1/tasks/{taskId}/events:
     parameters:
       - $ref: '#/components/parameters/TaskId'
@@ -236,6 +267,47 @@ components:
           type: array
           items: { type: string }
         created_at: { type: string, format: date-time }
+    PlanView:
+      type: object
+      additionalProperties: false
+      description: >-
+        Read model for the final immutable plan. `plan` follows
+        contracts/s19/plan.schema.json; the server never computes or mutates facts here.
+      required:
+        - task_id
+        - status
+        - trip_id
+        - version_id
+        - version_no
+        - etag
+        - schema_version
+        - generated_at
+        - plan
+        - source_metadata
+        - degraded_fields
+      properties:
+        task_id: { type: string, format: uuid }
+        status: { type: string, enum: [SUCCEEDED, PARTIAL] }
+        trip_id: { type: string, format: uuid }
+        version_id: { type: string, format: uuid }
+        version_no: { type: integer, minimum: 1 }
+        etag: { type: string, minLength: 1 }
+        content_hash: { type: string, minLength: 1 }
+        schema_version: { type: string, minLength: 1 }
+        generated_at: { type: string, format: date-time }
+        plan:
+          type: object
+          description: contracts/s19/plan.schema.json 的结构化最终方案
+        summary:
+          type: object
+          nullable: true
+        source_metadata:
+          type: array
+          items:
+            type: object
+        degraded_fields:
+          type: array
+          items: { type: string }
     Problem:
       type: object
       additionalProperties: false

@@ -1,8 +1,10 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
+import { ApiError } from '@/api/http'
 import type { CurrentUser, TaskView } from '@/api/types'
+import * as tasksApi from '@/api/tasks'
 import { usePlanningStore } from '@/stores/planning'
 import { useSessionStore } from '@/stores/session'
 import S14PlanningView from './S14PlanningView.vue'
@@ -27,6 +29,7 @@ vi.mock('@/api/points', () => ({
 vi.mock('@/api/tasks', () => ({
   create: vi.fn(),
   get: vi.fn(),
+  getPlan: vi.fn(),
   cancel: vi.fn(),
   eventsUrl: vi.fn(),
 }))
@@ -70,9 +73,16 @@ describe('S14PlanningView', () => {
     expect(wrapper.find('[data-testid="planning-form"]').exists()).toBe(false)
   })
 
-  it('终态任务的结果区展示接口缺失空态而非 fixture', async () => {
+  it('终态任务无可用版本时展示显式空态而非 fixture', async () => {
     vi.mocked(authApi.me).mockResolvedValue(currentUser)
     vi.mocked(pointsApi.balance).mockResolvedValue({ balancePoints: 100 })
+    vi.mocked(tasksApi.getPlan).mockRejectedValue(
+      new ApiError({
+        status: 409,
+        code: 'PLAN_NOT_READY',
+        message: '任务尚未生成可读取的行程版本',
+      }),
+    )
 
     const pinia = createPinia()
     setActivePinia(pinia)
@@ -90,7 +100,11 @@ describe('S14PlanningView', () => {
 
     const wrapper = mount(S14PlanningView, { global: { plugins: [pinia] } })
 
-    expect(wrapper.get('[data-testid="plan-result"]').text()).toContain('PENDING-S14-01')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="plan-result"]').text()).toContain(
+      '任务尚未生成可读取的行程版本',
+    )
+    expect(wrapper.get('[data-testid="plan-result"]').text()).toContain('已发布版本')
     expect(wrapper.text()).not.toContain('合成·北城晨光公园')
     expect(wrapper.text()).not.toContain('synthetic-bj-001')
   })

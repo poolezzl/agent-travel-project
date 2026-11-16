@@ -14,14 +14,14 @@ public class TaskWorkerService {
 
     private final TaskWorkerClaimService claims;
     private final TaskHeartbeatService heartbeats;
-    private final MockAgentExecutor mockAgent;
+    private final AgentStepExecutor executor;
     private final String workerId;
 
     public TaskWorkerService(TaskWorkerClaimService claims, TaskHeartbeatService heartbeats,
-            MockAgentExecutor mockAgent, TaskProperties properties) {
+            AgentStepExecutor executor, TaskProperties properties) {
         this.claims = claims;
         this.heartbeats = heartbeats;
-        this.mockAgent = mockAgent;
+        this.executor = executor;
         this.workerId = properties.getWorkerName() + "-" + UUID.randomUUID();
     }
 
@@ -33,9 +33,12 @@ public class TaskWorkerService {
         TaskWorkerClaimService.Claim claim = result.claim();
         heartbeats.start(claim);
         try {
-            TaskModels.WorkerResult output = mockAgent.execute(taskId, claim.stepName(), claim.attemptNo());
+            TaskModels.WorkerResult output = executor.execute(taskId, claim.stepName(), claim.attemptNo());
             return claims.commit(claim, output, traceId());
         } catch (TaskWorkerClaimService.StaleWorkException exception) {
+            return false;
+        } catch (PythonAgentStepExecutor.AgentServiceException exception) {
+            claims.failAttempt(claim, exception.code());
             return false;
         } catch (RuntimeException exception) {
             claims.failAttempt(claim, exception.getClass().getSimpleName());

@@ -2,7 +2,7 @@
 // 注意：CreateTaskRequest 没有 quote_id 字段；报价仅用于展示服务端价格，建任务时服务端自行计价预扣。
 
 import { apiUrl, request } from './http'
-import type { CancelTaskRequest, CreateTaskRequest, TaskView } from './types'
+import type { CancelTaskRequest, CreateTaskRequest, PlanView, TaskView } from './types'
 
 export function create(
   payload: CreateTaskRequest,
@@ -17,6 +17,11 @@ export function create(
 
 export function get(taskId: string): Promise<TaskView | undefined> {
   return request<TaskView>(`/api/v1/tasks/${taskId}`)
+}
+
+/** 最终行程只读接口（S19 关闭 PENDING-S14-01）。未终态/待确认时后端返回 409。 */
+export function getPlan(taskId: string): Promise<PlanView | undefined> {
+  return request<PlanView>(`/api/v1/tasks/${taskId}/plan`)
 }
 
 export function cancel(

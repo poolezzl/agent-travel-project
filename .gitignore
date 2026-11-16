@@ -40,6 +40,13 @@ coverage/
 /backups/
 *.log
 
+# Local sandbox build/test caches (never committed)
+/.deps/
+/.tmp/
+/.m2repo/
+/agent-service/pip-tmp/
+/agent-service/pytest-cache-files-*/
+
 # Test artifacts
 test-results/
 playwright-report/

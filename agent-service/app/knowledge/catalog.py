@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +25,7 @@ class CatalogError(ValueError):
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def parse_datetime(value: str | None) -> datetime | None:
@@ -33,7 +33,7 @@ def parse_datetime(value: str | None) -> datetime | None:
         return None
     normalized = value.replace("Z", "+00:00")
     parsed = datetime.fromisoformat(normalized)
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 def parse_date(value: str | None) -> date | None:
@@ -46,7 +46,7 @@ def parse_date(value: str | None) -> date | None:
 def isoformat(value: datetime | None) -> str | None:
     if value is None:
         return None
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def tokens(text: str) -> set[str]:
@@ -166,6 +166,12 @@ class Poi:
     aliases: tuple[str, ...]
     district: str | None
     category: str
+    # S19 planning facts (optional; missing means "unknown", never invented).
+    latitude: float | None = None
+    longitude: float | None = None
+    open_time: str | None = None
+    close_time: str | None = None
+    closed_weekdays: tuple[int, ...] = ()
 
 
 class PublishedCatalog:
@@ -178,14 +184,16 @@ class PublishedCatalog:
         pois: tuple[Poi, ...],
         entries: tuple[KnowledgeEntry, ...],
         rules: tuple[ReservationRule, ...],
+        sample_only: bool = False,
     ) -> None:
         self.catalog_version = catalog_version
         self.pois = pois
         self.entries = entries
         self.rules = rules
+        self.sample_only = sample_only
 
     @classmethod
-    def load(cls, path: str | Path) -> "PublishedCatalog":
+    def load(cls, path: str | Path) -> PublishedCatalog:
         catalog_path = Path(path)
         if not catalog_path.is_file():
             raise CatalogError(f"catalog not found: {catalog_path}")
@@ -196,7 +204,7 @@ class PublishedCatalog:
         return cls.from_payload(payload)
 
     @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> "PublishedCatalog":
+    def from_payload(cls, payload: dict[str, Any]) -> PublishedCatalog:
         pois = tuple(
             Poi(
                 poi_id=item["poi_id"],
@@ -205,6 +213,11 @@ class PublishedCatalog:
                 aliases=tuple(item.get("aliases") or ()),
                 district=item.get("district"),
                 category=item.get("category", "attraction"),
+                latitude=_optional_float(item.get("latitude")),
+                longitude=_optional_float(item.get("longitude")),
+                open_time=item.get("open_time"),
+                close_time=item.get("close_time"),
+                closed_weekdays=tuple(int(day) for day in item.get("closed_weekdays") or ()),
             )
             for item in payload.get("pois", [])
         )
@@ -215,6 +228,7 @@ class PublishedCatalog:
             pois=pois,
             entries=entries,
             rules=rules,
+            sample_only=bool(payload.get("sample_only", False)),
         )
 
     def find_pois(self, point_id: str, name: str, city_id: str | None) -> tuple[Poi, ...]:
@@ -273,7 +287,9 @@ class PublishedCatalog:
                 score = overlap / max(1, len(query_tokens))
                 if score > 0:
                     scored.append((score, entry))
-            readable = [entry for _, entry in sorted(scored, key=lambda pair: pair[0], reverse=True)]
+            readable = [
+                entry for _, entry in sorted(scored, key=lambda pair: pair[0], reverse=True)
+            ]
         return candidates, tuple(readable[:top_k])
 
     def rules_for(
@@ -299,6 +315,12 @@ class PublishedCatalog:
         ]
         matches.sort(key=lambda rule: rule.version, reverse=True)
         return candidates, tuple(matches[:1])
+
+
+def _optional_float(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
 
 def _source_from_payload(payload: dict[str, Any] | None) -> SourceRef:

@@ -208,6 +208,30 @@ class S11TaskUnitTests {
     }
 
     @Test
+    void partialOrDegradedStepStillAdvancesTheStateMachine() {
+        TaskRepository repository = mock(TaskRepository.class);
+        TaskWorkerClaimService worker = new TaskWorkerClaimService(repository,
+                mock(TaskTerminationService.class), mock(AuditRepository.class), new TaskProperties(),
+                new S11Metrics(new SimpleMeterRegistry()));
+        UUID taskId = UUID.randomUUID();
+        UUID stepId = UUID.randomUUID();
+        when(repository.findTaskForUpdate(taskId))
+                .thenReturn(task(taskId, UUID.randomUUID(), TaskStatus.PARSING, 3, 10));
+        when(repository.latestStep(taskId, "parse")).thenReturn(new TaskRepository.StepRow(stepId, "parse",
+                "PARTIAL", 1, null, null, null, UUID.randomUUID()));
+        when(repository.outputFresh(eq(stepId), any())).thenReturn(true);
+        when(repository.transitionStatus(eq(taskId), eq(TaskStatus.PARSING), eq(TaskStatus.COLLECTING),
+                any(), any())).thenReturn(1);
+
+        TaskWorkerClaimService.ClaimResult result = worker.claim(taskId, "worker");
+
+        assertThat(result.hasWork()).isFalse();
+        assertThat(result.busy()).isFalse();
+        verify(repository).transitionStatus(eq(taskId), eq(TaskStatus.PARSING), eq(TaskStatus.COLLECTING),
+                any(), any());
+    }
+
+    @Test
     void terminalTaskIgnoresLateWorkerMessage() {
         TaskRepository repository = mock(TaskRepository.class);
         TaskWorkerClaimService worker = new TaskWorkerClaimService(repository,

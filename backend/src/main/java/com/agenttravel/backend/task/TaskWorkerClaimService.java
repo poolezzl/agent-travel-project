@@ -2,6 +2,7 @@ package com.agenttravel.backend.task;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.agenttravel.backend.common.AuditRepository;
@@ -18,18 +19,27 @@ public class TaskWorkerClaimService {
 
     private final TaskRepository repository;
     private final TaskTerminationService termination;
+    private final TaskAssemblyService assembly;
     private final AuditRepository audit;
     private final TaskProperties properties;
     private final S11Metrics metrics;
     private final CanonicalJson canonicalJson = new CanonicalJson();
 
+    @org.springframework.beans.factory.annotation.Autowired
     public TaskWorkerClaimService(TaskRepository repository, TaskTerminationService termination,
-            AuditRepository audit, TaskProperties properties, S11Metrics metrics) {
+            TaskAssemblyService assembly, AuditRepository audit, TaskProperties properties, S11Metrics metrics) {
         this.repository = repository;
         this.termination = termination;
+        this.assembly = assembly;
         this.audit = audit;
         this.properties = properties;
         this.metrics = metrics;
+    }
+
+    /** Test/back-compat constructor; the assemble step requires the real assembly service. */
+    public TaskWorkerClaimService(TaskRepository repository, TaskTerminationService termination,
+            AuditRepository audit, TaskProperties properties, S11Metrics metrics) {
+        this(repository, termination, null, audit, properties, metrics);
     }
 
     @Transactional
@@ -75,7 +85,9 @@ public class TaskWorkerClaimService {
             return work(taskId, insert(taskId, definition.stepName(), step.attemptNo() + 1, workerId),
                     definition);
         }
-        if ("SUCCEEDED".equals(step.status())) {
+        // PARTIAL/DEGRADED still represent a completed, usable step result and must advance the
+        // state machine; otherwise any degraded sub-agent would stall the whole task.
+        if (Set.of("SUCCEEDED", "PARTIAL", "DEGRADED").contains(step.status())) {
             if (!repository.outputFresh(step.id(), Instant.now())) {
                 return work(taskId, insert(taskId, definition.stepName(), step.attemptNo() + 1, workerId),
                         definition);
@@ -105,7 +117,7 @@ public class TaskWorkerClaimService {
         UUID resultId;
         try {
             resultId = repository.insertAgentResult(claim.taskId(), claim.stepId(), claim.attemptNo(),
-                    "mock-agent",
+                    result.agentId() == null ? "mock-agent" : result.agentId(),
                     "mock:" + claim.taskId() + ":" + claim.stepName() + ":" + claim.attemptNo(),
                     "agent:" + claim.taskId() + ":" + claim.stepName() + ":" + claim.attemptNo(),
                     canonicalJson.hash(claim.taskId() + ":" + claim.stepName() + ":" + claim.attemptNo()),
@@ -141,11 +153,12 @@ public class TaskWorkerClaimService {
             throw new StaleWorkException();
         }
         append(claim.taskId(), claim.workStatus(), claim.stepName(), claim.attemptNo(),
-                "模拟步骤已完成，结果=" + stepStatus, result.degradedFields());
+                "步骤已完成，结果=" + stepStatus, result.degradedFields());
         if (claim.nextStatus() == null) {
-            repository.appendEvent(claim.taskId(), "TASK_ASSEMBLY_READY",
-                    new TaskModels.EventData("ASSEMBLING", claim.stepName(), claim.attemptNo(),
-                            "模拟整理已完成，版本提交由后续步骤负责", List.of("version_commit_deferred")));
+            if (!assembly.finalizeAssembly(claim, result)) {
+                termination.failAndRefund(claim.taskId(), "ASSEMBLY_FAILED");
+                return false;
+            }
             return true;
         }
         if (repository.transitionStatus(claim.taskId(), claim.workStatus(), claim.nextStatus(), task.stateVersion(),

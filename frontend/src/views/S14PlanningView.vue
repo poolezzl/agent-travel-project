@@ -33,6 +33,9 @@ const {
   events,
   activeStatus,
   degradedFields,
+  plan,
+  planError,
+  planLoading,
   balancePoints,
   balanceError,
   cancelling,
@@ -58,11 +61,23 @@ watch(stream.connected, (value) => {
   planning.streamConnected = value
 })
 
+// 终态后读取后端已发布版本；409（未就绪/待确认）由结果面板显式展示。
+watch(
+  activeStatus,
+  (value) => {
+    if (value && isTerminalStatus(value)) {
+      void planning.fetchPlan()
+    }
+  },
+  { immediate: true },
+)
+
 function onStreamDone(): void {
   if (doneRefreshed) return
   doneRefreshed = true
   void planning.refreshTask()
   void planning.fetchBalance()
+  void planning.fetchPlan()
 }
 
 async function handleSubmit(input: PlanningFormState): Promise<void> {
@@ -148,7 +163,7 @@ onBeforeUnmount(() => {
         <h1>北京单城三日 · 规划与任务</h1>
         <p>
           表单、报价、建任务、预扣与 SSE 进度均调用真实接口（本地 Mock 供应商端到端）；
-          行程结果展示受结果接口缺失限制，见下方说明。
+          终态后读取后端已发布行程版本，示例数据与降级字段显式标注。
         </p>
       </div>
       <dl class="s14-header__meta">
@@ -223,17 +238,20 @@ onBeforeUnmount(() => {
 
           <PlanResultPanel
             v-if="activeStatus && isTerminalStatus(activeStatus)"
+            :plan="plan"
+            :plan-error="planError"
+            :plan-loading="planLoading"
             :degraded-fields="degradedFields"
           />
-          <SourceBadges :sources="[]" />
+          <SourceBadges :sources="plan?.source_metadata ?? []" />
         </template>
       </div>
     </div>
 
     <footer class="s14-footer">
       <p>
-        已知限制：后端未提供行程结果查询接口（PENDING-S14-01），故结果区为空态而非 fixture；
-        本地后端使用 MockAgentExecutor，因此只能称为「本地 Mock
+        结果来自后端已发布版本（GET /api/v1/tasks/{task_id}/plan，S19 关闭 PENDING-S14-01）； 未配置
+        Python 编排服务时本地后端使用 MockAgentExecutor，因此只能称为「本地 Mock
         供应商端到端」，未配置真实供应商时不宣称真实端到端通过。
       </p>
     </footer>

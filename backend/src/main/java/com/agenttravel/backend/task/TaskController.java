@@ -27,10 +27,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class TaskController {
 
     private final TaskService service;
+    private final TaskPlanService planService;
     private final TaskEventStreamService eventStream;
 
-    public TaskController(TaskService service, TaskEventStreamService eventStream) {
+    public TaskController(TaskService service, TaskPlanService planService,
+            TaskEventStreamService eventStream) {
         this.service = service;
+        this.planService = planService;
         this.eventStream = eventStream;
     }
 
@@ -45,6 +48,12 @@ public class TaskController {
     public TaskModels.TaskView get(@PathVariable UUID taskId) {
         Context context = user();
         return service.get(context.userId(), context.role(), taskId);
+    }
+
+    @GetMapping("/{taskId}/plan")
+    public TaskModels.PlanView plan(@PathVariable UUID taskId) {
+        Context context = user();
+        return planService.get(context.userId(), context.role(), taskId);
     }
 
     @PostMapping("/{taskId}/cancel")

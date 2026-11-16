@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
+from app.agents import reservation_rules
 from app.main import app
 from fastapi.testclient import TestClient
 
@@ -35,7 +38,14 @@ def test_attractions_endpoint_returns_cited_cards() -> None:
     assert body["cards"][0]["facts"][0]["source_record_id"] == "SRC-BJ-001"
 
 
-def test_reservation_endpoint_returns_timeline() -> None:
+def test_reservation_endpoint_returns_timeline(monkeypatch) -> None:
+    # Freeze "now" before the release time so the fixture stays deterministic instead of
+    # silently failing once the calendar passes the release date.
+    monkeypatch.setattr(
+        reservation_rules,
+        "now_utc",
+        lambda: datetime(2026, 11, 13, 8, 0, tzinfo=UTC),
+    )
     response = client.post(
         "/v1/agents/reservation-rules/invoke",
         json={

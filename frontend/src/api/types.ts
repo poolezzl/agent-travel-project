@@ -191,3 +191,165 @@ export interface SourceMetadata {
   freshness_status: string
   is_estimated: boolean
 }
+
+// ===== 最终行程（contracts/openapi/s11-tasks.yaml `PlanView` + contracts/s19/plan.schema.json）=====
+
+export interface PlanTransport {
+  mode: string
+  distance_m: number
+  duration_min: number
+  is_estimated: boolean
+  source_record_id: string
+  retrieved_at: string
+}
+
+export interface PlanFact {
+  fact_type: string
+  value: string
+  chunk_id?: string | null
+  source_record_id: string
+}
+
+export interface PlanSegment {
+  sequence_no: number
+  point_id: string
+  name: string
+  district?: string | null
+  category?: string
+  start_time: string
+  end_time: string
+  duration_min: number
+  duration_source: 'knowledge' | 'assumed'
+  is_must_visit: boolean
+  is_estimated: boolean
+  facts: PlanFact[]
+  transport_to_next?: PlanTransport | null
+}
+
+export interface PlanWeather {
+  status: 'ok' | 'degraded' | 'unknown'
+  date: string
+  condition?: string | null
+  temp_min?: number | null
+  temp_max?: number | null
+  precip_prob?: number | null
+  data_type?: string | null
+  source_record_id?: string | null
+  stale?: boolean
+  message?: string
+}
+
+export interface PlanMealCandidate {
+  poi_id: string
+  name: string
+  category?: string
+  price?: { kind?: string; currency?: string | null; amount_minor?: number | null }
+  detour_min?: number
+  source_record_id?: string
+}
+
+export interface PlanMeal {
+  date: string
+  meal: 'lunch' | 'dinner'
+  anchor_point_id: string
+  start_time?: string | null
+  candidates: PlanMealCandidate[]
+}
+
+export interface PlanLodging {
+  date: string
+  area?: string | null
+  candidates: PlanMealCandidate[]
+}
+
+export interface PlanReservation {
+  point_id: string
+  policy_id: string
+  ticket_type?: string
+  reservation_required: boolean
+  channel?: string | null
+  currency?: string | null
+  amount_minor?: number | null
+  stale: boolean
+  holiday_exception?: string | null
+  timeline?: Array<{ release_at?: string; status?: string; [key: string]: unknown }>
+}
+
+export interface PlanDay {
+  date: string
+  weekday: string
+  city_id: string
+  weather: PlanWeather
+  segments: PlanSegment[]
+  meals: PlanMeal[]
+  lodging: PlanLodging
+  reservations: PlanReservation[]
+  warnings: string[]
+}
+
+export interface PlanQualityCheck {
+  code: string
+  status: 'pass' | 'warn' | 'fail' | 'skipped'
+  message: string
+  fields?: string[]
+}
+
+export interface PlanConflict {
+  code: string
+  severity: 'blocking' | 'warning'
+  message: string
+  affected_days?: string[]
+  affected_points?: string[]
+  options?: Array<{ option_id: string; label: string; impact: string }>
+}
+
+export interface PlanDocument {
+  plan_version: string
+  generated_at: string
+  sample_only: boolean
+  notice?: string
+  trip: {
+    city_id: string
+    city_name: string
+    start_date: string
+    end_date: string
+    day_count: number
+    party_size: number
+    transport_preference: string
+    budget?: Money
+    preferences?: string[]
+  }
+  summary: {
+    point_count: number
+    total_distance_m: number
+    total_transport_min: number
+    estimated_route_legs: number
+    estimated_cost?: Money & { basis?: string }
+    source_completeness: number
+    degraded: boolean
+    stale_fields: string[]
+    unknown_fields: string[]
+  }
+  days: PlanDay[]
+  quality: { status: 'pass' | 'warn' | 'fail'; checks: PlanQualityCheck[] }
+  conflicts: PlanConflict[]
+  confirmation: { required: boolean; conflict_codes?: string[] }
+  sources: SourceMetadata[]
+  degraded_fields: string[]
+}
+
+export interface PlanView {
+  task_id: string
+  status: 'SUCCEEDED' | 'PARTIAL'
+  trip_id: string
+  version_id: string
+  version_no: number
+  etag: string
+  content_hash?: string
+  schema_version: string
+  generated_at: string
+  plan: PlanDocument
+  summary?: Record<string, unknown> | null
+  source_metadata: SourceMetadata[]
+  degraded_fields: string[]
+}

@@ -62,6 +62,88 @@ function frame(seq: number, status: string, extra: Record<string, unknown> = {})
 const SUCCESS_EVENTS = frame(1, 'QUEUED') + frame(2, 'ASSEMBLING') + frame(3, 'SUCCEEDED')
 const QUEUED_EVENTS = frame(1, 'QUEUED')
 
+function planView(): Record<string, unknown> {
+  return {
+    task_id: 'task-1',
+    status: 'PARTIAL',
+    trip_id: 'trip-1',
+    version_id: 'version-1',
+    version_no: 1,
+    etag: 'abcdef1234567890',
+    schema_version: 's19-plan-v1',
+    generated_at: '2026-11-11T00:00:00Z',
+    source_metadata: [],
+    degraded_fields: ['days[0].weather'],
+    plan: {
+      plan_version: 's19-plan-v1',
+      generated_at: '2026-11-11T00:00:00Z',
+      sample_only: true,
+      notice: '示例数据，不代表真实事实。',
+      trip: {
+        city_id: 'beijing',
+        city_name: '北京',
+        start_date: '2026-12-01',
+        end_date: '2026-12-03',
+        day_count: 3,
+        party_size: 2,
+        transport_preference: '混合',
+      },
+      summary: {
+        point_count: 1,
+        total_distance_m: 0,
+        total_transport_min: 0,
+        estimated_route_legs: 1,
+        estimated_cost: { currency: 'CNY', amount_minor: 6000, basis: 'known_ticket_rules' },
+        source_completeness: 1,
+        degraded: true,
+        stale_fields: [],
+        unknown_fields: ['days[0].weather'],
+      },
+      days: [
+        {
+          date: '2026-12-01',
+          weekday: '周二',
+          city_id: 'beijing',
+          weather: { status: 'unknown', date: '2026-12-01' },
+          segments: [
+            {
+              sequence_no: 1,
+              point_id: 'POI-BJ-001',
+              name: '故宫博物院',
+              district: '东城区',
+              category: 'attraction',
+              start_time: '09:00',
+              end_time: '11:30',
+              duration_min: 150,
+              duration_source: 'knowledge',
+              is_must_visit: true,
+              is_estimated: false,
+              facts: [
+                {
+                  fact_type: 'highlights',
+                  value: '中轴线宫殿群',
+                  chunk_id: 'CHUNK-1',
+                  source_record_id: 'SRC-1',
+                },
+              ],
+              transport_to_next: null,
+            },
+          ],
+          meals: [],
+          lodging: { date: '2026-12-01', candidates: [] },
+          reservations: [],
+          warnings: [],
+        },
+      ],
+      quality: { status: 'warn', checks: [] },
+      conflicts: [],
+      confirmation: { required: false },
+      sources: [],
+      degraded_fields: ['days[0].weather'],
+    },
+  }
+}
+
 interface BackendOptions {
   events: string
   cancelStatus?: string
@@ -111,6 +193,13 @@ async function installBackend(page: Page, options: BackendOptions): Promise<void
     }
     if (method === 'GET' && /\/api\/v1\/tasks\/[^/]+\/events$/.test(path)) {
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: options.events })
+    }
+    if (method === 'GET' && /\/api\/v1\/tasks\/[^/]+\/plan$/.test(path)) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(planView()),
+      })
     }
     if (method === 'GET' && /\/api\/v1\/tasks\/[^/]+$/.test(path)) {
       return route.fulfill({
@@ -167,7 +256,8 @@ test.describe('S14 M1 真实端到端（mock 后端）', () => {
     await expect(page.getByTestId('task-progress')).toBeVisible()
 
     await expect(page.getByTestId('plan-result')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId('plan-result')).toContainText('PENDING-S14-01')
+    await expect(page.getByTestId('plan-result')).toContainText('故宫博物院')
+    await expect(page.getByTestId('plan-result')).toContainText('示例数据')
     await expect(page.getByTestId('task-status-banner')).toContainText('成功')
     await expect(page.getByTestId('plan-result')).not.toContainText('合成·北城晨光公园')
   })

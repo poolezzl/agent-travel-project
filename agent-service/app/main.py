@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.api.agents import router as agents_router
 from app.api.health import router as health_router
+from app.api.planning import router as planning_router
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -17,6 +18,7 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(agents_router)
+app.include_router(planning_router)
 
 
 if __name__ == "__main__":

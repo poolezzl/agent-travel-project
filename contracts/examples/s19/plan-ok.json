@@ -1,0 +1,209 @@
+{
+  "plan_version": "s19-plan-v1",
+  "generated_at": "2026-11-16T06:40:00Z",
+  "sample_only": true,
+  "notice": "基于 S06 合成样例，不代表真实票价、开放时间或位置。",
+  "trip": {
+    "city_id": "beijing",
+    "city_name": "北京",
+    "start_date": "2026-11-20",
+    "end_date": "2026-11-21",
+    "day_count": 2,
+    "party_size": 2,
+    "transport_preference": "混合",
+    "budget": {
+      "currency": "CNY",
+      "amount_minor": 300000,
+      "basis": "total"
+    },
+    "preferences": ["历史", "亲子"]
+  },
+  "summary": {
+    "point_count": 2,
+    "total_distance_m": 2450.5,
+    "total_transport_min": 18.0,
+    "estimated_route_legs": 1,
+    "estimated_cost": {
+      "currency": "CNY",
+      "amount_minor": 12000,
+      "basis": "known_ticket_rules"
+    },
+    "source_completeness": 1.0,
+    "degraded": true,
+    "stale_fields": [],
+    "unknown_fields": ["days[0].weather"]
+  },
+  "days": [
+    {
+      "date": "2026-11-20",
+      "weekday": "周五",
+      "city_id": "beijing",
+      "weather": {
+        "status": "unknown",
+        "date": "2026-11-20",
+        "condition": null,
+        "temp_min": null,
+        "temp_max": null,
+        "precip_prob": null,
+        "data_type": null,
+        "source_record_id": null,
+        "retrieved_at": null,
+        "valid_until": null,
+        "stale": false,
+        "message": "天气服务暂不可用，未生成天气事实"
+      },
+      "segments": [
+        {
+          "sequence_no": 1,
+          "point_id": "POI-BJ-001",
+          "name": "故宫博物院",
+          "district": "东城区",
+          "category": "attraction",
+          "start_time": "09:00",
+          "end_time": "11:30",
+          "duration_min": 150,
+          "duration_source": "knowledge",
+          "is_must_visit": true,
+          "is_estimated": false,
+          "facts": [
+            {
+              "fact_type": "highlights",
+              "value": "中轴线上的宫殿群适合按午门—太和殿—御花园的顺序参观。",
+              "chunk_id": "CHUNK-BJ-001-01",
+              "source_record_id": "SRC-BJ-001"
+            }
+          ],
+          "transport_to_next": null
+        }
+      ],
+      "meals": [
+        {
+          "date": "2026-11-20",
+          "meal": "lunch",
+          "anchor_point_id": "POI-BJ-001",
+          "start_time": "12:00",
+          "candidates": []
+        }
+      ],
+      "lodging": {
+        "date": "2026-11-20",
+        "area": "东城区",
+        "anchor_point_id": "POI-BJ-001",
+        "candidates": []
+      },
+      "reservations": [
+        {
+          "point_id": "POI-BJ-001",
+          "policy_id": "POLICY-BJ-001-V2",
+          "ticket_type": "standard",
+          "audience": "general",
+          "reservation_required": true,
+          "channel": "official",
+          "currency": "CNY",
+          "amount_minor": 6000,
+          "free_condition": null,
+          "effective_from": "2026-01-01T00:00:00+08:00",
+          "effective_until": "2026-12-31T23:59:59+08:00",
+          "timezone": "Asia/Shanghai",
+          "last_verified": "2026-10-20T09:00:00+08:00",
+          "holiday_exception": "周一闭馆及法定节假日安排以官方公告为准",
+          "stale": false,
+          "timeline": []
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "date": "2026-11-21",
+      "weekday": "周六",
+      "city_id": "beijing",
+      "weather": {
+        "status": "unknown",
+        "date": "2026-11-21",
+        "condition": null,
+        "temp_min": null,
+        "temp_max": null,
+        "precip_prob": null,
+        "data_type": null,
+        "source_record_id": null,
+        "retrieved_at": null,
+        "valid_until": null,
+        "stale": false,
+        "message": "天气服务暂不可用，未生成天气事实"
+      },
+      "segments": [
+        {
+          "sequence_no": 1,
+          "point_id": "POI-BJ-002",
+          "name": "中国国家博物馆",
+          "district": "东城区",
+          "category": "attraction",
+          "start_time": "09:00",
+          "end_time": "11:30",
+          "duration_min": 150,
+          "duration_source": "knowledge",
+          "is_must_visit": false,
+          "is_estimated": false,
+          "facts": [
+            {
+              "fact_type": "suggested_duration",
+              "value": "建议预留 2 到 3 小时，重点展览可再增加时间。",
+              "chunk_id": "CHUNK-BJ-002-02",
+              "source_record_id": "SRC-BJ-002"
+            }
+          ],
+          "transport_to_next": null
+        }
+      ],
+      "meals": [],
+      "lodging": {
+        "date": "2026-11-21",
+        "area": "东城区",
+        "anchor_point_id": "POI-BJ-002",
+        "candidates": []
+      },
+      "reservations": [],
+      "warnings": ["当日无餐饮候选"]
+    }
+  ],
+  "quality": {
+    "status": "warn",
+    "checks": [
+      {
+        "code": "TIME_OVERLAP",
+        "status": "pass",
+        "message": "未发现时间重叠",
+        "fields": []
+      },
+      {
+        "code": "WEATHER_AVAILABILITY",
+        "status": "warn",
+        "message": "天气服务暂不可用，方案未使用天气事实",
+        "fields": ["days[0].weather", "days[1].weather"]
+      }
+    ]
+  },
+  "conflicts": [],
+  "confirmation": {
+    "required": false
+  },
+  "sources": [
+    {
+      "source_type": "knowledge_base",
+      "source_record_id": "SRC-BJ-001",
+      "retrieved_at": "2026-10-20T09:00:00+08:00",
+      "valid_until": "2027-12-31T23:59:59+08:00",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    },
+    {
+      "source_type": "reservation_rule",
+      "source_record_id": "SRC-RULE-BJ-001-V2",
+      "retrieved_at": "2026-10-20T09:00:00+08:00",
+      "valid_until": "2026-12-31T23:59:59+08:00",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "degraded_fields": ["days[0].weather", "meals", "lodging"]
+}
