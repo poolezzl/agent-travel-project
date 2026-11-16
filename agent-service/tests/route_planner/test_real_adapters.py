@@ -269,6 +269,29 @@ def test_poi_same_name_requires_clarification_without_merge() -> None:
     assert "B000A1" in result.message and "B000A9" in result.message
 
 
+def test_poi_get_by_id_fetches_detail_once_and_maps_category() -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if request.url.path == "/v3/place/detail":
+            poi = {**POI_TIANANMEN, "type": "风景名胜;世界遗产"}
+            return httpx.Response(200, json={"status": "1", "pois": [poi]})
+        return httpx.Response(404, json={"status": "0"})
+
+    client = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handler))
+    poi = AmapPoiAdapter(client, "test-key")
+
+    first = poi.get("B000A1")
+    second = poi.get("B000A1")
+
+    assert first is not None
+    assert first.name == "天安门"
+    assert first.category == "风景名胜;世界遗产"
+    assert second is first
+    assert calls == ["/v3/place/detail"]
+
+
 def test_poi_out_of_range_coordinate_is_dropped() -> None:
     bad = {**POI_TIANANMEN, "location": "999.0,999.0"}
     poi, provider = _stack(_handler(pois=[bad, POI_HOTEL]))

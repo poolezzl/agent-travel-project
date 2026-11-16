@@ -62,7 +62,37 @@ class AmapPoiAdapter:
         return records
 
     def get(self, poi_id: str) -> PoiRecord | None:
-        return self._seen.get(poi_id)
+        """Return a seen record, or fetch it by authoritative 高德 id once.
+
+        The S10 Java ``PoiAdapter`` only exposes search, so this adapter closes the
+        by-id gap directly through ``/v3/place/detail``. Failures return ``None`` and
+        never invent coordinates.
+        """
+        cached = self._seen.get(poi_id)
+        if cached is not None:
+            return cached
+        try:
+            response = self._client.get(
+                "/v3/place/detail",
+                params={"id": poi_id, "key": self._api_key},
+            )
+        except httpx.HTTPError:
+            return None
+        if response.status_code != 200:
+            return None
+        try:
+            body = response.json()
+        except ValueError:
+            return None
+        if not isinstance(body, dict) or body.get("status") != "1":
+            return None
+        pois = body.get("pois")
+        if not isinstance(pois, list) or not pois:
+            return None
+        record = self._parse(pois[0], str(pois[0].get("adcode", "")))
+        if record is not None:
+            self._seen[record.poi_id] = record
+        return record
 
     def _parse(self, poi: object, city_id: str) -> PoiRecord | None:
         if not isinstance(poi, dict):
@@ -88,4 +118,5 @@ class AmapPoiAdapter:
             latitude=latitude,
             longitude=longitude,
             coordinate_system=_COORDINATE_SYSTEM,
+            category=poi.get("type") if isinstance(poi.get("type"), str) else None,
         )

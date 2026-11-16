@@ -60,6 +60,7 @@ class PoiRecord(BaseModel):
     latitude: float | None
     longitude: float | None
     coordinate_system: str | None
+    category: str | None = None
 
 
 class ResolvedPoint(BaseModel):
