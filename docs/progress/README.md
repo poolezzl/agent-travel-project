@@ -20,11 +20,11 @@
 | S02 | 已完成 | [S02.md](S02.md) |
 | S03 | 已完成（Hosted CI 环境豁免） | [S03.md](S03.md)、[S03-R6.md](S03-R6.md)、[S03-Gate-Final-复验报告.md](S03-Gate-Final-复验报告.md)、[S03-Gate-R5-环境豁免裁决.md](S03-Gate-R5-环境豁免裁决.md) |
 | S04 | 已完成 | [S04.md](S04.md)、[S04-最终数据模型冻结单.md](S04-最终数据模型冻结单.md)、[S04-Flyway-实现与验证报告.md](S04-Flyway-实现与验证报告.md)、[S04-Flyway-最终独立验收报告.md](S04-Flyway-最终独立验收报告.md) |
-| S05 | 进行中（TripStar/真实来源仍 PENDING） | [S05.md](S05.md) |
-| S06 | 进行中（真实来源许可仍 PENDING） | [S06.md](S06.md) |
+| S05 | 已完成（课程口径：30 案例 ready；TripStar 不纳入课程；组长验收） | [S05.md](S05.md) |
+| S06 | 已完成（课程口径：模板/校验 + 天聚北京样例；生产许可不在课程范围；组长验收） | [S06.md](S06.md) |
 | S07 | 已完成（模拟演示） | [S07.md](S07.md) |
 | S08 | 已完成 | [S08.md](S08.md) |
-| S09 | 已完成（真实 LLM 联通 4.1s/250 tokens；独立整体验收待 R7） | [S09.md](S09.md) |
+| S09 | 已完成（真实 LLM 联通 4.1s/250 tokens；组长验收） | [S09.md](S09.md) |
 | S10 | 已完成 | [S10.md](S10.md)、[S10-Gate.md](S10-Gate.md) |
 | S11 | 已完成 | [S11.md](S11.md)、[S11-Gate.md](S11-Gate.md) |
 | S12 | 已完成（真实高德 driving/walking/transit；契约冻结、PoiPort.get、category 均关闭；待 R2/R5 签字） | [S12.md](S12.md) |
@@ -33,7 +33,7 @@
 | S16 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 发布快照联调通过） | [S16.md](S16.md) |
 | S17 | 已完成（R3 已审核 2026-11-11；离线 Agent + Java 规则快照路径通过） | [S17.md](S17.md) |
 | S18 | 已完成（R3，2026-11-11；离线 Agent + 合法 POI 端口；本地合成样例） | [S18.md](S18.md) |
-| S14 | 已完成（前端 API/SSE/规划页；真实供应商；后端 10 并发 + 浏览器 e2e 4/4 mock + 1/1 真实；M1 Gate 签字待 R7） | [S14.md](S14.md) |
+| S14 | 已完成（课程口径：前端 + 真实供应商；10 并发探针 + 浏览器 e2e 4/4 mock + 1/1 真实；组长验收） | [S14.md](S14.md) |
 | S19 | 已完成（固定 DAG + 最终 Plan + `/plan`；真实 MySQL/Redis 9/9；10 并发 M1 探针通过；高德 exact 1/1、和风 3/3；M1/M2 Gate 未签字） | [S19.md](S19.md) |
 | S20-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
