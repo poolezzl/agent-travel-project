@@ -166,6 +166,20 @@ def test_forecast_in_window_returns_forecast_type() -> None:
     assert port.timezone == TZ
 
 
+def test_forecast_maps_supplier_update_time() -> None:
+    body = {
+        "code": "200",
+        "updateTime": "2026-09-21T08:00+08:00",
+        "daily": [fc("2026-09-21", 15, 24)],
+    }
+    port = adapter(handler(body=body))
+
+    result = port.forecast(CITY, date(2026, 9, 21))
+
+    assert isinstance(result, DailyWeather)
+    assert result.forecast_published_at == datetime(2026, 9, 21, 0, 0, tzinfo=UTC)
+
+
 def test_forecast_tier_drives_endpoint_not_hardcoded() -> None:
     calls: list[str] = []
     port = adapter(handler(forecast=[fc("2026-09-21", 15, 24)], calls=calls), days=7)

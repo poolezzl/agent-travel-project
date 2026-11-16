@@ -99,6 +99,7 @@ def _sanitize(data: DailyWeather, expected_type: DataType) -> WeatherDaily | Non
         source_record_id=data.source_record_id,
         retrieved_at=data.retrieved_at,
         valid_until=data.valid_until,
+        forecast_published_at=data.forecast_published_at,
     )
 
 

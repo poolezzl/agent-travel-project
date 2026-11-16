@@ -87,6 +87,13 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "forecast_published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       }

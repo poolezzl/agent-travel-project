@@ -51,6 +51,7 @@ class DailyWeather(BaseModel):
     retrieved_at: datetime
     valid_until: datetime | None = None
     freshness_status: Literal["fresh", "stale", "unknown"] = "fresh"
+    forecast_published_at: datetime | None = None
 
 
 class WeatherPortError(BaseModel):
@@ -75,6 +76,7 @@ class WeatherDaily(BaseModel):
     source_record_id: str
     retrieved_at: datetime
     valid_until: datetime | None = None
+    forecast_published_at: datetime | None = None
 
     @model_validator(mode="after")
     def _check_temps(self) -> WeatherDaily:

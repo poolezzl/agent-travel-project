@@ -95,6 +95,7 @@ class QWeatherAdapter:
         retrieved_at = self._now()
         valid_until = min(retrieved_at + self._cache_ttl, self._day_end(day))
         return DailyWeather(
+            forecast_published_at=_published_at(body),
             city_id=normalize_city_id(city_id),
             date=day,
             temp_min=temp_min,
@@ -139,6 +140,7 @@ class QWeatherAdapter:
 
         retrieved_at = self._now()
         return DailyWeather(
+            forecast_published_at=_published_at(body),
             city_id=normalize_city_id(city_id),
             date=day,
             temp_min=temp_min,
@@ -193,6 +195,19 @@ def _find_day(items: list[object], day: date) -> object | None:
         if text(item, "fxDate") == day.isoformat() or text(item, "date") == day.isoformat():
             return item
     return None
+
+
+def _published_at(body: object) -> datetime | None:
+    """Map supplier ``updateTime``; never invent a publication time."""
+    if not isinstance(body, dict):
+        return None
+    raw = text(body, "updateTime")
+    if raw is None:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _parse_day(
