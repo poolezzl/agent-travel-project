@@ -1,0 +1,137 @@
+openapi: 3.0.3
+info:
+  title: Trip revision API
+  version: s20-v1
+paths:
+  /api/v1/trips/{tripId}/revisions/preview:
+    post:
+      operationId: previewRevision
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionCommand'
+      responses:
+        '200':
+          description: query、change 预检或 ambiguous 澄清
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionResult'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/trips/{tripId}/revisions/confirm:
+    post:
+      operationId: confirmRevision
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+        - in: header
+          name: Idempotency-Key
+          required: true
+          description: 必须与请求体 confirmation_id 一致
+          schema: { type: string, maxLength: 128, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionCommand'
+      responses:
+        '200':
+          description: 已确认、等待确认或只读结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionResult'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/trips/{tripId}/revisions/rollback/{versionId}:
+    post:
+      operationId: rollbackRevision
+      parameters:
+        - $ref: '#/components/parameters/TripId'
+        - in: path
+          name: versionId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: header
+          name: If-Match
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: 通过创建新版本完成回滚
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionResult'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  parameters:
+    TripId:
+      in: path
+      name: tripId
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Conflict:
+      description: 基准版本或 ETag 已过期
+  schemas:
+    AtomicChange:
+      type: object
+      required: [operation, path]
+      properties:
+        operation: { type: string, enum: [add, remove, replace, reorder] }
+        path: { type: string, minLength: 1 }
+        value: {}
+    RevisionCommand:
+      type: object
+      required: [base_version_id]
+      properties:
+        base_version_id: { type: string, format: uuid }
+        etag: { type: string }
+        intent: { type: string, enum: [query, change, ambiguous] }
+        locked_paths: { type: array, items: { type: string } }
+        affected_days: { type: array, items: { type: integer, minimum: 1 }, minItems: 1 }
+        affected_agents: { type: array, items: { type: string }, minItems: 1 }
+        changes: { type: array, items: { $ref: '#/components/schemas/AtomicChange' } }
+        needs_confirm: { type: boolean }
+        confirmed: { type: boolean }
+        confirmation_id: { type: string }
+        revision_request: { type: string }
+        plan: { type: object, additionalProperties: true }
+        answer: { type: string }
+        clarification_question: { type: string }
+        schema_version: { type: string }
+        model_version: { type: string }
+        prompt_version: { type: string }
+        source_snapshot_ids: { type: array, items: { type: string, format: uuid } }
+    RevisionResult:
+      type: object
+      required: [intent, base_version_id, status, needs_confirm, affected_days, affected_agents, changes]
+      properties:
+        intent: { type: string, enum: [query, change, ambiguous] }
+        base_version_id: { type: string, format: uuid }
+        version_id: { type: string, format: uuid, nullable: true }
+        parent_version_id: { type: string, format: uuid, nullable: true }
+        etag: { type: string }
+        status: { type: string, enum: [PRECHECKED, AWAITING_CONFIRMATION, CREATED] }
+        needs_confirm: { type: boolean }
+        affected_days: { type: array, items: { type: integer } }
+        affected_agents: { type: array, items: { type: string } }
+        changes: { type: array, items: { $ref: '#/components/schemas/AtomicChange' } }
+        answer: { type: string, nullable: true }
+        clarification_question: { type: string, nullable: true }
+        summary: { type: string }
+        createdAt: { type: string, format: date-time }
+        reused: { type: boolean }
+        change_set: { type: array, items: { $ref: '#/components/schemas/AtomicChange' } }
+        source_snapshot_ids: { type: array, items: { type: string, format: uuid } }
+        schema_version: { type: string, nullable: true }
+        model_version: { type: string, nullable: true }
+        prompt_version: { type: string, nullable: true }
+        content_hash: { type: string, nullable: true }
