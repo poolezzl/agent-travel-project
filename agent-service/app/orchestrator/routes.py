@@ -71,6 +71,7 @@ def run_routes(
     *,
     deps: OrchestratorDeps | None = None,
     route_provider: RouteProvider | None = None,
+    cached_days: dict[tuple[str, tuple[str, ...]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Order each day's points and assign deterministic time slots."""
     city_id = str(constraints["city_id"])
@@ -98,6 +99,9 @@ def run_routes(
     days = schedule.get("days", [])
 
     def plan_day(day: dict[str, Any]) -> dict[str, Any]:
+        cached = (cached_days or {}).get((day["date"], tuple(day["point_ids"])))
+        if cached is not None:
+            return cached
         return _plan_day(day, city_id, transport, catalog_points, poi_port, provider)
 
     with ThreadPoolExecutor(max_workers=min(4, max(1, len(days)))) as pool:

@@ -23,7 +23,11 @@ _ESTIMATED_LEG_MIN = 20.0
 
 
 def run_schedule(
-    constraints: dict[str, Any], collected: dict[str, Any], *, max_points: int = MAX_POINTS_PER_DAY
+    constraints: dict[str, Any],
+    collected: dict[str, Any],
+    *,
+    max_points: int = MAX_POINTS_PER_DAY,
+    prefer_lower_ticket_cost: bool = False,
 ) -> dict[str, Any]:
     """Allocate collected points to trip days, protecting must-visit points."""
     dates = [date.fromisoformat(value) for value in constraints["dates"]]
@@ -139,6 +143,9 @@ def run_schedule(
         assignment[target.isoformat()].append(poi_id)
 
     non_must = sorted(poi_id for poi_id in points if poi_id not in set(must_ids))
+    if prefer_lower_ticket_cost:
+        currency = (constraints.get("budget") or {}).get("currency", "CNY")
+        non_must.sort(key=lambda poi_id: _ticket_priority(points[poi_id], currency))
     for poi_id in non_must:
         point = points[poi_id]
         for day in dates:
@@ -204,6 +211,15 @@ def run_schedule(
         "warnings": warnings,
         "degraded_fields": sorted(set(degraded)),
     }
+
+
+def _ticket_priority(point: dict[str, Any], currency: str) -> tuple[bool, int]:
+    known = [
+        rule["amount_minor"]
+        for rule in point.get("reservations", {}).values()
+        if rule.get("currency") == currency and type(rule.get("amount_minor")) is int
+    ]
+    return (not known, max(known, default=0))
 
 
 def _conflict(

@@ -3,6 +3,7 @@ package com.agenttravel.backend.points;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import com.agenttravel.backend.common.ApiException;
 import com.agenttravel.backend.common.AuditRepository;
@@ -87,6 +88,23 @@ public class PointsService {
         }
         audit.write(userId, "POINTS_RESERVE", "POINTS_QUOTE", quote.id(), "SUCCESS", null);
         return new PointsModels.PointsResponse(reference, -quote.points(), after, false);
+    }
+
+    @Transactional
+    public <T> T settleRevision(UUID userId, UUID tripId, String fingerprint, Supplier<T> publishVersion) {
+        String reference = "revision:" + userId + ":" + fingerprint;
+        PointsRepository.AccountRow account = repository.lockAccount(userId);
+        if (account.balance() < 2) {
+            throw new ApiException(HttpStatus.CONFLICT, "INSUFFICIENT_POINTS", "局部重规划需要 2 积分");
+        }
+        long after = account.balance() - 2;
+        repository.insertLedger(account.id(), userId, null, null, "RESERVE", -2, account.balance(), after,
+                reference + ":reserve");
+        repository.updateBalance(account.id(), after);
+        T published = publishVersion.get();
+        repository.insertLedger(account.id(), userId, null, null, "CONFIRM", 0, after, after, reference + ":confirm");
+        audit.write(userId, "POINTS_REVISION_CONFIRM", "TRIP", tripId, "SUCCESS", null);
+        return published;
     }
 
     @Transactional

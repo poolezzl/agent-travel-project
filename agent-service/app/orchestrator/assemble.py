@@ -21,6 +21,8 @@ def run_assemble(
     routes: dict[str, Any],
     deps: OrchestratorDeps,
     context: dict[str, Any],
+    *,
+    reusable_days: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Merge facts, day plans, meals/lodging and quality checks into one plan candidate."""
     now = deps.now()
@@ -36,9 +38,16 @@ def run_assemble(
     for route_day in routes.get("days", []):
         day_date = route_day["date"]
         segments = route_day.get("segments", [])
-        meals, lodging, dining_degraded = _dining_for_day(
-            day_date, constraints, segments, deps, context
-        )
+        reuse = (reusable_days or {}).get(day_date)
+        if reuse is not None and segments == reuse["segments"]:
+            meals, lodging = reuse["meals"], reuse["lodging"]
+            dining_degraded = (["meals"] if not meals else []) + (
+                ["lodging"] if not lodging["candidates"] else []
+            )
+        else:
+            meals, lodging, dining_degraded = _dining_for_day(
+                day_date, constraints, segments, deps, context
+            )
         degraded_fields.extend(dining_degraded)
         reservations: list[dict[str, Any]] = []
         for segment in segments:

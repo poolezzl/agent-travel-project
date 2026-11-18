@@ -9,10 +9,11 @@ from typing import Any
 
 from fastapi import APIRouter, Body
 
-from app.agents import attractions, dining_lodging, reservation_rules
+from app.agents import attractions, dining_lodging, reservation_rules, revision, revision_execution
 from app.agents.common import failure, new_context
 from app.knowledge.catalog import CatalogError, PublishedCatalog
 from app.knowledge.dining_lodging import JsonPoiSource, PoiSourceError
+from app.orchestrator.runtime import build_default_deps
 
 router = APIRouter(prefix="/v1/agents", tags=["r3-agents"])
 
@@ -85,6 +86,24 @@ def invoke_dining_lodging(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  
 def invoke_reservation_rules(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
     """Run the S17 reservation-rules agent against published rules."""
     return _invoke("reservation-rules", body)
+
+
+@router.post("/revision/invoke")
+def invoke_revision(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
+    """Classify one S20 query/change request and produce a bounded change proposal."""
+    return revision.run(_inputs(body), _context(body))
+
+
+@router.post("/revision/variants")
+def plan_revision_variants(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
+    """Plan 1-3 deterministic variants while sharing collection snapshots."""
+    return revision.plan_variants(_inputs(body), _context(body))
+
+
+@router.post("/revision/apply")
+def apply_revision(body: dict[str, Any] = Body(...)) -> dict[str, Any]:  # noqa: B008
+    """Build a candidate from the backend's confirmed proposal."""
+    return revision_execution.apply(_inputs(body), _context(body), build_default_deps())
 
 
 @router.get("/catalog")

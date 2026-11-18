@@ -24,3 +24,5 @@ management:
       enabled: false
     flyway:
       enabled: false
+    redis:
+      enabled: false

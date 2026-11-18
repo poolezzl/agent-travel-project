@@ -76,6 +76,7 @@ public class TaskPlanRepository {
                 SELECT BIN_TO_UUID(id),version_no,HEX(etag),HEX(content_hash),schema_version
                 FROM trip_version
                 WHERE trip_id=UUID_TO_BIN(?) AND content_hash=?
+                ORDER BY version_no DESC LIMIT 1
                 """,
                 (rs, rowNum) -> new VersionRow(UUID.fromString(rs.getString(1)), rs.getInt(2),
                         rs.getString(3), rs.getString(4), rs.getString(5)),

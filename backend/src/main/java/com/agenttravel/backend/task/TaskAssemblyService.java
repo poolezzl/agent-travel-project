@@ -3,6 +3,8 @@ package com.agenttravel.backend.task;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HexFormat;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -10,6 +12,8 @@ import java.util.UUID;
 import com.agenttravel.backend.common.AuditRepository;
 import com.agenttravel.backend.points.PointsModels;
 import com.agenttravel.backend.points.PointsService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,7 @@ public class TaskAssemblyService {
     private final AuditRepository audit;
     private final TaskProperties properties;
     private final CanonicalJson canonicalJson = new CanonicalJson();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public TaskAssemblyService(TaskRepository repository, TaskPlanRepository planRepository,
             PointsService pointsService, AuditRepository audit, TaskProperties properties) {
@@ -77,6 +82,10 @@ public class TaskAssemblyService {
                     codes.isBlank() ? "CONFIRMATION_REQUIRED" : codes);
             return true;
         }
+        List<?> variants = envelope.get("variants") instanceof List<?> items ? items : List.of();
+        if (!validVariants(expectedCount(task.id()), plan, variants)) {
+            return false;
+        }
 
         UUID tripId = task.tripId();
         if (tripId == null) {
@@ -87,7 +96,8 @@ public class TaskAssemblyService {
         }
         String planJson = canonicalJson.write(plan);
         byte[] contentHash = canonicalJson.hash(plan);
-        TaskPlanRepository.VersionRow existing = planRepository.findVersionByHash(tripId, contentHash);
+        TaskPlanRepository.VersionRow existing = variants.isEmpty()
+                ? planRepository.findVersionByHash(tripId, contentHash) : null;
         TaskPlanRepository.VersionRow version = existing;
         if (version == null) {
             int versionNo = planRepository.nextVersionNo(tripId);
@@ -97,8 +107,11 @@ public class TaskAssemblyService {
                     HexFormat.of().formatHex(contentHash), String.valueOf(plan.get("plan_version")));
             planRepository.insertVersion(versionId, tripId, versionNo, etag, contentHash,
                     version.schemaVersion(), task.ownerId(), now);
-            planRepository.insertPlanSnapshot(UUID.randomUUID(), versionId, planJson,
-                    canonicalJson.write(mapOrEmpty(plan.get("summary"))), now);
+            Map<String, Object> summary = new LinkedHashMap<>(mapOrEmpty(plan.get("summary")));
+            if (!variants.isEmpty()) {
+                summary.put("variants", variants);
+            }
+            planRepository.insertPlanSnapshot(UUID.randomUUID(), versionId, planJson, canonicalJson.write(summary), now);
             if (planRepository.setTripCurrentVersion(tripId, versionId, now) != 1) {
                 throw new IllegalStateException("TRIP_VERSION_BIND_FAILED");
             }
@@ -136,6 +149,44 @@ public class TaskAssemblyService {
         UUID tripId = UUID.randomUUID();
         planRepository.insertTrip(tripId, task.ownerId(), title, start, end, now);
         return tripId;
+    }
+
+    private int expectedCount(UUID taskId) {
+        String request = repository.taskRequestJson(taskId);
+        if (request == null) {
+            return 1;
+        }
+        try {
+            return mapper.readTree(request).path("plan_count").asInt(1);
+        } catch (JsonProcessingException exception) {
+            return -1;
+        }
+    }
+
+    private boolean validVariants(int count, Map<String, Object> primary, List<?> variants) {
+        if (count == 1) {
+            return variants.isEmpty();
+        }
+        if (count < 2 || count > 3 || variants.size() != count) {
+            return false;
+        }
+        var ids = new HashSet<String>();
+        String shared = null;
+        for (Object item : variants) {
+            Map<String, Object> variant = map(item);
+            if (variant == null || !(variant.get("variant_id") instanceof String id) || !ids.add(id)
+                    || !(variant.get("shared_snapshot_hash") instanceof String snapshot)
+                    || !snapshot.matches("[a-f0-9]{64}") || (shared != null && !shared.equals(snapshot))) {
+                return false;
+            }
+            Map<String, Object> plan = map(variant.get("plan"));
+            if (plan == null || !SUPPORTED_PLAN_VERSION.equals(plan.get("plan_version"))
+                    || confirmationRequired(plan) || (shared == null && !primary.equals(plan))) {
+                return false;
+            }
+            shared = snapshot;
+        }
+        return true;
     }
 
     @SuppressWarnings("unchecked")

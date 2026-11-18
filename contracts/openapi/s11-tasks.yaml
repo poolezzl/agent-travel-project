@@ -301,6 +301,24 @@ components:
         summary:
           type: object
           nullable: true
+          properties:
+            variants:
+              type: array
+              description: 多方案任务的可比较结果。各项共享同一采集批次，plan 遵循 S19 行程 Schema。
+              minItems: 2
+              maxItems: 3
+              items:
+                type: object
+                required: [variant_id, strategy, difference_summary, shared_snapshot_hash, quality_score, plan]
+                properties:
+                  variant_id: { type: string }
+                  strategy: { type: string }
+                  difference_summary: { type: string }
+                  shared_snapshot_hash: { type: string, pattern: '^[a-f0-9]{64}$' }
+                  quality_score: { type: integer, minimum: 0, maximum: 100, nullable: true }
+                  strategy_duration_ms: { type: integer, minimum: 0, nullable: true }
+                  estimated_trip_cost: { type: object, nullable: true }
+                  plan: { type: object }
         source_metadata:
           type: array
           items:

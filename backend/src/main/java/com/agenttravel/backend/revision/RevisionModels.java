@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotBlank;
 
 public final class RevisionModels {
@@ -13,6 +14,7 @@ public final class RevisionModels {
     private RevisionModels() {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record AtomicChange(
             @NotBlank String operation,
             @NotBlank String path,

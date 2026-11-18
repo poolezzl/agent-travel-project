@@ -2,6 +2,7 @@ package com.agenttravel.backend.task;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,9 +53,11 @@ public class TaskService {
 
         UUID taskId = UUID.randomUUID();
         Instant now = Instant.now();
+        var trustedPayload = new LinkedHashMap<>(request.request());
+        trustedPayload.put("plan_count", request.planCount());
         try {
             repository.insertTask(taskId, userId, request.tripId(), request.baseVersionId(), request.taskType(),
-                    idempotencyKey, requestHash, canonicalJson.write(sanitizer.sanitize(request.request())),
+                    idempotencyKey, requestHash, canonicalJson.write(sanitizer.sanitize(trustedPayload)),
                     now.plusSeconds(properties.getOperationTimeoutSeconds()));
         } catch (DuplicateKeyException exception) {
             TaskRepository.TaskRow raced = repository.findTaskByIdempotency(userId, idempotencyKey);

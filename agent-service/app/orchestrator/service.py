@@ -12,6 +12,7 @@ from app.orchestrator.deps import OrchestratorDeps
 from app.orchestrator.request import parse_request
 from app.orchestrator.routes import run_routes
 from app.orchestrator.schedule import run_schedule
+from app.orchestrator.variants import fresh_collection, generate_variants
 
 STEPS = ("parse", "collect", "schedule", "route", "assemble")
 
@@ -47,6 +48,8 @@ def run_stage(
         constraints = _constraints(raw_request, prior, deps)
         if step == "collect":
             collected = run_collect(constraints, deps, ctx)
+            if constraints["plan_count"] > 1:
+                collected = fresh_collection(collected, deps.now())
             return envelope(
                 ctx,
                 status=collected["status"],
@@ -115,8 +118,10 @@ def run_stage(
         plan = assembled["plan"]
         if assembled["status"] == "degraded" and plan["confirmation"]["required"]:
             message = "方案存在需用户确认的硬冲突，确认前不会创建不可变版本"
+            variants = []
         else:
             message = assembled["message"]
+            variants = generate_variants(constraints, collected, plan, scheduled, routed, deps, ctx)
         return envelope(
             ctx,
             status=assembled["status"],
@@ -124,6 +129,7 @@ def run_stage(
             degraded_fields=assembled["degraded_fields"],
             source_metadata=plan["sources"],
             plan=plan,
+            **({"variants": variants} if variants else {}),
         )
     except StageInputError as exc:
         return failure(ctx, "INVALID_INPUT", str(exc))

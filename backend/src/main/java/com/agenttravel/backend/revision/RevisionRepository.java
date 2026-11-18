@@ -84,15 +84,17 @@ public class RevisionRepository {
         jdbc.update("""
                 INSERT INTO trip_version(id,trip_id,parent_version_id,version_no,etag,content_hash,version_status,
                   schema_version,model_version,prompt_version,created_by,created_at)
-                VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),?,?,?,'PUBLISHED',?,?,?,?,?)
+                VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),?,?,?,'PUBLISHED',?,?,?,UUID_TO_BIN(?),?)
                 """, versionId.toString(), tripId.toString(), uuid(parentId), versionNo, etag, contentHash,
                 schemaVersion, modelVersion, promptVersion, creator.toString(), Timestamp.from(now));
-        jdbc.update("INSERT INTO plan_snapshot(id,trip_version_id,plan_json) VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),CAST(? AS JSON))",
-                UUID.randomUUID().toString(), versionId.toString(), planJson);
+        jdbc.update("""
+                INSERT INTO plan_snapshot(id,trip_version_id,plan_json,summary_json)
+                VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),CAST(? AS JSON),JSON_EXTRACT(?, '$.summary'))
+                """, UUID.randomUUID().toString(), versionId.toString(), planJson, planJson);
         jdbc.update("""
                 INSERT INTO change_set(id,trip_version_id,base_version_id,change_no,change_type,affected_paths_json,
                   change_json,change_hash)
-                VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),1,?,?,CAST(? AS JSON),?)
+                VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),1,?,CAST(? AS JSON),CAST(? AS JSON),?)
                 """, UUID.randomUUID().toString(), versionId.toString(), uuid(baseVersionId), changeType,
                 affectedPathsJson, changeJson, changeHash);
         if (sourceSnapshotIds != null) {
@@ -105,11 +107,42 @@ public class RevisionRepository {
     }
 
     public int advanceCurrentVersion(UUID tripId, UUID expectedVersionId, UUID newVersionId, String expectedEtag) {
-        return jdbc.update("""
-                UPDATE trip t JOIN trip_version v ON v.id=t.current_version_id
-                SET t.current_version_id=UUID_TO_BIN(?),t.updated_at=CURRENT_TIMESTAMP(6),v.version_status='SUPERSEDED'
-                WHERE t.id=UUID_TO_BIN(?) AND t.current_version_id=UUID_TO_BIN(?) AND HEX(v.etag)=?
+        int updated = jdbc.update("""
+                UPDATE trip t SET current_version_id=UUID_TO_BIN(?),updated_at=CURRENT_TIMESTAMP(6)
+                WHERE t.id=UUID_TO_BIN(?) AND t.current_version_id=UUID_TO_BIN(?)
+                  AND EXISTS (SELECT 1 FROM trip_version v WHERE v.id=t.current_version_id AND HEX(v.etag)=?)
                 """, newVersionId.toString(), tripId.toString(), expectedVersionId.toString(), expectedEtag);
+        if (updated == 1) {
+            jdbc.update("UPDATE trip_version SET version_status='SUPERSEDED' WHERE id=UUID_TO_BIN(?)",
+                    expectedVersionId.toString());
+        }
+        return updated;
+    }
+
+    public List<UUID> copyVersionSources(UUID from, UUID to) {
+        jdbc.update("""
+                INSERT INTO trip_version_source(trip_version_id,source_snapshot_id,field_path)
+                SELECT UUID_TO_BIN(?),source_snapshot_id,field_path FROM trip_version_source
+                WHERE trip_version_id=UUID_TO_BIN(?)
+                """, to.toString(), from.toString());
+        return versionSources(to);
+    }
+
+    public List<UUID> versionSources(UUID id) {
+        return jdbc.query("SELECT DISTINCT BIN_TO_UUID(source_snapshot_id) FROM trip_version_source WHERE trip_version_id=UUID_TO_BIN(?)",
+                (rs, n) -> UUID.fromString(rs.getString(1)), id.toString());
+    }
+
+    public void saveProposalScope(UUID version, String scopeJson) {
+        jdbc.update("UPDATE change_set SET scope_json=CAST(? AS JSON) WHERE trip_version_id=UUID_TO_BIN(?) AND change_no=1",
+                scopeJson, version.toString());
+    }
+
+    public String loadPublishedProposal(UUID version) {
+        return jdbc.queryForObject("""
+                SELECT JSON_OBJECT('impact_scope',scope_json,'changes',change_json) FROM change_set
+                WHERE trip_version_id=UUID_TO_BIN(?) AND change_no=1
+                """, String.class, version.toString());
     }
 
     public String json(Object value) {

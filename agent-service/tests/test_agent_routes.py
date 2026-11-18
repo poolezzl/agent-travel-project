@@ -158,6 +158,56 @@ class AgentRouteTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["error_code"], "INVALID_INPUT")
 
+    def _revision_plan(self) -> dict[str, object]:
+        return {
+            "days": [
+                {
+                    "date": "2026-11-20",
+                    "segments": [
+                        {
+                            "sequence_no": 1,
+                            "point_id": "POI-BJ-001",
+                            "name": "故宫博物院",
+                            "is_must_visit": True,
+                        }
+                    ],
+                    "reservations": [],
+                }
+            ],
+            "sources": [],
+        }
+
+    def test_revision_route_returns_bounded_change(self) -> None:
+        result = self.module.invoke_revision(
+            {
+                "task_id": "task-revision",
+                "input": {
+                    "base_version_id": "version-1",
+                    "current_plan": self._revision_plan(),
+                    "revision_request": "删除第一天的故宫",
+                },
+            }
+        )
+
+        self.assertEqual(result["task_id"], "task-revision")
+        self.assertEqual(result["intent"], "change")
+        self.assertTrue(result["impact_scope"]["needs_confirm"])
+
+    def test_revision_variant_route_enforces_requested_count(self) -> None:
+        result = self.module.plan_revision_variants(
+            {
+                "input": {
+                    "current_plan": self._revision_plan(),
+                    "plan_count": 2,
+                    "shared_source_snapshot_ids": ["11111111-1111-4111-8111-111111111111"],
+                }
+            }
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["requested_count"], 2)
+        self.assertEqual(len(result["variants"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

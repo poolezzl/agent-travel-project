@@ -165,7 +165,8 @@ def evaluate_quality(
     else:
         status = "pass"
 
-    estimated_cost = _estimated_cost(points)
+    currency = (constraints.get("budget") or {}).get("currency", "CNY")
+    estimated_cost = _estimated_cost(points, days, int(constraints.get("party_size", 1)), currency)
     total_distance = sum(
         float(segment["transport_to_next"]["distance_m"])
         for day in days
@@ -257,15 +258,16 @@ def _budget_check(
     return None
 
 
-def _estimated_cost(points: dict[str, Any]) -> dict[str, Any]:
+def _estimated_cost(
+    points: dict[str, Any], days: list[dict[str, Any]], party_size: int, currency: str
+) -> dict[str, Any]:
     total = 0
-    currency = "CNY"
-    for point in points.values():
-        cards = point.get("reservations", {}).values()
-        chosen = next(iter(cards), None) if cards else None
-        if chosen and chosen.get("currency") == currency:
-            total += int(chosen.get("amount_minor") or 0)
-    return {"currency": currency, "amount_minor": total, "basis": "known_ticket_rules"}
+    for day in days:
+        for segment in day["segments"]:
+            rule = points.get(segment["point_id"], {}).get("reservations", {}).get(day["date"])
+            if rule and not rule.get("stale") and rule.get("currency") == currency:
+                total += int(rule.get("amount_minor") or 0)
+    return {"currency": currency, "amount_minor": total * party_size, "basis": "known_ticket_rules"}
 
 
 def _check(code: str, status: str, message: str, fields: list[str] | None = None) -> dict[str, Any]:
