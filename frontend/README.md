@@ -113,6 +113,30 @@ npm --prefix frontend run dev   # http://127.0.0.1:5173，/api 由 vite server.p
 - 真实端到端仍未验证：`PENDING-002`（高德 Key）、`PENDING-003`（和风天气 Key）未关闭；本地后端用 `MockAgentExecutor`，
   因此只能称「本地 Mock 供应商端到端」，未配置真实供应商时不宣称真实端到端通过。
 
+## S21 对话修改、确认、diff 与版本时间线（local/production）
+
+S21 在 S14 规划页内（`S14PlanningView`）挂载 `RevisionPanel`，仅当「已登录 + 任务终态 + plan 非空」时渲染，不新增路由。统一「问答 / 修改」入口由服务端判定 `query / change / ambiguous`：
+
+- `query`：只显示答案并标注「仅问答 · 未创建新版本 · 未扣费」，不修改任何行程展示。
+- `ambiguous`：展示服务端澄清问题，继续输入补充说明；不出现确认按钮。
+- `change`：弹出确认弹窗（基准版本、影响日期、受影响 Agent、保护项、结构化 diff、费用说明），确认前不乐观更新。
+- 确认成功/回滚成功：重新读取最新版本（`GET /api/v1/tasks/{task_id}/plan`）并刷新余额，在会话内版本时间线追加入口。
+- 409 `REVISION_BASE_MISMATCH`：横幅提示「行程版本已变化」，自动刷新并展示新版本号/时间，要求重新预览，不静默重试。
+- 弱网/失败重试：同一草稿复用同一 `confirmation_id`，不产生重复版本与重复扣费。
+
+主要文件：`src/api/revisions.ts`、`src/stores/revision.ts`、`src/composables/revisionDiff.ts`、`src/components/revision/*`。
+
+E2E 运行（端口 5175，development 模式）：
+
+```powershell
+npm --prefix frontend run test:e2e:s21
+```
+
+### S21 已知 PENDING
+
+- `PENDING-S21-01`：缺少版本列表与按版本读内容接口，跨会话历史版本时间线与历史版本内容 diff 不可用（负责 R5）。
+- `PENDING-S21-02`：版本内容读取依赖最初生成任务的 `taskId`，属隐式约定未进 OpenAPI（负责 R5/R1）。
+
 ## Playwright 演示证据
 
 首次使用需要安装浏览器（国内网络建议指定镜像）：

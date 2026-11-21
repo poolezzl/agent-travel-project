@@ -353,3 +353,65 @@ export interface PlanView {
   source_metadata: SourceMetadata[]
   degraded_fields: string[]
 }
+
+// ===== 行程修订（contracts/openapi/s20-revisions.yaml s20-v1）=====
+
+export type RevisionIntent = 'query' | 'change' | 'ambiguous'
+export type RevisionOperation = 'add' | 'remove' | 'replace' | 'reorder'
+export type RevisionStatus = 'PRECHECKED' | 'AWAITING_CONFIRMATION' | 'CREATED'
+
+/**
+ * 单条原子变更。path 形如 /days/{1 起算天}/{segments|meals|lodging|reservations}/{0 起算索引}。
+ * value 为服务端给出的自由 JSON（新增内容、替换后的新值等），前端只做摘要展示不猜测结构。
+ */
+export interface AtomicChange {
+  operation: RevisionOperation
+  path: string
+  value?: unknown
+}
+
+/**
+ * 修订命令载荷。preview 只需 base_version_id / etag / revision_request / locked_paths；
+ * confirm 额外带 confirmed: true 与 confirmation_id，且请求头 Idempotency-Key 必须与其一致。
+ */
+export interface RevisionCommand {
+  base_version_id: string
+  etag?: string | null
+  intent?: RevisionIntent | null
+  locked_paths?: string[]
+  affected_days?: number[]
+  affected_agents?: string[]
+  changes?: AtomicChange[]
+  needs_confirm?: boolean
+  confirmed?: boolean
+  confirmation_id?: string | null
+  revision_request: string
+}
+
+/**
+ * 修订结果。注意：契约与后端 Java 模型中该字段为 `createdAt`（camelCase，例外），
+ * 其余字段均为 snake_case。createdAt 表示基准版本的创建时间，不得当作「本次请求时间」展示。
+ */
+export interface RevisionResult {
+  intent: RevisionIntent
+  base_version_id: string
+  version_id: string | null
+  parent_version_id: string | null
+  etag: string
+  status: RevisionStatus
+  needs_confirm: boolean
+  affected_days: number[]
+  affected_agents: string[]
+  changes: AtomicChange[]
+  answer: string | null
+  clarification_question: string | null
+  summary: string
+  createdAt: string
+  reused: boolean
+  change_set: AtomicChange[] | null
+  source_snapshot_ids: string[] | null
+  schema_version: string | null
+  model_version: string | null
+  prompt_version: string | null
+  content_hash: string | null
+}

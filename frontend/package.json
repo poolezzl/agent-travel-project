@@ -23,6 +23,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:s14": "playwright test --config playwright.s14.config.ts",
+    "test:e2e:s21": "playwright test --config playwright.s21.config.ts",
     "test:e2e:report": "playwright show-report",
     "check": "npm run lint && npm run format:check && npm run test:unit && npm run build:mock"
   },

@@ -44,6 +44,8 @@ export interface RequestOptions {
   body?: unknown
   /** 写请求幂等键；省略则不携带该头。 */
   idempotencyKey?: string
+  /** 额外自定义请求头（如 If-Match）；不改变 Authorization/Content-Type/Idempotency-Key 既有行为。 */
+  headers?: Record<string, string>
   /** 默认 30s；到期 AbortController 中断。 */
   timeoutMs?: number
   signal?: AbortSignal
@@ -165,6 +167,7 @@ async function doFetch(path: string, options: RequestOptions): Promise<Response>
   if (options.auth !== false) Object.assign(headers, authHeader())
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
+  if (options.headers) Object.assign(headers, options.headers)
 
   const controller = new AbortController()
   const timeoutMs = options.timeoutMs ?? 30_000

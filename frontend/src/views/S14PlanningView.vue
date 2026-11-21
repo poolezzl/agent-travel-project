@@ -10,6 +10,7 @@ import ErrorPanel from '@/components/planning/ErrorPanel.vue'
 import PlanResultPanel from '@/components/planning/PlanResultPanel.vue'
 import PlanningForm from '@/components/planning/PlanningForm.vue'
 import QuoteSummary from '@/components/planning/QuoteSummary.vue'
+import RevisionPanel from '@/components/revision/RevisionPanel.vue'
 import SourceBadges from '@/components/planning/SourceBadges.vue'
 import TaskProgress from '@/components/planning/TaskProgress.vue'
 import TaskStatusBanner from '@/components/planning/TaskStatusBanner.vue'
@@ -243,6 +244,7 @@ onBeforeUnmount(() => {
             :plan-loading="planLoading"
             :degraded-fields="degradedFields"
           />
+          <RevisionPanel v-if="activeStatus && isTerminalStatus(activeStatus) && plan" />
           <SourceBadges :sources="plan?.source_metadata ?? []" />
         </template>
       </div>
