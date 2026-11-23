@@ -92,7 +92,7 @@ public class TaskPlanRepository {
                 JOIN trip tr ON tr.id=t.trip_id
                 JOIN trip_version v ON v.id=tr.current_version_id
                 JOIN plan_snapshot p ON p.trip_version_id=v.id
-                WHERE t.id=UUID_TO_BIN(?)
+                WHERE t.id=UUID_TO_BIN(?) AND tr.deleted_at IS NULL AND tr.status<>'DELETED'
                 """,
                 (rs, rowNum) -> new PlanRow(UUID.fromString(rs.getString(1)), rs.getString(2),
                         UUID.fromString(rs.getString(3)), UUID.fromString(rs.getString(4)),

@@ -33,6 +33,10 @@ spring:
       connect-timeout: "${REDIS_CONNECT_TIMEOUT:2s}"
 
 app:
+  s26:
+    pdf-font: "${S26_PDF_FONT:}"
+    export-directory: "${S26_EXPORT_DIRECTORY:${user.home}/.agent-travel/exports}"
+    scheduling-enabled: "${S26_SCHEDULING_ENABLED:true}"
   agent-service:
     enabled: "${AGENT_SERVICE_ENABLED:true}"
     base-url: "${AGENT_SERVICE_BASE_URL:}"

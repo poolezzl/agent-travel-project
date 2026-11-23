@@ -34,6 +34,7 @@ public class RevisionRepository {
                 FROM trip_version v JOIN trip t ON t.id=v.trip_id
                   JOIN plan_snapshot p ON p.trip_version_id=v.id
                 WHERE v.id=UUID_TO_BIN(?) AND v.trip_id=UUID_TO_BIN(?) AND t.owner_id=UUID_TO_BIN(?)
+                  AND t.deleted_at IS NULL AND t.status<>'DELETED'
                 """ + (lock ? " FOR UPDATE" : "");
         List<VersionRow> rows = jdbc.query(sql, (rs, n) -> new VersionRow(
                 UUID.fromString(rs.getString(1)), UUID.fromString(rs.getString(2)),
@@ -45,8 +46,10 @@ public class RevisionRepository {
     }
 
     public UUID currentVersionId(UUID tripId, UUID ownerId, boolean lock) {
-        List<UUID> rows = jdbc.query("SELECT BIN_TO_UUID(current_version_id) FROM trip WHERE id=UUID_TO_BIN(?) AND owner_id=UUID_TO_BIN(?)"
-                + (lock ? " FOR UPDATE" : ""), (rs, n) -> rs.getString(1) == null ? null : UUID.fromString(rs.getString(1)),
+        List<UUID> rows = jdbc.query("""
+                SELECT BIN_TO_UUID(current_version_id) FROM trip
+                WHERE id=UUID_TO_BIN(?) AND owner_id=UUID_TO_BIN(?) AND deleted_at IS NULL AND status<>'DELETED'
+                """ + (lock ? " FOR UPDATE" : ""), (rs, n) -> rs.getString(1) == null ? null : UUID.fromString(rs.getString(1)),
                 tripId.toString(), ownerId.toString());
         return rows.isEmpty() ? null : rows.get(0);
     }
@@ -61,6 +64,7 @@ public class RevisionRepository {
                   JOIN trip t ON t.id=v.trip_id JOIN plan_snapshot p ON p.trip_version_id=v.id
                 WHERE v.trip_id=UUID_TO_BIN(?) AND c.base_version_id=UUID_TO_BIN(?)
                   AND c.change_hash=? AND t.owner_id=UUID_TO_BIN(?)
+                  AND t.deleted_at IS NULL AND t.status<>'DELETED'
                 ORDER BY v.created_at DESC LIMIT 1
                 """, (rs, n) -> new VersionRow(UUID.fromString(rs.getString(1)), UUID.fromString(rs.getString(2)),
                 rs.getString(3) == null ? null : UUID.fromString(rs.getString(3)), rs.getInt(4), rs.getString(5),
@@ -110,6 +114,7 @@ public class RevisionRepository {
         int updated = jdbc.update("""
                 UPDATE trip t SET current_version_id=UUID_TO_BIN(?),updated_at=CURRENT_TIMESTAMP(6)
                 WHERE t.id=UUID_TO_BIN(?) AND t.current_version_id=UUID_TO_BIN(?)
+                  AND t.deleted_at IS NULL AND t.status<>'DELETED'
                   AND EXISTS (SELECT 1 FROM trip_version v WHERE v.id=t.current_version_id AND HEX(v.etag)=?)
                 """, newVersionId.toString(), tripId.toString(), expectedVersionId.toString(), expectedEtag);
         if (updated == 1) {

@@ -1,0 +1,16 @@
+{
+  "notification_id": "e56f69ce-02ca-4bc5-91ad-dcbcb555a104",
+  "trip_id": "0281387b-2b48-4145-9a74-b84fc863a992",
+  "type": "RESERVATION",
+  "delivered_at": "2026-12-01T10:00:00Z",
+  "payload": {
+    "date": "2026-12-09",
+    "message": "预约即将开放，请查看官方渠道。",
+    "source_type": "reservation_rule",
+    "source_record_id": "synthetic-test-rule",
+    "retrieved_at": "2026-11-23T01:00:00Z",
+    "valid_until": "2026-12-01T11:00:00Z",
+    "freshness_status": "fresh",
+    "is_estimated": false
+  }
+}

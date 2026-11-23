@@ -9,7 +9,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     try:
         import yaml
-        from openapi_spec_validator import validate_spec
+        from openapi_spec_validator import validate
     except ImportError as error:
         print(f"完整契约校验依赖缺失: {error}")
         return 2
@@ -20,7 +20,7 @@ def main() -> int:
             document = yaml.safe_load(source)
         if not isinstance(document, dict):
             raise ValueError(f"契约不是对象: {path}")
-        validate_spec(document)
+        validate(document, base_uri=path.as_uri())
         checked += 1
 
     for path in sorted((root / "contracts" / "examples").rglob("*.json")):

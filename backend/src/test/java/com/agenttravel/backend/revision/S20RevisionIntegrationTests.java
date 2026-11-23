@@ -118,6 +118,31 @@ class S20RevisionIntegrationTests {
     }
 
     @Test
+    void deletedTripCannotBeReadOrChangedThroughPreviousVersion() throws Exception {
+        UUID user = fundedUser();
+        UUID trip = UUID.randomUUID();
+        UUID base = UUID.randomUUID();
+        String plan = Files.readString(Path.of("../contracts/examples/s19/plan-ok.json"));
+        Instant now = Instant.now();
+        plans.insertTrip(trip, user, "删除状态", LocalDate.of(2026, 11, 20), LocalDate.of(2026, 11, 21), now);
+        plans.insertVersion(base, trip, 1, TaskPlanRepository.sha256(base.toString()), TaskPlanRepository.sha256(plan),
+                "s19-plan-v1", user, now);
+        plans.insertPlanSnapshot(UUID.randomUUID(), base, plan, "{}", now);
+        plans.setTripCurrentVersion(trip, base, now);
+        var original = revisions.findVersion(trip, base, user, false);
+        jdbc.update("UPDATE trip SET deleted_at=UTC_TIMESTAMP(6) WHERE id=UUID_TO_BIN(?)", trip.toString());
+
+        assertThatThrownBy(() -> service.preview(user, trip, request(base, null, "故宫票价多少？", "deleted-read", false)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("CONTEXT_NOT_FOUND"));
+        assertThatThrownBy(() -> service.confirm(user, trip,
+                request(base, original.etag(), "删除第二天的中国国家博物馆", "deleted-change", true)))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("CONTEXT_NOT_FOUND"));
+        assertThatThrownBy(() -> service.rollback(user, trip, base, original.etag())).isInstanceOf(ApiException.class);
+        assertThat(revisions.currentVersionId(trip, user, false)).isNull();
+        assertThat(points.balance(user).balancePoints()).isEqualTo(100);
+    }
+
+    @Test
     @EnabledIfEnvironmentVariable(named = "S20_REDIS_IT", matches = "true")
     void queuedGenerationReturnsThreePlansAndChargesServerCountOnce() {
         UUID user = fundedUser();
@@ -141,6 +166,9 @@ class S20RevisionIntegrationTests {
         var plan = taskPlans.get(user, "USER", task.taskId());
         assertThat((List<?>) plan.summary().get("variants")).hasSize(3);
         assertThat(points.balance(user).balancePoints()).isEqualTo(75);
+        jdbc.update("UPDATE trip SET status='DELETED' WHERE id=UUID_TO_BIN(?)", plan.tripId().toString());
+        assertThatThrownBy(() -> taskPlans.get(user, "USER", task.taskId()))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("PLAN_NOT_READY"));
     }
 
     private UUID fundedUser() {

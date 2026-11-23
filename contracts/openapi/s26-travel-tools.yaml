@@ -1,0 +1,140 @@
+openapi: 3.1.0
+info:
+  title: 行程导出与站内提醒
+  version: 1.0.0
+servers:
+  - url: /api/v1
+security:
+  - bearer: []
+paths:
+  /trips/{tripId}/versions/{versionId}/exports:
+    parameters:
+      - {$ref: '#/components/parameters/Trip'}
+      - {$ref: '#/components/parameters/Version'}
+    post:
+      operationId: createExport
+      description: 本人可导出已发布的固定版本。重复提交同一请求返回原任务，复用编号提交其他请求返回冲突。
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateExport'}
+      responses:
+        '202':
+          description: 已接收
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Export'}
+        default: {$ref: '#/components/responses/Problem'}
+  /exports/{exportId}:
+    parameters:
+      - {$ref: '#/components/parameters/Export'}
+    get:
+      operationId: getExport
+      responses:
+        '200':
+          description: 任务状态。成功时返回最长五分钟有效的本人下载链接，文件保留二十四小时。
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Export'}
+        default: {$ref: '#/components/responses/Problem'}
+  /exports/{exportId}/download:
+    parameters:
+      - {$ref: '#/components/parameters/Export'}
+    get:
+      operationId: downloadExport
+      description: 本人登录并提交有效签名。下载写入审计。
+      parameters:
+        - {name: expires, in: query, required: true, schema: {type: integer, format: int64}}
+        - {name: signature, in: query, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{43}$'}}
+      responses:
+        '200':
+          description: 私有附件
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+            text/calendar:
+              schema: {type: string, format: binary}
+        default: {$ref: '#/components/responses/Problem'}
+  /trips/{tripId}/versions/{versionId}/reminders:
+    parameters:
+      - {$ref: '#/components/parameters/Trip'}
+      - {$ref: '#/components/parameters/Version'}
+    put:
+      operationId: enableReminders
+      description: 本人授权此当前版本的预约和天气提醒。天气风险持续时只提示一次，风险消退后再次出现可重新提醒。重复授权幂等，同版本取消后再次提交返回冲突。
+      responses:
+        '204': {description: 已授权}
+        default: {$ref: '#/components/responses/Problem'}
+    delete:
+      operationId: cancelReminders
+      description: 撤销此版本的授权，取消尚未投递的提醒。已送达的消息仍可查看。
+      responses:
+        '204': {description: 已撤销}
+        default: {$ref: '#/components/responses/Problem'}
+  /notifications:
+    get:
+      operationId: listNotifications
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 0, maximum: 10000, default: 0}}
+      responses:
+        '200':
+          description: 本人已投递的消息，按送达时间倒序，每页二十条。
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Notification'}}
+        default: {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    Trip: {name: tripId, in: path, required: true, schema: {type: string, format: uuid}}
+    Version: {name: versionId, in: path, required: true, schema: {type: string, format: uuid}}
+    Export: {name: exportId, in: path, required: true, schema: {type: string, format: uuid}}
+  responses:
+    Problem:
+      description: 参数错误、未登录、资源不存在、状态冲突或下载授权失效
+      content:
+        application/problem+json:
+          schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  schemas:
+    CreateExport:
+      type: object
+      additionalProperties: false
+      required: [format]
+      properties:
+        format: {type: string, enum: [PDF, ICS]}
+    Export:
+      type: object
+      additionalProperties: false
+      required: [export_id, version_id, format, status]
+      properties:
+        export_id: {type: string, format: uuid}
+        version_id: {type: string, format: uuid}
+        format: {type: string, enum: [PDF, ICS]}
+        status: {type: string, enum: [PENDING, RUNNING, SUCCEEDED, FAILED, EXPIRED]}
+        expires_at: {type: string, format: date-time}
+        download_url: {type: string, format: uri-reference}
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [notification_id, trip_id, type, delivered_at, payload]
+      properties:
+        notification_id: {type: string, format: uuid}
+        trip_id: {type: string, format: uuid}
+        type: {type: string, enum: [RESERVATION, WEATHER]}
+        delivered_at: {type: string, format: date-time}
+        payload:
+          type: object
+          required: [date, message, source_type, source_record_id, retrieved_at, valid_until, freshness_status, is_estimated]
+          properties:
+            date: {type: string, format: date}
+            message: {type: string}
+            source_type: {type: string, enum: [reservation_rule, weather]}
+            source_record_id: {type: string}
+            retrieved_at: {type: string, format: date-time}
+            valid_until: {type: string, format: date-time}
+            freshness_status: {type: string, enum: [fresh, stale, unknown]}
+            is_estimated: {type: boolean}

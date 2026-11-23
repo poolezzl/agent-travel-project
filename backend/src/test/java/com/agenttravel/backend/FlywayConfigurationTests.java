@@ -12,7 +12,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 class FlywayConfigurationTests {
 
     @Test
-    void migrationDirectoryContainsV1ThroughV6() throws IOException {
+    void migrationDirectoryContainsV1ThroughV8() throws IOException {
         Resource[] versionedMigrations = new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:db/migration/V*.sql");
 
@@ -25,7 +25,9 @@ class FlywayConfigurationTests {
                         "V3__s20_allow_identical_version_content.sql",
                         "V4__s22_queue_sequence.sql",
                         "V5__s23_community.sql",
-                        "V6__s25_wallet.sql");
+                        "V6__s25_wallet.sql",
+                        "V7__s26_exports_and_reminders.sql",
+                        "V8__s26_weather_reminder_state.sql");
     }
 
     @Test

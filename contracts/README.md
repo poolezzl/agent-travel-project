@@ -6,6 +6,8 @@ S23 社区、榜单与治理接口见 [社区接口](openapi/s23-community.yaml)
 
 S25 模拟充值、积分流水和管理员调整沿用 `openapi/s08-public.yaml` 的积分接口。
 
+S26 行程导出与站内提醒见 [接口](openapi/s26-travel-tools.yaml) 和 [样例](examples/s26)。
+
 计划结构：
 
 ```text
