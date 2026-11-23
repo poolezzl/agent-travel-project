@@ -1,0 +1,24 @@
+{
+  "cost": {
+    "api_cost_minor_mean": 0.0,
+    "api_cost_minor_total": 0.0,
+    "token_mean": 0.0,
+    "token_total": 0
+  },
+  "degradation_visibility_rate": 1.0,
+  "hard_constraints": {
+    "satisfaction_rate": 1.0,
+    "total": 50,
+    "violations": 0
+  },
+  "latency_ms": {
+    "p50": 2.9555,
+    "p95": 4.066199999999998
+  },
+  "local_modification_preservation_rate": 1.0,
+  "route_feasibility_rate": 1.0,
+  "run_count": 30,
+  "schema_valid_rate": 1.0,
+  "source_completeness_rate": 1.0,
+  "stale_display_rate": 1.0
+}

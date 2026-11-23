@@ -60,6 +60,26 @@ class S11RedisIntegrationTests {
     }
 
     @Test
+    void realQueuePublishesAndReadsTheSequenceNumber() {
+        RedisTaskQueue queue = new RedisTaskQueue(redis);
+        UUID taskId = UUID.randomUUID();
+        UUID outboxId = UUID.randomUUID();
+        String streamKey = RedisTaskQueue.key(taskId);
+        try {
+            queue.publish(new TaskModels.QueueMessage(taskId, outboxId, "TASK_QUEUED", "QUEUED", 42L));
+
+            List<TaskModels.QueueRecord> records = queue.poll(taskId, "s22-it-seq", "consumer-a", 10);
+
+            assertThat(records).hasSize(1);
+            assertThat(records.get(0).message().outboxId()).isEqualTo(outboxId);
+            assertThat(records.get(0).message().sequenceNo()).isEqualTo(42L);
+        } finally {
+            redis.opsForStream().destroyGroup(streamKey, "s22-it-seq");
+            redis.delete(streamKey);
+        }
+    }
+
+    @Test
     void interruptedConsumerMessageCanBeClaimedAndAcknowledged() {
         String group = "s11-it-group";
         String crashedConsumer = "s11-it-crashed";

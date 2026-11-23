@@ -7,6 +7,7 @@ is never presented as a hard-feasibility proof.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from typing import Any
@@ -60,8 +61,9 @@ class EstimateOnlyRoutePort:
         return RoutePortError(kind=RouteErrorKind.EMPTY, message="route provider not configured")
 
 
-def build_route_provider(mode: str = "estimate") -> RouteProvider:
-    return RouteProvider(EstimateOnlyRoutePort(), MockRouteCache())
+def build_route_provider(mode: str = "estimate", now: Callable[[], Any] | None = None) -> RouteProvider:
+    """Estimate-only provider. ``now`` keeps estimated legs on the orchestrator clock."""
+    return RouteProvider(EstimateOnlyRoutePort(), MockRouteCache(), now=now)
 
 
 def run_routes(
@@ -94,7 +96,7 @@ def run_routes(
     if provider is None and deps is not None and deps.route_provider_factory is not None:
         provider = deps.route_provider_factory(poi_port)
     if provider is None:
-        provider = build_route_provider()
+        provider = build_route_provider(now=deps.now if deps is not None else None)
     transport = str(constraints.get("transport_preference") or "混合")
     days = schedule.get("days", [])
 

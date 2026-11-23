@@ -198,6 +198,49 @@ public class TaskRepository {
                 """, this::taskRow, limit);
     }
 
+    /**
+     * Tasks whose confirmation window has elapsed. The sweeper re-checks each row under a
+     * row lock, so a stale read here can never refund twice.
+     */
+    public List<TaskRow> expiredConfirmations(Instant now, int limit) {
+        return jdbc.query(TASK_COLUMNS + """
+                 WHERE status='AWAITING_CONFIRMATION'
+                   AND confirmation_deadline_at IS NOT NULL
+                   AND confirmation_deadline_at<=?
+                 ORDER BY confirmation_deadline_at
+                 LIMIT ?
+                """, this::taskRow, Timestamp.from(now), limit);
+    }
+
+    public long currentQueueSequence(UUID taskId) {
+        Long value = jdbc.queryForObject(
+                "SELECT last_queue_sequence FROM planning_task WHERE id=UUID_TO_BIN(?)",
+                Long.class, taskId.toString());
+        return value == null ? 0L : value;
+    }
+
+    /**
+     * Advance the applied-sequence watermark monotonically.
+     *
+     * @return 1 when the watermark moved, 0 when the message is stale or duplicated.
+     */
+    public int markQueueSequence(UUID taskId, long sequence) {
+        return jdbc.update("""
+                UPDATE planning_task
+                SET last_queue_sequence=?,updated_at=updated_at
+                WHERE id=UUID_TO_BIN(?) AND last_queue_sequence<?
+                """, sequence, taskId.toString(), sequence);
+    }
+
+    /** Clears the reservation snapshot after the points have been refunded. */
+    public int clearReservedPoints(UUID taskId) {
+        return jdbc.update("""
+                UPDATE planning_task
+                SET reserved_points=0,updated_at=updated_at
+                WHERE id=UUID_TO_BIN(?) AND reserved_points>0
+                """, taskId.toString());
+    }
+
     public List<TaskModels.TaskEventView> eventsAfter(UUID taskId, long afterSequence, int limit) {
         return jdbc.query("""
                 SELECT sequence_no,event_type,event_json,created_at

@@ -19,3 +19,14 @@
 ## 替换与回滚
 
 替换消息系统必须保留 Outbox 和至少一次语义。Redis 故障时停止新消费并在恢复后重放，不改写 MySQL 事实。
+
+## 增补（S22）：顺序水位与重复/乱序消息
+
+至少一次投递意味着同一消息可能重复或乱序到达。S22 在消息载荷中增加 `sequence_no`（产生该命令的
+`task_event.sequence_no`），并在 `planning_task.last_queue_sequence` 持久化已应用水位：
+
+- 消费端丢弃并确认 `sequence_no ≤ last_queue_sequence` 的消息，不重跑步骤；
+- 处理成功后以“仅当更大才更新”的条件写推进水位；
+- 缺少 `sequence_no` 的历史消息按 0 处理，不参与比较，仍由任务行锁与 `attempt_no` 保证幂等。
+
+该设计不改变“MySQL 为事实来源、Redis 可重建”的前提，只把顺序判定从隐式约定变为可测试的显式状态。

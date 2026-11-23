@@ -74,12 +74,13 @@ public class TaskService {
         pointsService.reserve(userId, new PointsModels.ReserveRequest(quote.quoteReference(), taskId),
                 "task-reserve:" + taskId);
         requireTransition(taskId, TaskStatus.BALANCE_RESERVED, TaskStatus.QUEUED, null);
-        event(taskId, "TASK_STATUS_CHANGED", new TaskModels.EventData(TaskStatus.QUEUED.name(), null, null,
-                "等待执行器处理", List.of()));
+        long queuedSequence = event(taskId, "TASK_STATUS_CHANGED", new TaskModels.EventData(TaskStatus.QUEUED.name(),
+                null, null, "等待执行器处理", List.of()));
         UUID outboxId = UUID.randomUUID();
         repository.insertOutbox(taskId, "TASK_QUEUED",
                 "task-queued:" + taskId,
-                new TaskModels.QueueMessage(taskId, outboxId, "TASK_QUEUED", TaskStatus.QUEUED.name()), now);
+                new TaskModels.QueueMessage(taskId, outboxId, "TASK_QUEUED", TaskStatus.QUEUED.name(),
+                        queuedSequence), now);
         metrics.taskCreated();
         return view(repository.findTask(taskId), false);
     }
@@ -102,24 +103,27 @@ public class TaskService {
         Instant now = Instant.now();
         boolean reserved = task.reservedPoints() > 0;
         if (reserved) {
-            pointsService.refund(task.ownerId(), new PointsModels.SettlementRequest(
+            pointsService.refundForTask(task.ownerId(), new PointsModels.SettlementRequest(
                     "reserve:" + task.ownerId() + ":task-reserve:" + taskId), "task-cancel:" + taskId);
+            // The reservation snapshot must not survive the refund: otherwise a later
+            // settle attempt would charge against points that are already back.
+            repository.clearReservedPoints(taskId);
         }
         if (repository.transitionStatus(taskId, task.status(), TaskStatus.CANCELLED, task.stateVersion(), now) != 1) {
             throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT", "任务状态已变化，请刷新后重试");
         }
-        event(taskId, "TASK_STATUS_CHANGED", new TaskModels.EventData(TaskStatus.CANCELLED.name(), null, null,
-                "任务已取消", List.of()));
+        long sequence = event(taskId, "TASK_STATUS_CHANGED", new TaskModels.EventData(TaskStatus.CANCELLED.name(), null,
+                null, "任务已取消", List.of()));
         TaskStatus finalStatus = TaskStatus.CANCELLED;
         if (reserved) {
             requireTransition(taskId, TaskStatus.CANCELLED, TaskStatus.REFUNDED, null);
-            event(taskId, "TASK_STATUS_CHANGED", new TaskModels.EventData(TaskStatus.REFUNDED.name(), null, null,
-                    "积分已退回", List.of()));
+            sequence = event(taskId, "TASK_STATUS_CHANGED", new TaskModels.EventData(TaskStatus.REFUNDED.name(), null,
+                    null, "积分已退回", List.of()));
             finalStatus = TaskStatus.REFUNDED;
         }
         UUID outboxId = UUID.randomUUID();
         repository.insertOutbox(taskId, "TASK_CANCELLED", "task-cancelled:" + taskId,
-                new TaskModels.QueueMessage(taskId, outboxId, "TASK_CANCELLED", finalStatus.name()), now);
+                new TaskModels.QueueMessage(taskId, outboxId, "TASK_CANCELLED", finalStatus.name(), sequence), now);
         audit.write(userId, "TASK_CANCEL", "PLANNING_TASK", taskId, "SUCCESS", null);
         metrics.taskCancelled();
         return view(repository.findTask(taskId), false);
@@ -159,8 +163,8 @@ public class TaskService {
         }
     }
 
-    private void event(UUID taskId, String eventType, TaskModels.EventData eventData) {
-        repository.appendEvent(taskId, eventType, eventData);
+    private long event(UUID taskId, String eventType, TaskModels.EventData eventData) {
+        return repository.appendEvent(taskId, eventType, eventData);
     }
 
     private void validate(TaskModels.CreateTaskRequest request) {

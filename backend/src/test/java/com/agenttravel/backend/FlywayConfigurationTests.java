@@ -12,7 +12,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 class FlywayConfigurationTests {
 
     @Test
-    void migrationDirectoryContainsV1ThroughV3() throws IOException {
+    void migrationDirectoryContainsV1ThroughV4() throws IOException {
         Resource[] versionedMigrations = new PathMatchingResourcePatternResolver()
                 .getResources("classpath*:db/migration/V*.sql");
 
@@ -22,7 +22,8 @@ class FlywayConfigurationTests {
                 .toList())
                 .containsExactlyInAnyOrder("V1__initial_s04_schema.sql",
                         "V2__s15_knowledge_and_reservation_rules.sql",
-                        "V3__s20_allow_identical_version_content.sql");
+                        "V3__s20_allow_identical_version_content.sql",
+                        "V4__s22_queue_sequence.sql");
     }
 
     @Test

@@ -91,20 +91,29 @@ public class PointsService {
     }
 
     @Transactional
-    public <T> T settleRevision(UUID userId, UUID tripId, String fingerprint, Supplier<T> publishVersion) {
+    public <T> java.util.Optional<T> settleRevision(UUID userId, UUID tripId, String fingerprint,
+            Supplier<T> publishVersion) {
         String reference = "revision:" + userId + ":" + fingerprint;
+        String reserveReference = reference + ":reserve";
         PointsRepository.AccountRow account = repository.lockAccount(userId);
+        if (repository.findLedger(reserveReference) != null) {
+            // A concurrent duplicate confirmation already paid for this fingerprint.
+            return java.util.Optional.empty();
+        }
         if (account.balance() < 2) {
             throw new ApiException(HttpStatus.CONFLICT, "INSUFFICIENT_POINTS", "局部重规划需要 2 积分");
         }
         long after = account.balance() - 2;
-        repository.insertLedger(account.id(), userId, null, null, "RESERVE", -2, account.balance(), after,
-                reference + ":reserve");
+        if (repository.insertLedgerIfAbsent(account.id(), userId, null, null, "RESERVE", -2, account.balance(), after,
+                reserveReference) == 0) {
+            return java.util.Optional.empty();
+        }
         repository.updateBalance(account.id(), after);
         T published = publishVersion.get();
-        repository.insertLedger(account.id(), userId, null, null, "CONFIRM", 0, after, after, reference + ":confirm");
+        repository.insertLedgerIfAbsent(account.id(), userId, null, null, "CONFIRM", 0, after, after,
+                reference + ":confirm");
         audit.write(userId, "POINTS_REVISION_CONFIRM", "TRIP", tripId, "SUCCESS", null);
-        return published;
+        return java.util.Optional.of(published);
     }
 
     @Transactional
@@ -132,6 +141,25 @@ public class PointsService {
 
     @Transactional
     public PointsModels.PointsResponse refund(UUID userId, PointsModels.SettlementRequest request, String idempotencyKey) {
+        // A task reservation is refunded by the task state machine only. Letting the owner
+        // settle it directly would leave planning_task.reserved_points disagreeing with the
+        // ledger and could strand an in-flight assemble.
+        if (repository.ledgerBelongsToTask(normalizeReservation(request.reservationReference()))) {
+            throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT",
+                    "任务预扣只能由任务状态机退款（取消、失败或确认超时）");
+        }
+        return doRefund(userId, request, idempotencyKey);
+    }
+
+    /** Internal refund used by the task state machine (cancel, failure, confirmation timeout). */
+    @Transactional
+    public PointsModels.PointsResponse refundForTask(UUID userId, PointsModels.SettlementRequest request,
+            String idempotencyKey) {
+        return doRefund(userId, request, idempotencyKey);
+    }
+
+    private PointsModels.PointsResponse doRefund(UUID userId, PointsModels.SettlementRequest request,
+            String idempotencyKey) {
         requireKey(idempotencyKey);
         String reserveReference = normalizeReservation(request.reservationReference());
         PointsRepository.LedgerRow reserve = repository.findLedger(reserveReference);

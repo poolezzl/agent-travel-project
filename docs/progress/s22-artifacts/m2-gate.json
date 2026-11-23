@@ -1,0 +1,671 @@
+{
+  "case_count": 30,
+  "cases": [
+    {
+      "behaviors": {
+        "source_complete": true
+      },
+      "case_id": "BJ-01",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 4.559,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "manual_disambiguation": true,
+        "same_name_poi": true
+      },
+      "case_id": "BJ-02",
+      "case_version": 1,
+      "confirmation_required": true,
+      "conflict_codes": [
+        "MUST_VISIT_AMBIGUOUS"
+      ],
+      "degraded_fields": 18,
+      "failed_behaviors": [],
+      "latency_ms": 3.613,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "fail",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "closed_conflict": true
+      },
+      "case_id": "BJ-03",
+      "case_version": 1,
+      "confirmation_required": true,
+      "conflict_codes": [
+        "MUST_VISIT_CLOSED",
+        "MUST_VISIT_MISSING"
+      ],
+      "degraded_fields": 16,
+      "failed_behaviors": [],
+      "latency_ms": 2.542,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "fail",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "forecast_window": true
+      },
+      "case_id": "BJ-04",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 3.08,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "climate_statistics": true
+      },
+      "case_id": "BJ-05",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 23,
+      "failed_behaviors": [],
+      "latency_ms": 2.45,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 30
+    },
+    {
+      "behaviors": {
+        "stale_visible": true
+      },
+      "case_id": "BJ-06",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 2.706,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 9
+    },
+    {
+      "behaviors": {
+        "unknown_fact": true
+      },
+      "case_id": "BJ-07",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [
+        "BUDGET_UNKNOWN"
+      ],
+      "degraded_fields": 53,
+      "failed_behaviors": [],
+      "latency_ms": 3.429,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "local_point_preserved": true
+      },
+      "case_id": "BJ-08",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 3.465,
+      "local_latency_ms": 1.2696999997388048,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "local_day_scope": true
+      },
+      "case_id": "BJ-09",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 3.002,
+      "local_latency_ms": 0.9917000002133136,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "cross_day_scope": true
+      },
+      "case_id": "BJ-10",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 2.929,
+      "local_latency_ms": 1.64889999996376,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-11",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 3.063,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-12",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 3.282,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "budget_respected": true,
+        "local_modification_fidelity": true
+      },
+      "case_id": "CASE-13",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 4.437,
+      "local_latency_ms": 0.9050999997270992,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-14",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 2.689,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-15",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 2.435,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "budget_respected": true,
+        "local_modification_fidelity": true
+      },
+      "case_id": "CASE-16",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 2.62,
+      "local_latency_ms": 0.9531999999126128,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-17",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 2.774,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-18",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 3.554,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "budget_respected": true,
+        "local_modification_fidelity": true
+      },
+      "case_id": "CASE-19",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 3.6,
+      "local_latency_ms": 0.9077999998226005,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-20",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 3.117,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-21",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 2.85,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "budget_respected": true,
+        "local_modification_fidelity": true
+      },
+      "case_id": "CASE-22",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 2.455,
+      "local_latency_ms": 1.1335000003782625,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-23",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 2.534,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-24",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 3.033,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "budget_respected": true,
+        "local_modification_fidelity": true
+      },
+      "case_id": "CASE-25",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 3.481,
+      "local_latency_ms": 0.8964999997260747,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-26",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 2.803,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-27",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 2.517,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "budget_respected": true,
+        "local_modification_fidelity": true
+      },
+      "case_id": "CASE-28",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 17,
+      "failed_behaviors": [],
+      "latency_ms": 2.786,
+      "local_latency_ms": 1.1171000001013454,
+      "local_preservation_rate": 1.0,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    },
+    {
+      "behaviors": {
+        "source_complete": true,
+        "stale_displayed": true
+      },
+      "case_id": "CASE-29",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 44,
+      "failed_behaviors": [],
+      "latency_ms": 2.452,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 21
+    },
+    {
+      "behaviors": {
+        "degraded_explained": true,
+        "route_feasible": true
+      },
+      "case_id": "CASE-30",
+      "case_version": 1,
+      "confirmation_required": false,
+      "conflict_codes": [],
+      "degraded_fields": 21,
+      "failed_behaviors": [],
+      "latency_ms": 2.982,
+      "local_latency_ms": null,
+      "local_preservation_rate": null,
+      "passed": true,
+      "plan_status": "warn",
+      "stale_facts": 0
+    }
+  ],
+  "checks": [
+    {
+      "actual": 30,
+      "key": "case_count",
+      "label": "固定案例数",
+      "passed": true,
+      "threshold": ">= 30"
+    },
+    {
+      "actual": true,
+      "key": "all_cases_ready",
+      "label": "案例全部 ready 且已执行",
+      "passed": true,
+      "threshold": "每例都产生方案或稳定失败码"
+    },
+    {
+      "actual": 1.0,
+      "key": "e2e_pass_rate",
+      "label": "端到端通过率",
+      "passed": true,
+      "threshold": ">= 0.85"
+    },
+    {
+      "actual": 1.0,
+      "key": "local_modification_preservation",
+      "label": "局部修改未影响区块保真率",
+      "passed": true,
+      "threshold": "= 1.0"
+    },
+    {
+      "actual": 1.0,
+      "key": "stale_display",
+      "label": "过期事实可见（所有 stale 事实均显式标注）",
+      "passed": true,
+      "threshold": "= 1.0 且至少 1 例含 stale 事实"
+    },
+    {
+      "actual": true,
+      "key": "estimated_visibility",
+      "label": "估算路段可见（is_estimated + 降级字段）",
+      "passed": true,
+      "threshold": "所有含估算的案例均显式标注"
+    },
+    {
+      "actual": 1.0,
+      "key": "degradation_visibility",
+      "label": "降级可见率（有空降级字段必须解释）",
+      "passed": true,
+      "threshold": "= 1.0 且至少 1 例降级"
+    },
+    {
+      "actual": 1.497,
+      "key": "local_modification_p95",
+      "label": "P95 局部修改时延",
+      "passed": true,
+      "threshold": "<= 60000 ms"
+    },
+    {
+      "actual": 1.0,
+      "key": "schema_valid_rate",
+      "label": "Plan Schema 合法率",
+      "passed": true,
+      "threshold": "= 1.0"
+    },
+    {
+      "actual": 1.0,
+      "key": "source_completeness",
+      "label": "事实来源完整率",
+      "passed": true,
+      "threshold": "= 1.0"
+    },
+    {
+      "actual": true,
+      "key": "source_whitelist",
+      "label": "事实来源均在案例白名单内",
+      "passed": true,
+      "threshold": "全部通过"
+    },
+    {
+      "actual": 0,
+      "key": "hard_constraints",
+      "label": "硬约束违反数",
+      "passed": true,
+      "threshold": "= 0"
+    },
+    {
+      "actual": 0,
+      "key": "dag_stability",
+      "label": "固定 DAG 无步骤级失败",
+      "passed": true,
+      "threshold": "= 0"
+    }
+  ],
+  "gate_passed": true,
+  "generated_at": "2026-11-23T02:38:16.979823Z",
+  "index_ready_case_count": 30,
+  "interpreter": "CPython 3.14.6",
+  "local_case_count": 9,
+  "local_p95_ms": 1.497,
+  "local_preservation_rate": 1.0,
+  "metrics": {
+    "cost": {
+      "api_cost_minor_mean": 0.0,
+      "api_cost_minor_total": 0.0,
+      "token_mean": 0.0,
+      "token_total": 0
+    },
+    "degradation_visibility_rate": 1.0,
+    "hard_constraints": {
+      "satisfaction_rate": 1.0,
+      "total": 50,
+      "violations": 0
+    },
+    "latency_ms": {
+      "p50": 2.9555,
+      "p95": 4.066199999999998
+    },
+    "local_modification_preservation_rate": 1.0,
+    "route_feasibility_rate": 1.0,
+    "run_count": 30,
+    "schema_valid_rate": 1.0,
+    "source_completeness_rate": 1.0,
+    "stale_display_rate": 1.0
+  },
+  "pass_count": 30,
+  "pass_rate": 1.0,
+  "reference_time": "2026-10-01T00:00:00Z",
+  "schema_version": "s22-m2-gate-v1"
+}

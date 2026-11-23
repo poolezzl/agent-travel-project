@@ -32,7 +32,9 @@ def test_attractions_endpoint_returns_cited_cards() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["task_id"] == "task-http-attractions"
-    assert body["status"] == "ok"
+    # Sample knowledge ages: a stale card must be reported as partial, never hidden.
+    expected = "ok" if body["cards"][0]["freshness_status"] == "fresh" else "partial"
+    assert body["status"] == expected
     assert body["cards"][0]["knowledge_id"] == "KN-BJ-001"
     assert body["cards"][0]["chunk_ids"] == ["CHUNK-BJ-001-02"]
     assert body["cards"][0]["facts"][0]["source_record_id"] == "SRC-BJ-001"

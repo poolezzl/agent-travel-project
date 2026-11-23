@@ -68,3 +68,18 @@
 ## 覆盖矩阵
 
 案例索引将场景映射到需求和预期行为。S22 运行前必须补齐 30 个 `ready` 案例，并在 Schema、数据、算法或模型版本变化后回归。
+
+## S22 执行口径
+
+S22 用 `tests/evaluation/s22_gate.py` 对 30 个固定案例跑真实编排代码，输出
+`docs/progress/s22-artifacts/{runs,metrics,m2-gate}.json`：
+
+- 每个案例使用一份由案例契约确定性生成的**合成已发布快照**（`sample_only=true`），来源 ID 只取自
+  该案例 `allowed_source_record_ids`；因此结论只证明流水线行为（来源传播、鲜度显隐、降级可见、
+  局部保真），不代表真实城市或供应商数据。
+- 通过定义：固定 DAG 无步骤失败、Plan 通过 `contracts/s19/plan.schema.json`、全部
+  `expected_behaviors` 成立、全部硬约束成立、事实来源均在白名单内。阻断冲突导致
+  `plan.quality.status=fail` 属契约期望，不计为流水线失败。
+- 局部修改使用 S20 `revision_execution.apply` 执行已确认变更，按未影响日期的规范化哈希比较保真。
+- 时延与成本口径：只覆盖编排与修订核心执行段，不含网络、数据库往返与模型调用；真实 P95 与费用
+  在 S29 部署环境按 10 并发实测（PENDING-S22-01）。

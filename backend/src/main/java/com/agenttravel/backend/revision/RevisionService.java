@@ -89,11 +89,22 @@ public class RevisionService {
             return previewResult(base, proposal);
         }
         validateScope(proposal, plan);
-        return points.settleRevision(userId, tripId, HexFormat.of().formatHex(fingerprint), () -> {
+        var settled = points.settleRevision(userId, tripId, HexFormat.of().formatHex(fingerprint), () -> {
             JsonNode updated = agent.apply(plan, proposal);
             validateResult(plan, updated, proposal.scope().days());
             return writeVersion(userId, tripId, base, base, updated, proposal, fingerprint, false);
         });
+        if (settled.isPresent()) {
+            return settled.get();
+        }
+        // A concurrent duplicate confirmation already paid for this fingerprint; reuse the
+        // version it produced instead of charging twice or leaking a duplicate-key error.
+        var raced = repository.findVersionByChange(tripId, base.id(), userId, fingerprint);
+        if (raced != null) {
+            return published(base, raced, readProposal(raced.id()), repository.versionSources(raced.id()), true,
+                    "并发重复确认已复用原版本");
+        }
+        throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT", "同一确认正在处理，请稍后重试");
     }
 
     @Transactional
