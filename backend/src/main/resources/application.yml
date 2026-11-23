@@ -5,6 +5,10 @@ spring:
     default: local
   main:
     banner-mode: off
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 7MB
   datasource:
     url: "${DB_URL:jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:trip_planner}?useUnicode=true&characterEncoding=utf8&connectionTimeZone=UTC&serverTimezone=UTC&forceConnectionTimeZoneToSession=true&connectionCollation=utf8mb4_unicode_ci}"
     username: "${DB_USERNAME:${MYSQL_USERNAME:trip_planner}}"

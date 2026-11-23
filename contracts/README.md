@@ -2,6 +2,8 @@
 
 跨服务契约目录。Agent 输入输出以 `../agents/` 下的 Draft-07 JSON Schema 为事实来源；Java 与 Python 的 REST 边界以 `openapi/agent-business.yaml` 为事实来源。S08 公共认证与积分接口见 `openapi/s08-public.yaml`，版本为 `s08-v1`；S19 最终行程结构见 `s19/plan.schema.json`，任务读模型见 `openapi/s11-tasks.yaml` 的 `PlanView`；Agent 契约版本为 `agent-contract-v1`。
 
+S23 社区、榜单与治理接口见 [社区接口](openapi/s23-community.yaml)，发布与写入响应样例见 [示例](examples/s23)。
+
 计划结构：
 
 ```text

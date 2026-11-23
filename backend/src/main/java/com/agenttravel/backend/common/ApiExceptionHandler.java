@@ -3,13 +3,18 @@ package com.agenttravel.backend.common;
 import java.time.Instant;
 import java.util.Optional;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -19,9 +24,16 @@ public class ApiExceptionHandler {
         return response(exception.status(), exception.code(), exception.getMessage());
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<ApiError> validation(MethodArgumentNotValidException exception) {
+    @ExceptionHandler({MethodArgumentNotValidException.class, HandlerMethodValidationException.class,
+            MethodArgumentTypeMismatchException.class, ServletRequestBindingException.class,
+            HttpMessageNotReadableException.class, MissingServletRequestPartException.class})
+    ResponseEntity<ApiError> validation(Exception exception) {
         return response(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "请求参数不合法");
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> uploadTooLarge(MaxUploadSizeExceededException exception) {
+        return response(HttpStatus.PAYLOAD_TOO_LARGE, "INVALID_INPUT", "上传文件大小超限");
     }
 
     @ExceptionHandler(Exception.class)

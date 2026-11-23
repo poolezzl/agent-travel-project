@@ -38,7 +38,8 @@
 | S20 | 已完成（R4/R5，Java、Python、MySQL 与 Redis 联调） | [S20.md](S20.md) |
 | S21 | 已完成（前端） | [S21.md](S21.md) |
 | S22 | 已完成（M2 Gate 通过：30 案例 100%、局部保真 100%、过期/估算/降级可见 100%、P95 局部修改 1.5ms；真实 MySQL/Redis 演练通过） | [S22.md](S22.md)、[m2-gate.json](s22-artifacts/m2-gate.json)、[metrics.json](s22-artifacts/metrics.json) |
-| S23-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
+| S23 | 已完成（社区、分类榜单与治理后端） | [S23.md](S23.md) |
+| S24-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容
 

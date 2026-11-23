@@ -1,0 +1,537 @@
+openapi: 3.1.0
+info:
+  title: 文旅社区与治理
+  version: 1.0.0
+servers:
+  - url: /api/v1/community
+security:
+  - bearer: []
+paths:
+  /posts:
+    get:
+      operationId: feed
+      security: []
+      parameters:
+        - {"name":"sort","in":"query","required":false,"schema":{"type":"string","enum":["LATEST","HOT"],"default":"LATEST"}}
+        - {"name":"q","in":"query","required":false,"schema":{"type":"string","maxLength":100}}
+        - {"name":"city","in":"query","required":false,"schema":{"type":"string","maxLength":128}}
+        - {"name":"theme","in":"query","required":false,"schema":{"$ref":"#/components/schemas/Theme"}}
+        - {"name":"days","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":30}}
+        - {"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        - {"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"type":"array","items":{"$ref":"#/components/schemas/Post"}}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+    post:
+      operationId: publish
+      parameters:
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [post]
+              properties:
+                post: {"$ref":"#/components/schemas/Publish"}
+                images: {type: array, maxItems: 3, items: {type: string, format: binary}}
+            encoding:
+              post: {contentType: application/json}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}:
+    get:
+      operationId: post
+      security: []
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Post"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+    delete:
+      operationId: withdraw
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"If-Match","in":"header","required":true,"schema":{"type":"integer","minimum":1}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}/images/{objectId}:
+    get:
+      operationId: image
+      security: []
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"objectId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"expires","in":"query","required":true,"schema":{"type":"integer","format":"int64"}}
+        - {"name":"signature","in":"query","required":true,"schema":{"type":"string"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            image/png:
+              schema: {type: string, format: binary}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}/comments:
+    get:
+      operationId: comments
+      security: []
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        - {"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"type":"array","items":{"$ref":"#/components/schemas/Comment"}}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+    post:
+      operationId: comment
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/CommentRequest"}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}/reactions/{reaction}:
+    put:
+      operationId: addReaction
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"reaction","in":"path","required":true,"schema":{"type":"string","enum":["LIKE","FAVORITE"]}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+    delete:
+      operationId: removeReaction
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"reaction","in":"path","required":true,"schema":{"type":"string","enum":["LIKE","FAVORITE"]}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}/reports:
+    post:
+      operationId: reportPost
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/Report"}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}/comments/{commentId}/reports:
+    post:
+      operationId: reportComment
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"commentId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/Report"}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /posts/{postId}/reuse:
+    post:
+      operationId: reuse
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/Reuse"}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /drafts/{draftId}:
+    get:
+      operationId: draft
+      parameters:
+        - {"name":"draftId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Draft"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /rankings:
+    get:
+      operationId: rankings
+      security: []
+      parameters:
+        - {"name":"city","in":"query","required":false,"schema":{"type":"string","maxLength":128}}
+        - {"name":"theme","in":"query","required":false,"schema":{"$ref":"#/components/schemas/Theme"}}
+        - {"name":"days","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":30}}
+        - name: duration
+          in: query
+          description: 周末两日、三至四日或一周七日，和精确天数共同生效。
+          schema: {type: string, enum: [WEEKEND, SHORT, WEEK]}
+        - {"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        - {"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"type":"array","items":{"$ref":"#/components/schemas/Post"}}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /moderation:
+    get:
+      operationId: moderationQueue
+      description: 仅管理员可用。
+      parameters:
+        - {"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        - {"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"type":"array","items":{"$ref":"#/components/schemas/ReviewItem"}}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /moderation/{postId}:
+    post:
+      operationId: reviewPost
+      description: 仅管理员可用。
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"If-Match","in":"header","required":true,"schema":{"type":"integer","minimum":1}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/Review"}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+  /moderation/{postId}/cases/{caseId}:
+    post:
+      operationId: resolveReport
+      description: 仅管理员可用。
+      parameters:
+        - {"name":"postId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"caseId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"If-Match","in":"header","required":true,"schema":{"type":"integer","minimum":1}}
+        - {"name":"Idempotency-Key","in":"header","required":true,"schema":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,128}$"}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/Resolution"}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/Id"}
+        default:
+          description: 参数、权限、资源状态、并发或限流错误
+          content:
+            application/problem+json:
+              schema: {$ref: './s08-public.yaml#/components/schemas/ProblemDetail'}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer, bearerFormat: JWT}
+  schemas:
+    Theme: {type: string, enum: [FAMILY, HIKING, PHOTOGRAPHY, FOOD, OTHER]}
+    Id:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id: {"type":"string","format":"uuid"}
+    Publish:
+      type: object
+      additionalProperties: false
+      required: [source_version_id, title, body, theme]
+      properties:
+        source_version_id: {"type":"string","format":"uuid"}
+        title: {"type":"string","minLength":1,"maxLength":200}
+        body: {"type":"string","minLength":1,"maxLength":4000}
+        theme: {"$ref":"#/components/schemas/Theme"}
+        image_licenses: {"type":"array","items":{"$ref":"#/components/schemas/License"},"maxItems":3}
+    License:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: {"type":"string","enum":["OWN","CC0","CC_BY","AUTHORIZED"]}
+        source_url: {"type":"string","format":"uri","maxLength":2048}
+    CommentRequest:
+      type: object
+      additionalProperties: false
+      required: [body]
+      properties:
+        body: {"type":"string","minLength":1,"maxLength":1000}
+        rating: {"type":"integer","minimum":1,"maximum":5}
+    Comment:
+      type: object
+      additionalProperties: false
+      required: [id, body, created_at]
+      properties:
+        id: {"type":"string","format":"uuid"}
+        body: {"type":"string"}
+        rating: {"type":"integer"}
+        created_at: {"type":"string","format":"date-time"}
+    Report:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: {"type":"string","enum":["SPAM","ABUSE","PRIVACY","COPYRIGHT","OTHER"]}
+        detail: {"type":"string","maxLength":1000}
+    Reuse:
+      type: object
+      additionalProperties: false
+      required: [start_date]
+      properties:
+        start_date: {"type":"string","format":"date"}
+    Review:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: {"type":"string","enum":["APPROVE","WITHDRAW","PIN","UNPIN"]}
+    Resolution:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action: {"type":"string","enum":["DISMISS","REMOVE"]}
+    ReviewItem:
+      type: object
+      additionalProperties: false
+      required: [post_id, version, status, title, body, images]
+      properties:
+        post_id: {"type":"string","format":"uuid"}
+        version: {"type":"integer"}
+        status: {"type":"string"}
+        case_id: {"type":"string","format":"uuid"}
+        target_id: {"type":"string","format":"uuid"}
+        target_type: {"type":"string"}
+        title: {"type":"string"}
+        body: {"type":"string"}
+        images: {"type":"array","items":{"type":"string"}}
+        target_body: {"type":"string"}
+        report_reason: {"type":"string"}
+        report_detail: {"type":"string"}
+    Draft:
+      type: object
+      additionalProperties: false
+      required: [id, version_id, start_date, end_date, itinerary]
+      properties:
+        id: {"type":"string","format":"uuid"}
+        version_id: {"type":"string","format":"uuid"}
+        start_date: {"type":"string","format":"date"}
+        end_date: {"type":"string","format":"date"}
+        itinerary: {"$ref":"#/components/schemas/Itinerary"}
+    Itinerary:
+      type: object
+      additionalProperties: false
+      required: [city, city_name, sample_only, days]
+      properties:
+        city: {"type":"string"}
+        city_name: {"type":"string"}
+        sample_only: {"type":"boolean"}
+        days: {"type":"array","items":{"$ref":"#/components/schemas/Day"}}
+    Day:
+      type: object
+      additionalProperties: false
+      required: [city, points]
+      properties:
+        city: {"type":"string"}
+        points: {"type":"array","items":{"$ref":"#/components/schemas/Point"}}
+    Point:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: {"type":"string"}
+        name: {"type":"string"}
+    Post:
+      type: object
+      additionalProperties: false
+      required: [id, title, body, theme, itinerary, published_at, likes, favorites, comments, reuses, images, version]
+      properties:
+        id: {"type":"string","format":"uuid"}
+        title: {"type":"string"}
+        body: {"type":"string"}
+        theme: {"$ref":"#/components/schemas/Theme"}
+        itinerary: {"$ref":"#/components/schemas/Itinerary"}
+        published_at: {"type":"string","format":"date-time"}
+        likes: {"type":"integer"}
+        favorites: {"type":"integer"}
+        comments: {"type":"integer"}
+        reuses: {"type":"integer"}
+        rating: {"type":"number"}
+        images: {"type":"array","items":{"type":"string"}}
+        version: {"type":"integer"}
+        score: {"type":"number"}
+        unavailable_dimensions: {"type":"array","items":{"type":"string"}}
+        estimated_dimensions: {"type":"array","items":{"type":"string"}}
