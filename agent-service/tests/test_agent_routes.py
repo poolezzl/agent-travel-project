@@ -78,13 +78,16 @@ class AgentRouteTests(unittest.TestCase):
         body = {"task_id": "task-route", "input": {"points": [self._point()]}}
         result = self.module.invoke_attractions(body)
         self.assertEqual(result["task_id"], "task-route")
-        self.assertEqual(result["status"], "ok")
+        # Sample knowledge ages out; a stale card is reported as partial, never hidden.
+        expected = "ok" if result["cards"][0]["freshness_status"] == "fresh" else "partial"
+        self.assertEqual(result["status"], expected)
         self.assertEqual(result["cards"][0]["knowledge_id"], "KN-BJ-001")
 
     def test_reservation_route_returns_timeline(self) -> None:
         body = {"input": {"points": [self._point()], "date": "2026-12-10"}}
         result = self.module.invoke_reservation_rules(body)
-        self.assertEqual(result["status"], "ok")
+        expected = "partial" if result["reservations"][0]["stale"] else "ok"
+        self.assertEqual(result["status"], expected)
         self.assertEqual(len(result["timeline"]), 1)
 
     def _dining_input(self) -> dict[str, object]:

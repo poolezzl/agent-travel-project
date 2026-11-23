@@ -69,6 +69,7 @@ def run_collect(
             {"points": point_inputs, "city_id": city_id},
             catalog,
             ctx,
+            moment=now,
         )
         weather_future = pool.submit(_weather_slice, constraints, deps)
         reservation_futures = {
@@ -77,6 +78,7 @@ def run_collect(
                 {"points": point_inputs, "date": day.isoformat(), "city_id": city_id},
                 catalog,
                 ctx,
+                moment=now,
             )
             for day in dates
         }

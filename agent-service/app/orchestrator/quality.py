@@ -19,6 +19,13 @@ def evaluate_quality(
     """Run time, closure, reachability, reservation, budget and source checks."""
     points = {point["poi_id"]: point for point in collected.get("points", [])}
     days = routes.get("days", [])
+    # Weather lives on the collect stage, not on the route stage output; read the real
+    # slice so a fresh forecast is never mislabelled as unknown/expired.
+    weather_by_date = {
+        str(item.get("date")): item
+        for item in (collected.get("weather") or {}).get("daily") or []
+        if isinstance(item, dict)
+    }
     checks: list[dict[str, Any]] = []
     conflicts: list[dict[str, Any]] = list(schedule.get("conflicts", [])) + list(
         routes.get("conflicts", [])
@@ -75,7 +82,7 @@ def evaluate_quality(
                 if reservation.get("stale"):
                     stale_fields.append(f"days[{day_index}].reservations[{segment['point_id']}]")
 
-        weather = day.get("weather") or {}
+        weather = weather_by_date.get(str(day.get("date"))) or {}
         if weather.get("stale"):
             stale_fields.append(f"days[{day_index}].weather")
         if weather.get("status") != "ok":

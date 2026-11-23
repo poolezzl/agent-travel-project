@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 from app.main import app
@@ -15,10 +16,13 @@ PLAN_SCHEMA = json.loads(
     (ROOT / "contracts" / "s19" / "plan.schema.json").read_text(encoding="utf-8")
 )
 
+# Relative dates keep this HTTP smoke test valid on any run date; a fixed 2026-11 date
+# silently started failing once the calendar passed it.
+_START = date.today() + timedelta(days=7)
 PAYLOAD = {
     "city": "北京",
-    "start_date": "2026-11-20",
-    "end_date": "2026-11-22",
+    "start_date": _START.isoformat(),
+    "end_date": (_START + timedelta(days=2)).isoformat(),
     "party_size": 2,
     "budget": {"currency": "CNY", "amount_minor": 300000},
     "must_visit": ["故宫博物院"],
