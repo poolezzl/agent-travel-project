@@ -173,7 +173,7 @@ onBeforeUnmount(() => {
           <dd>{{ isAuthenticated ? `已登录（${user?.login ?? ''}）` : '未登录' }}</dd>
         </div>
         <div>
-          <dt>积分余额</dt>
+          <dt><RouterLink to="/wallet">积分钱包</RouterLink></dt>
           <dd data-testid="balance-points">{{ balancePoints === null ? '—' : balancePoints }}</dd>
         </div>
       </dl>

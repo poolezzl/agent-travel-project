@@ -80,6 +80,16 @@ public class PointsRepository {
                 quoteId == null ? null : uuidBytes(quoteId), type, delta, before, after, reference);
     }
 
+    public void insertTaskSettlement(String reserveReference, String type, long delta, long before, long after,
+            String reference) {
+        jdbc.update("""
+                INSERT INTO points_ledger (id, account_id, user_id, task_id, quote_id, entry_type, points_delta,
+                                           balance_before, balance_after, business_reference)
+                SELECT UUID_TO_BIN(?), account_id, user_id, task_id, quote_id, ?, ?, ?, ?, ?
+                FROM points_ledger WHERE business_reference=?
+                """, UUID.randomUUID().toString(), type, delta, before, after, reference, reserveReference);
+    }
+
     /** True when the reservation was created by a task and must be settled by the state machine. */
     public boolean ledgerBelongsToTask(String reference) {
         Integer count = jdbc.queryForObject(

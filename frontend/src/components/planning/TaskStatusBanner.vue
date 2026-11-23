@@ -35,13 +35,19 @@ const awaiting = computed(() => props.status === 'AWAITING_CONFIRMATION')
         {{ label }}
         <code>{{ status ?? 'UNKNOWN' }}</code>
       </span>
-      <span v-if="reservedPoints !== null" class="task-status-banner__points">
+      <span
+        v-if="reservedPoints !== null && status !== 'REFUNDED'"
+        class="task-status-banner__points"
+      >
         已预扣积分：<strong>{{ reservedPoints }}</strong>
       </span>
     </div>
 
     <p v-if="awaiting" class="task-status-banner__note">
       任务等待确认；确认/拒绝操作属于后续步骤（S21），本步骤仅展示该状态。
+    </p>
+    <p v-else-if="status === 'REFUNDED'" class="task-status-banner__note">
+      本次预扣积分已退回。<RouterLink to="/wallet">查看钱包流水</RouterLink>
     </p>
     <p v-else-if="terminal" class="task-status-banner__note">
       任务已进入终态，SSE 流已关闭，不再自动重连。

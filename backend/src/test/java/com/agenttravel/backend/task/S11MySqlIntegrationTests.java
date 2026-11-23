@@ -142,8 +142,12 @@ class S11MySqlIntegrationTests {
         assertThat(repository.findTask(created.taskId()).status()).isEqualTo(TaskStatus.PARTIAL);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM trip_version WHERE trip_id=(SELECT trip_id FROM planning_task WHERE id=UUID_TO_BIN(?))",
                 Integer.class, created.taskId().toString())).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM plan_snapshot",
-                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM plan_snapshot s
+                JOIN trip_version v ON v.id=s.trip_version_id
+                JOIN planning_task t ON t.trip_id=v.trip_id
+                WHERE t.id=UUID_TO_BIN(?)
+                """, Integer.class, created.taskId().toString())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT sequence_no) FROM task_event WHERE task_id=UUID_TO_BIN(?)",
                 Integer.class, created.taskId().toString())).isGreaterThanOrEqualTo(10);
         assertThat(jdbc.queryForObject("""
@@ -273,8 +277,9 @@ class S11MySqlIntegrationTests {
         assertThat(repository.findTask(created.taskId()).status()).isEqualTo(TaskStatus.REFUNDED);
         assertThat(balance()).isEqualTo(100);
         assertThat(jdbc.queryForObject("""
-                SELECT COUNT(*) FROM points_ledger WHERE user_id=UUID_TO_BIN(?) AND entry_type='REFUND'
-                """, Integer.class, userId.toString())).isEqualTo(1);
+                SELECT COUNT(*) FROM points_ledger
+                WHERE user_id=UUID_TO_BIN(?) AND task_id=UUID_TO_BIN(?) AND entry_type='REFUND'
+                """, Integer.class, userId.toString(), created.taskId().toString())).isEqualTo(1);
         assertThat(jdbc.queryForObject("""
                 SELECT publish_status FROM outbox_event WHERE aggregate_id=UUID_TO_BIN(?)
                 """, String.class, created.taskId().toString())).isEqualTo("DEAD");
@@ -366,8 +371,13 @@ class S11MySqlIntegrationTests {
         var request = new com.agenttravel.backend.points.PointsModels.SettlementRequest(
                 "reserve:" + userId + ":task-reserve:" + created.taskId());
 
-        var first = pointsService.confirm(userId, request, "confirm-it-1");
-        var second = pointsService.confirm(userId, request, "confirm-it-2");
+        assertThatThrownBy(() -> pointsService.confirm(userId, request, "public-confirm"))
+                .isInstanceOf(ApiException.class)
+                .extracting(exception -> ((ApiException) exception).code())
+                .isEqualTo("CONCURRENCY_CONFLICT");
+
+        var first = pointsService.confirmForTask(userId, request, "confirm-it-1");
+        var second = pointsService.confirmForTask(userId, request, "confirm-it-2");
 
         assertThat(first.reused()).isFalse();
         assertThat(second.reused()).isTrue();

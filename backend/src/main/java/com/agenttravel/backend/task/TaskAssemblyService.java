@@ -118,7 +118,7 @@ public class TaskAssemblyService {
         }
 
         if (task.reservedPoints() > 0) {
-            pointsService.confirm(task.ownerId(), new PointsModels.SettlementRequest(
+            pointsService.confirmForTask(task.ownerId(), new PointsModels.SettlementRequest(
                     "reserve:" + task.ownerId() + ":task-reserve:" + task.id()), "task-confirm:" + task.id());
         }
         TaskStatus terminal = "ok".equals(status) ? TaskStatus.SUCCEEDED : TaskStatus.PARTIAL;

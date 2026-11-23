@@ -9,6 +9,7 @@ import com.agenttravel.backend.common.ApiException;
 import com.agenttravel.backend.common.AuditRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Lazy;
@@ -116,8 +117,22 @@ public class PointsService {
         return java.util.Optional.of(published);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PointsModels.PointsResponse confirm(UUID userId, PointsModels.SettlementRequest request, String idempotencyKey) {
+        if (repository.ledgerBelongsToTask(normalizeReservation(request.reservationReference()))) {
+            throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT", "任务预扣只能由任务状态机确认");
+        }
+        return doConfirm(userId, request, idempotencyKey, false);
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public PointsModels.PointsResponse confirmForTask(UUID userId, PointsModels.SettlementRequest request,
+            String idempotencyKey) {
+        return doConfirm(userId, request, idempotencyKey, true);
+    }
+
+    private PointsModels.PointsResponse doConfirm(UUID userId, PointsModels.SettlementRequest request,
+            String idempotencyKey, boolean forTask) {
         requireKey(idempotencyKey);
         String reserveReference = normalizeReservation(request.reservationReference());
         PointsRepository.LedgerRow reserve = repository.findLedger(reserveReference);
@@ -134,12 +149,18 @@ public class PointsService {
         if (repository.findLedger("refund:" + userId + ":" + settlementHash) != null) {
             throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT", "该预扣已退款");
         }
-        repository.insertLedger(account.id(), userId, null, null, "CONFIRM", 0, account.balance(), account.balance(), reference);
+        if (forTask) {
+            repository.insertTaskSettlement(reserveReference, "CONFIRM", 0, account.balance(), account.balance(),
+                    reference);
+        } else {
+            repository.insertLedger(account.id(), userId, null, null, "CONFIRM", 0, account.balance(),
+                    account.balance(), reference);
+        }
         audit.write(userId, "POINTS_CONFIRM", "POINTS_LEDGER", null, "SUCCESS", null);
         return new PointsModels.PointsResponse(reference, 0, reserve.balanceAfter(), false);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PointsModels.PointsResponse refund(UUID userId, PointsModels.SettlementRequest request, String idempotencyKey) {
         // A task reservation is refunded by the task state machine only. Letting the owner
         // settle it directly would leave planning_task.reserved_points disagreeing with the
@@ -148,18 +169,18 @@ public class PointsService {
             throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT",
                     "任务预扣只能由任务状态机退款（取消、失败或确认超时）");
         }
-        return doRefund(userId, request, idempotencyKey);
+        return doRefund(userId, request, idempotencyKey, false);
     }
 
-    /** Internal refund used by the task state machine (cancel, failure, confirmation timeout). */
-    @Transactional
+    /** 任务状态机负责在取消、失败或确认超时后退回积分。 */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PointsModels.PointsResponse refundForTask(UUID userId, PointsModels.SettlementRequest request,
             String idempotencyKey) {
-        return doRefund(userId, request, idempotencyKey);
+        return doRefund(userId, request, idempotencyKey, true);
     }
 
     private PointsModels.PointsResponse doRefund(UUID userId, PointsModels.SettlementRequest request,
-            String idempotencyKey) {
+            String idempotencyKey, boolean forTask) {
         requireKey(idempotencyKey);
         String reserveReference = normalizeReservation(request.reservationReference());
         PointsRepository.LedgerRow reserve = repository.findLedger(reserveReference);
@@ -177,7 +198,13 @@ public class PointsService {
             throw new ApiException(HttpStatus.CONFLICT, "CONCURRENCY_CONFLICT", "该预扣已确认");
         }
         long after = account.balance() - reserve.delta();
-        repository.insertLedger(account.id(), userId, null, null, "REFUND", -reserve.delta(), account.balance(), after, reference);
+        if (forTask) {
+            repository.insertTaskSettlement(reserveReference, "REFUND", -reserve.delta(), account.balance(), after,
+                    reference);
+        } else {
+            repository.insertLedger(account.id(), userId, null, null, "REFUND", -reserve.delta(), account.balance(),
+                    after, reference);
+        }
         repository.updateBalance(account.id(), after);
         audit.write(userId, "POINTS_REFUND", "POINTS_LEDGER", null, "SUCCESS", null);
         return new PointsModels.PointsResponse(reference, -reserve.delta(), after, false);

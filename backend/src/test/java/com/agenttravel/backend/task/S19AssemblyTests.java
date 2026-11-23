@@ -61,7 +61,7 @@ class S19AssemblyTests {
                 eq("s19-plan-v1"), eq(ownerId), any());
         verify(planRepository).insertPlanSnapshot(any(), any(), anyString(), anyString(), any());
         verify(planRepository).setTripCurrentVersion(eq(tripId.getValue()), any(), any());
-        verify(points).confirm(eq(ownerId), any(), eq("task-confirm:" + taskId));
+        verify(points).confirmForTask(eq(ownerId), any(), eq("task-confirm:" + taskId));
         verify(repository).transitionStatus(eq(taskId), eq(TaskStatus.ASSEMBLING), eq(TaskStatus.SUCCEEDED),
                 eq(4L), any());
         verify(repository).appendEvent(eq(taskId), eq("TASK_VERSION_CREATED"), any());

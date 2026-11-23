@@ -4,6 +4,8 @@
 
 S23 社区、榜单与治理接口见 [社区接口](openapi/s23-community.yaml)，发布与写入响应样例见 [示例](examples/s23)。
 
+S25 模拟充值、积分流水和管理员调整沿用 `openapi/s08-public.yaml` 的积分接口。
+
 计划结构：
 
 ```text

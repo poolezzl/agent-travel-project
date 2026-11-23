@@ -32,6 +32,12 @@ const routes = isMockProfile
         meta: { title: 'S14 M1 真实端到端前端' },
       },
       {
+        path: '/wallet',
+        name: 'wallet',
+        component: () => import('@/views/S25WalletView.vue'),
+        meta: { title: '积分钱包' },
+      },
+      {
         path: '/scaffold',
         name: 'scaffold',
         component: () => import('@/views/ScaffoldView.vue'),

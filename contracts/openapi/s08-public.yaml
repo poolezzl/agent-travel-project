@@ -49,6 +49,7 @@ paths:
   /v1/points/confirm:
     post:
       operationId: confirmPoints
+      description: 确认无任务关联的预扣。任务预扣由任务状态机结算。
       security: [{ bearerAuth: [] }]
       parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SettlementRequest' } } } }
@@ -72,15 +73,140 @@ paths:
       operationId: pointsBalance
       security: [{ bearerAuth: [] }]
       responses: { '200': { description: 当前余额, content: { application/json: { schema: { $ref: '#/components/schemas/BalanceResponse' } } } }, '401': { $ref: '#/components/responses/Problem' } }
+  /v1/points/packages:
+    get:
+      security: [{ bearerAuth: [] }]
+      operationId: listTopUpPackages
+      responses:
+        '200':
+          description: 服务端当前充值档位
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/TopUpPackage' } }
+        '401': { $ref: '#/components/responses/Problem' }
+  /v1/points/ledger:
+    get:
+      security: [{ bearerAuth: [] }]
+      operationId: listOwnPointsLedger
+      parameters: [{ $ref: '#/components/parameters/WalletOffset' }]
+      responses:
+        '200': { $ref: '#/components/responses/WalletLedger' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /v1/points/admin/ledger:
+    get:
+      security: [{ bearerAuth: [] }]
+      operationId: listAdminPointsLedger
+      parameters:
+        - $ref: '#/components/parameters/WalletOffset'
+        - { name: userId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200': { $ref: '#/components/responses/WalletLedger' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+  /v1/points/top-up/quotes:
+    post:
+      security: [{ bearerAuth: [] }]
+      operationId: quoteSimulatedTopUp
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packageCode]
+              properties:
+                packageCode: { type: string, minLength: 1, maxLength: 32 }
+            example: { packageCode: 'standard' }
+      responses:
+        '200': { $ref: '#/components/responses/WalletQuote' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /v1/points/admin/adjustments/quotes:
+    post:
+      security: [{ bearerAuth: [] }]
+      operationId: quoteAdminPointsAdjustment
+      description: 管理员申请有符号的调整积分，服务端校验后绑定目标账户版本。
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, pointsDelta]
+              properties:
+                userId: { type: string, format: uuid }
+                pointsDelta: { type: integer, format: int32, description: 非零整数 }
+      responses:
+        '200': { $ref: '#/components/responses/WalletQuote' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /v1/points/wallet/confirm:
+    post:
+      security: [{ bearerAuth: [] }]
+      operationId: confirmWalletQuote
+      description: 报价仅签发者可确认。管理员调整再次校验管理员权限。报价仅使用一次，同键重试返回原流水。
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quoteId]
+              properties:
+                quoteId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: 本次入账结果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PointsResponse' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   parameters:
     IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+    WalletOffset:
+      name: offset
+      in: query
+      schema: { type: integer, format: int32, minimum: 0, default: 0 }
   responses:
     Problem:
       description: 统一问题详情
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/ProblemDetail' } } }
+    WalletQuote:
+      description: 五分钟有效的服务端报价
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/WalletQuote' }
+          example:
+            quoteId: '51785fa1-ba3b-4000-8000-000000000001'
+            userId: '51785fa1-ba3b-4000-8000-000000000002'
+            pointsDelta: 100
+            balanceAfter: 200
+            expiresAt: '2026-11-23T10:05:00Z'
+    WalletLedger:
+      description: 最新流水在前，每页最多二十条
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [entries, nextOffset]
+            properties:
+              entries: { type: array, items: { $ref: '#/components/schemas/WalletLedgerEntry' } }
+              nextOffset: { type: integer, nullable: true, minimum: 0 }
   schemas:
     RegisterRequest:
       type: object
@@ -142,3 +268,29 @@ components:
       additionalProperties: false
       required: [type, title, status, detail, code, traceId, timestamp]
       properties: { type: { type: string, format: uri }, title: { type: string }, status: { type: integer }, detail: { type: string }, code: { type: string, pattern: '^[A-Z][A-Z0-9_]*$' }, traceId: { type: string }, timestamp: { type: string, format: date-time } }
+    TopUpPackage:
+      type: object
+      required: [code, points]
+      properties:
+        code: { type: string }
+        points: { type: integer, format: int64 }
+    WalletQuote:
+      type: object
+      required: [quoteId, userId, pointsDelta, balanceAfter, expiresAt]
+      properties:
+        quoteId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        pointsDelta: { type: integer, format: int64 }
+        balanceAfter: { type: integer, format: int64, description: 报价时的预览余额，以确认后的入账结果为准 }
+        expiresAt: { type: string, format: date-time }
+    WalletLedgerEntry:
+      type: object
+      required: [id, userId, taskId, entryType, pointsDelta, balanceAfter, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid, nullable: true }
+        entryType: { type: string, enum: [GRANT, RESERVE, CONFIRM, REFUND, TOP_UP, ADMIN_ADJUST] }
+        pointsDelta: { type: integer, format: int64 }
+        balanceAfter: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
