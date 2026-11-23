@@ -168,7 +168,7 @@ class S11TaskUnitTests {
         when(repository.findTaskForUpdate(taskId)).thenReturn(running);
         when(repository.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
         when(repository.findTask(taskId)).thenReturn(task(taskId, owner, TaskStatus.REFUNDED, 5, 10));
-        when(points.refund(eq(owner), any(), anyString()))
+        when(points.refundForTask(eq(owner), any(), anyString()))
                 .thenReturn(new PointsModels.PointsResponse("refund", 10, 100, false));
 
         TaskModels.TaskView result = service.cancel(owner, "USER", taskId,
@@ -176,7 +176,8 @@ class S11TaskUnitTests {
 
         assertThat(result.status()).isEqualTo(TaskStatus.REFUNDED);
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(points, repository);
-        order.verify(points).refund(eq(owner), any(), eq("task-cancel:" + taskId));
+        order.verify(points).refundForTask(eq(owner), any(), eq("task-cancel:" + taskId));
+        order.verify(repository).clearReservedPoints(taskId);
         order.verify(repository).transitionStatus(eq(taskId), eq(TaskStatus.PARSING), eq(TaskStatus.CANCELLED),
                 eq(3L), any());
         order.verify(repository).transitionStatus(eq(taskId), eq(TaskStatus.CANCELLED), eq(TaskStatus.REFUNDED),

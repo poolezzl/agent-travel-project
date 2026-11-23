@@ -24,6 +24,8 @@ public class TaskProperties {
     private long replayAfterSeconds = 10;
     private long consumerIntervalMs = 250;
     private int consumerBatchSize = 10;
+    private boolean confirmationSweepEnabled = true;
+    private int confirmationSweepBatchSize = 20;
     private long reconnectSourceFreshnessSeconds = 3600;
     private long sseTimeoutMs = 120000;
     private long ssePollIntervalMs = 500;
@@ -166,6 +168,22 @@ public class TaskProperties {
 
     public void setConsumerBatchSize(int consumerBatchSize) {
         this.consumerBatchSize = consumerBatchSize;
+    }
+
+    public boolean isConfirmationSweepEnabled() {
+        return confirmationSweepEnabled;
+    }
+
+    public void setConfirmationSweepEnabled(boolean confirmationSweepEnabled) {
+        this.confirmationSweepEnabled = confirmationSweepEnabled;
+    }
+
+    public int getConfirmationSweepBatchSize() {
+        return confirmationSweepBatchSize;
+    }
+
+    public void setConfirmationSweepBatchSize(int confirmationSweepBatchSize) {
+        this.confirmationSweepBatchSize = confirmationSweepBatchSize;
     }
 
     public long getReconnectSourceFreshnessSeconds() {

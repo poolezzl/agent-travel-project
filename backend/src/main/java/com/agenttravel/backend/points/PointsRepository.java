@@ -64,6 +64,30 @@ public class PointsRepository {
                 quoteId == null ? null : uuidBytes(quoteId), type, delta, before, after, reference);
     }
 
+    /**
+     * Insert a ledger row unless its business reference already exists.
+     *
+     * <p>Used by settlement paths whose idempotency anchor is the reference itself rather
+     * than a pre-read: a concurrent duplicate becomes a 0-row insert instead of a raw
+     * {@code DuplicateKeyException} escaping as HTTP 500.
+     *
+     * @return 1 when inserted, 0 when the reference was already settled.
+     */
+    public int insertLedgerIfAbsent(UUID accountId, UUID userId, UUID taskId, UUID quoteId, String type,
+            long delta, long before, long after, String reference) {
+        return jdbc.update("INSERT IGNORE INTO points_ledger(id,account_id,user_id,task_id,quote_id,entry_type,points_delta,balance_before,balance_after,business_reference) VALUES(UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),?,?,?, ?,?,?,?)",
+                UUID.randomUUID().toString(), accountId.toString(), userId.toString(), taskId == null ? null : uuidBytes(taskId),
+                quoteId == null ? null : uuidBytes(quoteId), type, delta, before, after, reference);
+    }
+
+    /** True when the reservation was created by a task and must be settled by the state machine. */
+    public boolean ledgerBelongsToTask(String reference) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM points_ledger WHERE business_reference=? AND task_id IS NOT NULL",
+                Integer.class, reference);
+        return count != null && count > 0;
+    }
+
     public void updateBalance(UUID accountId, long balance) {
         jdbc.update("UPDATE points_account SET balance_points=?,state_version=state_version+1,updated_at=? WHERE id=UUID_TO_BIN(?)",
                 balance, Timestamp.from(Instant.now()), accountId.toString());

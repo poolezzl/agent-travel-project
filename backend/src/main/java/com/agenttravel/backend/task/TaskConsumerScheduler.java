@@ -3,8 +3,8 @@ package com.agenttravel.backend.task;
 import java.time.Instant;
 import java.util.List;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -42,6 +42,14 @@ public class TaskConsumerScheduler {
         }
     }
 
+    /**
+     * At-least-once consumption with an explicit ordering watermark.
+     *
+     * <p>Every queued command carries the {@code task_event.sequence_no} that produced it.
+     * A redelivered or late message whose sequence is not greater than the applied
+     * watermark is acknowledged and dropped instead of re-running a step, so duplicate and
+     * out-of-order deliveries cannot advance a task twice.
+     */
     private void consumeQueued(java.util.UUID taskId) {
         List<TaskModels.QueueRecord> records = queue.claim(taskId, properties.getWorkerGroup(), worker.workerId(),
                 properties.leaseDuration(), properties.getConsumerBatchSize());
@@ -51,11 +59,22 @@ public class TaskConsumerScheduler {
         }
         for (TaskModels.QueueRecord record : records) {
             try {
-                worker.advance(taskId);
+                if (isStale(taskId, record.message())) {
+                    queue.acknowledge(taskId, properties.getWorkerGroup(), record.recordId());
+                    continue;
+                }
+                boolean advanced = worker.advance(taskId);
+                if (advanced && record.message().sequenceNo() > 0) {
+                    repository.markQueueSequence(taskId, record.message().sequenceNo());
+                }
                 queue.acknowledge(taskId, properties.getWorkerGroup(), record.recordId());
             } catch (RuntimeException ignored) {
                 // 未确认消息由下一次领取或租约回收继续处理。
             }
         }
+    }
+
+    private boolean isStale(java.util.UUID taskId, TaskModels.QueueMessage message) {
+        return message.sequenceNo() > 0 && message.sequenceNo() <= repository.currentQueueSequence(taskId);
     }
 }

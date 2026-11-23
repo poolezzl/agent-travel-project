@@ -41,6 +41,7 @@ public class RedisTaskQueue implements TaskQueue {
         fields.put("outbox_id", message.outboxId().toString());
         fields.put("event_type", message.eventType());
         fields.put("status", message.status());
+        fields.put("sequence_no", Long.toString(message.sequenceNo()));
         streams.add(key(message.taskId()), fields);
     }
 
@@ -95,8 +96,20 @@ public class RedisTaskQueue implements TaskQueue {
                 UUID.fromString(String.valueOf(fields.get("task_id"))),
                 UUID.fromString(String.valueOf(fields.get("outbox_id"))),
                 String.valueOf(fields.get("event_type")),
-                String.valueOf(fields.get("status")));
+                String.valueOf(fields.get("status")),
+                sequenceOf(fields.get("sequence_no")));
         return new TaskModels.QueueRecord(record.getId().getValue(), message);
+    }
+
+    private long sequenceOf(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException exception) {
+            return 0L;
+        }
     }
 
     private boolean contains(Throwable error, String text) {

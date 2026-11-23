@@ -38,7 +38,8 @@ import org.springframework.test.web.servlet.MvcResult;
         "app.s11.relay-enabled=false",
         "app.s11.consumer-enabled=false",
         "app.s11.heartbeat-scheduler-enabled=false",
-        "app.s11.sse-scheduler-enabled=false"
+        "app.s11.sse-scheduler-enabled=false",
+        "app.s11.confirmation-sweep-enabled=false"
 })
 @AutoConfigureMockMvc
 class S11MySqlIntegrationTests {
@@ -57,6 +58,10 @@ class S11MySqlIntegrationTests {
     private OutboxRelayService relay;
     @Autowired
     private TaskRepository repository;
+    @Autowired
+    private TaskConfirmationTimeoutService confirmationTimeout;
+    @Autowired
+    private com.agenttravel.backend.points.PointsService pointsService;
     @Autowired
     private JwtTokenService tokens;
     @Autowired
@@ -303,6 +308,100 @@ class S11MySqlIntegrationTests {
         assertThat(body).contains("id:2").contains("task-progress").doesNotContain("北京")
                 .doesNotContain("preferences");
         assertThat(repository.findTask(created.taskId()).status()).isEqualTo(TaskStatus.REFUNDED);
+    }
+
+    @Test
+    void cancellingQueuedTaskRefundsOnceAndClearsTheReservation() {
+        TaskModels.TaskView created = createTask(null, null, "GENERATION");
+        assertThat(balance()).isEqualTo(90);
+
+        taskService.cancel(userId, "USER", created.taskId(),
+                new TaskModels.CancelTaskRequest(created.stateVersion()), "cancel-it");
+
+        TaskRepository.TaskRow cancelled = repository.findTask(created.taskId());
+        assertThat(cancelled.status()).isEqualTo(TaskStatus.REFUNDED);
+        assertThat(cancelled.reservedPoints()).isZero();
+        assertThat(balance()).isEqualTo(100);
+        assertThat(ledgerRows("REFUND")).isEqualTo(1);
+
+        // Repeating the cancel on a terminal task returns the stored result without a
+        // second ledger row.
+        TaskModels.TaskView again = taskService.cancel(userId, "USER", created.taskId(),
+                new TaskModels.CancelTaskRequest(created.stateVersion()), "cancel-it-again");
+        assertThat(again.status()).isEqualTo(TaskStatus.REFUNDED);
+        assertThat(ledgerRows("REFUND")).isEqualTo(1);
+    }
+
+    @Test
+    void confirmationTimeoutRefundsOnceAndClosesTheTask() {
+        TaskModels.TaskView created = createTask(null, null, "GENERATION");
+        jdbc.update("""
+                UPDATE planning_task
+                SET status='AWAITING_CONFIRMATION',state_version=state_version+1,confirmation_deadline_at=?
+                WHERE id=UUID_TO_BIN(?)
+                """, Timestamp.from(Instant.now().minusSeconds(60)), created.taskId().toString());
+        assertThat(balance()).isEqualTo(90);
+
+        assertThat(confirmationTimeout.expireOne(created.taskId(), Instant.now())).isTrue();
+
+        TaskRepository.TaskRow expired = repository.findTask(created.taskId());
+        assertThat(expired.status()).isEqualTo(TaskStatus.REFUNDED);
+        assertThat(expired.reservedPoints()).isZero();
+        assertThat(balance()).isEqualTo(100);
+        assertThat(ledgerRows("REFUND")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM outbox_event
+                WHERE aggregate_id=UUID_TO_BIN(?) AND event_type='TASK_CONFIRMATION_TIMEOUT'
+                """, Integer.class, created.taskId().toString())).isEqualTo(1);
+
+        // A second sweep must not refund again.
+        assertThat(confirmationTimeout.expireOne(created.taskId(), Instant.now())).isFalse();
+        assertThat(balance()).isEqualTo(100);
+        assertThat(ledgerRows("REFUND")).isEqualTo(1);
+    }
+
+    @Test
+    void repeatedSettlementWritesOneConfirmRowAndRejectsRefundAfterwards() {
+        TaskModels.TaskView created = createTask(null, null, "GENERATION");
+        var request = new com.agenttravel.backend.points.PointsModels.SettlementRequest(
+                "reserve:" + userId + ":task-reserve:" + created.taskId());
+
+        var first = pointsService.confirm(userId, request, "confirm-it-1");
+        var second = pointsService.confirm(userId, request, "confirm-it-2");
+
+        assertThat(first.reused()).isFalse();
+        assertThat(second.reused()).isTrue();
+        assertThat(ledgerRows("CONFIRM")).isEqualTo(1);
+        assertThat(ledgerRows("REFUND")).isZero();
+
+        assertThatThrownBy(() -> pointsService.refundForTask(userId, request, "refund-after-confirm"))
+                .isInstanceOf(ApiException.class)
+                .extracting(exception -> ((ApiException) exception).code())
+                .isEqualTo("CONCURRENCY_CONFLICT");
+        assertThat(ledgerRows("REFUND")).isZero();
+    }
+
+    @Test
+    void queueSequenceWatermarkRejectsDuplicatesAndRegressions() {
+        TaskModels.TaskView created = createTask(null, null, "GENERATION");
+        assertThat(repository.currentQueueSequence(created.taskId())).isZero();
+
+        assertThat(repository.markQueueSequence(created.taskId(), 7L)).isEqualTo(1);
+        assertThat(repository.markQueueSequence(created.taskId(), 7L)).isZero();
+        assertThat(repository.markQueueSequence(created.taskId(), 6L)).isZero();
+        assertThat(repository.markQueueSequence(created.taskId(), 9L)).isEqualTo(1);
+        assertThat(repository.currentQueueSequence(created.taskId())).isEqualTo(9L);
+
+        String payload = jdbc.queryForObject(
+                "SELECT payload_json FROM outbox_event WHERE aggregate_id=UUID_TO_BIN(?)",
+                String.class, created.taskId().toString());
+        assertThat(payload).contains("\"sequenceNo\":").doesNotContain("\"sequenceNo\":0");
+    }
+
+    private long ledgerRows(String entryType) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM points_ledger WHERE user_id=UUID_TO_BIN(?) AND entry_type=?
+                """, Long.class, userId.toString(), entryType);
     }
 
     private TaskModels.TaskView createTask(UUID tripId, UUID versionId, String type) {

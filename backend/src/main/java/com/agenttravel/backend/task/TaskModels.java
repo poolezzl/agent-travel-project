@@ -71,7 +71,15 @@ public final class TaskModels {
             @JsonProperty("created_at") Instant createdAt) {
     }
 
-    public record QueueMessage(UUID taskId, UUID outboxId, String eventType, String status) {
+    /**
+     * One queued task command. {@code sequenceNo} is the task_event sequence that produced
+     * this message; consumers use it to drop duplicate or out-of-order deliveries.
+     */
+    public record QueueMessage(UUID taskId, UUID outboxId, String eventType, String status, long sequenceNo) {
+
+        public QueueMessage(UUID taskId, UUID outboxId, String eventType, String status) {
+            this(taskId, outboxId, eventType, status, 0L);
+        }
     }
 
     public record QueueRecord(String recordId, QueueMessage message) {

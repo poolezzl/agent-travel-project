@@ -39,8 +39,9 @@ public class TaskTerminationService {
         }
         append(taskId, TaskStatus.FAILED, "任务执行失败");
         if (task.reservedPoints() > 0) {
-            pointsService.refund(task.ownerId(), new PointsModels.SettlementRequest(
+            pointsService.refundForTask(task.ownerId(), new PointsModels.SettlementRequest(
                     "reserve:" + task.ownerId() + ":task-reserve:" + taskId), "task-fail:" + taskId);
+            repository.clearReservedPoints(taskId);
             if (repository.transitionStatus(taskId, TaskStatus.FAILED, TaskStatus.REFUNDED, null,
                     Instant.now()) == 1) {
                 append(taskId, TaskStatus.REFUNDED, "任务失败，积分已退回");
