@@ -2,7 +2,7 @@
   "schema_version": "evaluation-index-v1",
   "reference_time": "2026-10-01T00:00:00Z",
   "case_count": 30,
-  "ready_case_count": 10,
+  "ready_case_count": 30,
   "beijing_case_ids": [
     "BJ-01",
     "BJ-02",
