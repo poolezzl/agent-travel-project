@@ -12,8 +12,8 @@
     "violations": 0
   },
   "latency_ms": {
-    "p50": 3.229,
-    "p95": 5.025049999999996
+    "p50": 2.9555,
+    "p95": 4.066199999999998
   },
   "local_modification_preservation_rate": 1.0,
   "route_feasibility_rate": 1.0,

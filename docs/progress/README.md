@@ -1,4 +1,4 @@
-# 开发步骤 Gate 索引
+﻿# 开发步骤 Gate 索引
 
 本目录是 S00-S31 实际完成证据的唯一入口。没有真实验证结果的步骤不得标记为完成。
 
@@ -37,7 +37,7 @@
 | S19 | 已完成（固定 DAG + 最终 Plan + `/plan`；真实 MySQL/Redis 9/9；10 并发 M1 探针 + 真实链路；高德 exact 1/1、和风 3/3；组长验收） | [S19.md](S19.md) |
 | S20 | 已完成（R4/R5，Java、Python、MySQL 与 Redis 联调） | [S20.md](S20.md) |
 | S21 | 已完成（前端） | [S21.md](S21.md) |
-| S22 | 已完成（M2 Gate 通过：30 案例 100%、局部保真 100%、过期/估算/降级可见 100%、P95 局部修改 1.932ms；真实 MySQL/Redis 演练通过） | [S22.md](S22.md)、[m2-gate.json](s22-artifacts/m2-gate.json)、[metrics.json](s22-artifacts/metrics.json) |
+| S22 | 已完成（M2 Gate 通过：30 案例 100%、局部保真 100%、过期/估算/降级可见 100%、P95 局部修改 1.5ms；真实 MySQL/Redis 演练通过） | [S22.md](S22.md)、[m2-gate.json](s22-artifacts/m2-gate.json)、[metrics.json](s22-artifacts/metrics.json) |
 | S23-S31 | 未开始 | 执行到对应步骤时创建独立证据文件 |
 
 ## 证据文件必备内容

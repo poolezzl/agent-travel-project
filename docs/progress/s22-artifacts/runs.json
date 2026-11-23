@@ -350,7 +350,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 5.886,
+    "latency_ms": 4.559,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -714,7 +714,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 5.759,
+    "latency_ms": 3.613,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "fail",
@@ -1041,7 +1041,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.429,
+    "latency_ms": 2.542,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "fail",
@@ -1404,7 +1404,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.945,
+    "latency_ms": 3.08,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -1773,7 +1773,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.05,
+    "latency_ms": 2.45,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -2163,7 +2163,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.35,
+    "latency_ms": 2.706,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -2310,7 +2310,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.129,
+    "latency_ms": 3.429,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -2673,7 +2673,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.125,
+    "latency_ms": 3.465,
     "local_modification": {
       "changed_days": [
         2
@@ -2689,7 +2689,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.098,
+    "local_modification_latency_ms": 1.27,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -3050,7 +3050,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.472,
+    "latency_ms": 3.002,
     "local_modification": {
       "changed_days": [
         2
@@ -3066,7 +3066,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.358,
+    "local_modification_latency_ms": 0.992,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -3427,7 +3427,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.729,
+    "latency_ms": 2.929,
     "local_modification": {
       "changed_days": [
         2,
@@ -3440,7 +3440,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 2.269,
+    "local_modification_latency_ms": 1.649,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -3832,7 +3832,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.077,
+    "latency_ms": 3.063,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -4175,7 +4175,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.221,
+    "latency_ms": 3.282,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -4542,7 +4542,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.451,
+    "latency_ms": 4.437,
     "local_modification": {
       "changed_days": [
         1
@@ -4558,7 +4558,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.427,
+    "local_modification_latency_ms": 0.905,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -4950,7 +4950,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.237,
+    "latency_ms": 2.689,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -5293,7 +5293,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.486,
+    "latency_ms": 2.435,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -5660,7 +5660,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.868,
+    "latency_ms": 2.62,
     "local_modification": {
       "changed_days": [
         1
@@ -5676,7 +5676,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.396,
+    "local_modification_latency_ms": 0.953,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -6068,7 +6068,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.864,
+    "latency_ms": 2.774,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -6411,7 +6411,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.586,
+    "latency_ms": 3.554,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -6778,7 +6778,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.799,
+    "latency_ms": 3.6,
     "local_modification": {
       "changed_days": [
         1
@@ -6794,7 +6794,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.114,
+    "local_modification_latency_ms": 0.908,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -7186,7 +7186,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.18,
+    "latency_ms": 3.117,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -7529,7 +7529,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.571,
+    "latency_ms": 2.85,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -7896,7 +7896,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.902,
+    "latency_ms": 2.455,
     "local_modification": {
       "changed_days": [
         1
@@ -7912,7 +7912,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 0.962,
+    "local_modification_latency_ms": 1.134,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -8304,7 +8304,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.363,
+    "latency_ms": 2.534,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -8647,7 +8647,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.686,
+    "latency_ms": 3.033,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -9014,7 +9014,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.896,
+    "latency_ms": 3.481,
     "local_modification": {
       "changed_days": [
         1
@@ -9030,7 +9030,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.177,
+    "local_modification_latency_ms": 0.896,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -9422,7 +9422,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.981,
+    "latency_ms": 2.803,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -9765,7 +9765,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 4.128,
+    "latency_ms": 2.517,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -10132,7 +10132,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.145,
+    "latency_ms": 2.786,
     "local_modification": {
       "changed_days": [
         1
@@ -10148,7 +10148,7 @@
         }
       ]
     },
-    "local_modification_latency_ms": 1.274,
+    "local_modification_latency_ms": 1.117,
     "plan_status": "warn",
     "route": {
       "feasible": true
@@ -10540,7 +10540,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 2.968,
+    "latency_ms": 2.452,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
@@ -10883,7 +10883,7 @@
         "satisfied": true
       }
     ],
-    "latency_ms": 3.273,
+    "latency_ms": 2.982,
     "local_modification": null,
     "local_modification_latency_ms": null,
     "plan_status": "warn",
