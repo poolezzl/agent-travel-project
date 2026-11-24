@@ -1,0 +1,18 @@
+[
+  {
+    "key": "city",
+    "valueJson": {"city_id": "beijing", "name": "北京"},
+    "sourceType": "HISTORY_ANALYSIS",
+    "confidence": 0.82,
+    "weight": 12,
+    "lastUsedAt": "2026-11-24T12:30:00Z"
+  },
+  {
+    "key": "pace",
+    "valueJson": {"level": "relaxed", "walks_less": true},
+    "sourceType": "EXPLICIT",
+    "confidence": 0.95,
+    "weight": 9,
+    "lastUsedAt": "2026-11-20T08:00:00Z"
+  }
+]

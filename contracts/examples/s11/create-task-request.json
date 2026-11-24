@@ -2,8 +2,12 @@
   "task_type": "GENERATION",
   "plan_count": 1,
   "request": {
-    "city": "北京",
-    "days": 3,
-    "preferences": "希望少走路并安排室内备选"
+    "city_id": "beijing",
+    "start_date": "2026-12-01",
+    "end_date": "2026-12-03",
+    "party_size": 2,
+    "preferences": ["少走路", "室内备选"],
+    "transport": "混合",
+    "must_visit": ["故宫博物院"]
   }
 }

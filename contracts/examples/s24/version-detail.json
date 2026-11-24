@@ -1,0 +1,31 @@
+{
+  "versionId": "0f0c2f9e-8a4b-4c1d-9e7a-1b2c3d4e5f60",
+  "tripId": "1c7be642-71da-433a-9932-8b239b4f1b26",
+  "versionNo": 2,
+  "parentVersionId": "548c706f-e0e8-4b3a-9ac6-f502ddba9e89",
+  "status": "PUBLISHED",
+  "etag": "9B2E7C6D11A0F4B7C3D8E5A1F6B09C2D4E7A1B3C5D8F0A2E4C6B8D1F3A5E7C9B",
+  "contentHash": "4A7F1C3E9D2B6A8C0E5F7B9D1A3C5E7B9D1F3A5C7E9B1D3F5A7C9E1B3D5F7A9C",
+  "schemaVersion": "s19-plan-v1",
+  "createdAt": "2026-11-24T12:40:00Z",
+  "current": true,
+  "changeType": "UPDATE",
+  "affectedPaths": ["days[1].segments", "days[1].weather"],
+  "plan": {
+    "days": [
+      {
+        "date": "2026-12-01",
+        "city_id": "beijing",
+        "weather": {"status": "ok", "condition": "晴", "temp_min": -2, "temp_max": 8},
+        "segments": [
+          {"from_point_id": "poi-gugong", "to_point_id": "poi-tiananmen", "transport": "步行", "duration_min": 18, "is_estimated": false}
+        ]
+      }
+    ],
+    "sources": [],
+    "degraded_fields": []
+  },
+  "summary": {"day_count": 3, "city_id": "beijing"},
+  "sourceMetadata": [],
+  "degradedFields": []
+}

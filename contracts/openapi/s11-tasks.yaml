@@ -200,7 +200,61 @@ components:
           type: object
           minProperties: 1
           additionalProperties: true
-          description: Immutable planning input. Sensitive keys are redacted before persistence.
+          description: >-
+            Immutable planning input. Sensitive keys are redacted before persistence.
+            For task_type=GENERATION the orchestrator requires city_id (or city) plus
+            start_date and end_date in YYYY-MM-DD; missing or malformed values fail the
+            parse stage with INVALID_INPUT instead of being guessed. task_type=REVISION
+            carries the change instruction instead, see s20-revisions.yaml.
+          properties:
+            city_id:
+              type: string
+              enum: [beijing, shanghai, hangzhou, nanjing, suzhou, chengdu, xian, chongqing, guangzhou, xiamen]
+            city:
+              type: string
+              description: Display name such as 北京; accepted only when city_id is absent.
+            start_date:
+              type: string
+              format: date
+              description: Must not be earlier than today in Asia/Shanghai.
+            end_date:
+              type: string
+              format: date
+              description: Must not be earlier than start_date; the window is at most 7 days.
+            party_size:
+              type: integer
+              minimum: 1
+              maximum: 10
+              default: 1
+            must_visit:
+              type: array
+              maxItems: 10
+              items:
+                type: string
+                minLength: 1
+            preferences:
+              description: Free-form preferences, either a comma separated string or a string array.
+              oneOf:
+                - type: string
+                - type: array
+                  maxItems: 10
+                  items:
+                    type: string
+                    minLength: 1
+            transport:
+              type: string
+              enum: [步行, 公交, 地铁, 打车, 混合]
+            budget:
+              type: object
+              additionalProperties: false
+              required: [currency, amount_minor]
+              properties:
+                currency:
+                  type: string
+                  pattern: '^[A-Z]{3}$'
+                amount_minor:
+                  type: integer
+                  minimum: 0
     CancelTaskRequest:
       type: object
       additionalProperties: false

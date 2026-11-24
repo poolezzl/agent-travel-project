@@ -6,6 +6,7 @@ info:
     S24 历史行程、偏好分析与偏好记忆库接口草案（R8 补充，对应 ALG-12）。
     统计维度 city/theme/pace/budget/season 由规则聚合产出，每条带可解释理由；
     LLM 仅生成自然语言文案；<3 条历史不出画像。
+    行程版本列表与按版本读取补齐 PENDING-S21-01 / PENDING-S22-03，与同行程版本对比接口互补。
 servers:
   - url: /api/v1
 security:
@@ -100,6 +101,74 @@ paths:
           description: 已清空
         default:
           $ref: './s08-public.yaml#/components/responses/Problem'
+  /trips/{tripId}/versions:
+    get:
+      operationId: listTripVersions
+      summary: 列出本人行程的已发布版本
+      description: >-
+        按 version_no 倒序返回。仅行程所有者或 ADMIN 可读；不存在、已删除或不属于调用者时
+        统一返回 404 CONTEXT_NOT_FOUND，避免枚举他人行程。
+      parameters:
+        - {"name":"tripId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"limit","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        - {"name":"offset","in":"query","required":false,"schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"type":"array","items":{"$ref":"#/components/schemas/TripVersionSummary"}}
+              examples:
+                list:
+                  $ref: '../examples/s24/versions.json'
+        default:
+          $ref: './s08-public.yaml#/components/responses/Problem'
+  /trips/{tripId}/versions/{versionId}:
+    get:
+      operationId: getTripVersion
+      summary: 按版本号读取行程内容
+      description: >-
+        返回该版本的完整 plan 与来源、降级字段，供跨会话版本时间线与版本 diff 使用。
+        已发布版本不可原地修改；仅所有者或 ADMIN 可读。
+      parameters:
+        - {"name":"tripId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+        - {"name":"versionId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VersionDetail'}
+              examples:
+                detail:
+                  $ref: '../examples/s24/version-detail.json'
+        default:
+          $ref: './s08-public.yaml#/components/responses/Problem'
+  /preferences/recall:
+    get:
+      operationId: recallPreferences
+      summary: 按权重召回本人 TOP-K 偏好
+      description: >-
+        按遗忘后的权重倒序返回，作为 Agent 上下文的软约束来源；仅本人可见，不参与公共榜单。
+      parameters:
+        - {"name":"top_k","in":"query","required":false,"schema":{"type":"integer","minimum":1,"maximum":20,"default":5}}
+      responses:
+        '200':
+          description: 请求成功
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {"type":"array","items":{"$ref":"#/components/schemas/PreferenceItem"}}
+              examples:
+                recall:
+                  $ref: '../examples/s24/recall.json'
+        default:
+          $ref: './s08-public.yaml#/components/responses/Problem'
 components:
   schemas:
     HistoricalTrip:
@@ -175,3 +244,51 @@ components:
           type: string
           description: LLM 基于 dimensions 生成的自然语言画像文案；eligible=false 时为空
         generatedAt: {type: string, format: date-time}
+    TripVersionSummary:
+      type: object
+      required: [versionId, tripId, versionNo, status, etag, contentHash, schemaVersion, createdAt, current]
+      properties:
+        versionId: {type: string, format: uuid}
+        tripId: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        parentVersionId:
+          type: [string, "null"]
+          format: uuid
+          description: 首版为 null，其余指向上一版本
+        status: {type: string, enum: [PUBLISHED, SUPERSEDED], description: 已发布版本不可原地修改}
+        etag: {type: string, description: 大写十六进制内容摘要，用于并发校验}
+        contentHash: {type: string, description: 大写十六进制 SHA-256 内容哈希}
+        schemaVersion: {type: string}
+        createdAt: {type: string, format: date-time}
+        current: {type: boolean, description: 是否为行程当前版本}
+        changeType:
+          type: [string, "null"]
+          enum: [UPDATE, ROLLBACK, null]
+          description: 局部修改或回滚产生时给出，首次生成版本为 null
+    VersionDetail:
+      type: object
+      required: [versionId, tripId, versionNo, status, etag, contentHash, schemaVersion, createdAt, current, plan, summary, sourceMetadata, degradedFields]
+      properties:
+        versionId: {type: string, format: uuid}
+        tripId: {type: string, format: uuid}
+        versionNo: {type: integer, minimum: 1}
+        parentVersionId:
+          type: [string, "null"]
+          format: uuid
+        status: {type: string, enum: [PUBLISHED, SUPERSEDED]}
+        etag: {type: string}
+        contentHash: {type: string}
+        schemaVersion: {type: string}
+        createdAt: {type: string, format: date-time}
+        current: {type: boolean}
+        changeType:
+          type: [string, "null"]
+          enum: [UPDATE, ROLLBACK, null]
+        affectedPaths:
+          type: array
+          description: 该版本改动过的字段路径，仅局部修改或回滚版本有值
+          items: {type: string}
+        plan: {type: object, description: 已发布版本的行程内容，字段见 s19/plan.schema.json}
+        summary: {type: object}
+        sourceMetadata: {"type": "array", "items": {"type": "object"}}
+        degradedFields: {"type": "array", "items": {"type": "string"}}
