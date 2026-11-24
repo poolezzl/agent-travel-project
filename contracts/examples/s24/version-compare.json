@@ -1,0 +1,23 @@
+{
+  "tripId": "65710000-0000-4000-8000-000000000001",
+  "from": {
+    "versionId": "65710000-0000-4000-8000-000000000011",
+    "versionNo": 1,
+    "versionStatus": "DRAFT",
+    "createdAt": "2026-11-20T10:00:00Z",
+    "schemaVersion": "s24-v1"
+  },
+  "to": {
+    "versionId": "65710000-0000-4000-8000-000000000012",
+    "versionNo": 2,
+    "versionStatus": "ACTIVE",
+    "createdAt": "2026-11-21T10:00:00Z",
+    "schemaVersion": "s24-v1"
+  },
+  "changes": [
+    { "path": "budget", "changeType": "MODIFIED", "before": 3000, "after": 3500 },
+    { "path": "days[0].spots", "changeType": "MODIFIED", "before": 2, "after": 3 },
+    { "path": "theme", "changeType": "ADDED", "before": null, "after": "海滨" },
+    { "path": "title", "changeType": "MODIFIED", "before": "初版", "after": "终版" }
+  ]
+}

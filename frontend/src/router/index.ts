@@ -38,6 +38,12 @@ const routes = isMockProfile
         meta: { title: '积分钱包' },
       },
       {
+        path: '/preferences',
+        name: 'preferences',
+        component: () => import('@/views/S24PreferenceView.vue'),
+        meta: { title: '历史行程与偏好画像' },
+      },
+      {
         path: '/scaffold',
         name: 'scaffold',
         component: () => import('@/views/ScaffoldView.vue'),
