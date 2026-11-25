@@ -121,7 +121,9 @@ onMounted(load)
         <h2>偏好画像</h2>
         <template v-if="summary && summary.eligible">
           <p class="narrative">{{ summary.narrative }}</p>
-          <p class="meta">基于 {{ summary.sampleCount }} 条历史行程 · 版本 {{ summary.summaryVersion }}</p>
+          <p class="meta">
+            基于 {{ summary.sampleCount }} 条历史行程 · 版本 {{ summary.summaryVersion }}
+          </p>
           <ul class="dimensions">
             <li v-for="item in summary.dimensions" :key="item.key">
               <strong>{{ item.key }}</strong>
@@ -152,11 +154,21 @@ onMounted(load)
           <li v-for="trip in trips" :key="trip.id">
             <div>
               <strong>{{ trip.title }}</strong>
-              <span class="meta">{{ formatDate(trip.startDate) }} 至 {{ formatDate(trip.endDate) }}</span>
-              <span class="meta">{{ trip.cities.join('、') || '未记录城市' }} · {{ trip.versionCount }} 个版本</span>
+              <span class="meta"
+                >{{ formatDate(trip.startDate) }} 至 {{ formatDate(trip.endDate) }}</span
+              >
+              <span class="meta"
+                >{{ trip.cities.join('、') || '未记录城市' }} · {{ trip.versionCount }} 个版本</span
+              >
             </div>
             <span class="actions">
-              <button type="button" :disabled="busy || trip.versionCount < 2" @click="compare(trip)">版本对比</button>
+              <button
+                type="button"
+                :disabled="busy || trip.versionCount < 2"
+                @click="compare(trip)"
+              >
+                版本对比
+              </button>
               <button type="button" :disabled="busy" @click="reuse(trip)">再来一单</button>
             </span>
           </li>
@@ -167,17 +179,24 @@ onMounted(load)
       <section v-if="comparison" class="panel">
         <h2>版本演进对比 · {{ comparingTrip }}</h2>
         <p class="meta">
-          版本 {{ comparison.from.versionNo }}（{{ comparison.from.versionStatus }}）
-          → 版本 {{ comparison.to.versionNo }}（{{ comparison.to.versionStatus }}）
+          版本 {{ comparison.from.versionNo }}（{{ comparison.from.versionStatus }}） → 版本
+          {{ comparison.to.versionNo }}（{{ comparison.to.versionStatus }}）
         </p>
         <p v-if="comparison.changes.length === 0" class="empty">两个版本内容一致。</p>
         <table v-else class="diff-table">
           <thead>
-            <tr><th>字段</th><th>变化</th><th>旧值</th><th>新值</th></tr>
+            <tr>
+              <th>字段</th>
+              <th>变化</th>
+              <th>旧值</th>
+              <th>新值</th>
+            </tr>
           </thead>
           <tbody>
             <tr v-for="change in comparison.changes" :key="change.path">
-              <td><code>{{ change.path }}</code></td>
+              <td>
+                <code>{{ change.path }}</code>
+              </td>
               <td>{{ change.changeType }}</td>
               <td>{{ formatValue(change.before) }}</td>
               <td>{{ formatValue(change.after) }}</td>
