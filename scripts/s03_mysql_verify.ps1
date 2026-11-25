@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$onWindows = ($env:OS -eq "Windows_NT")
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot "deploy\docker-compose.s03.yml"
 $composeProject = if ($ProjectName) { $ProjectName } else { "s03-validation-$PID" }
@@ -107,6 +108,35 @@ function Test-TcpPort {
     }
 }
 
+function Get-MySqlServerVersion {
+    # 只做 TCP 端口探测无法确认对端确实是 MySQL（可能是残留端口占用），
+    # 这里读取 MySQL 握手包首字节确认服务端身份。
+    param(
+        [Parameter(Mandatory = $true)][string]$TargetHost,
+        [Parameter(Mandatory = $true)][int]$TargetPort
+    )
+
+    $client = [Net.Sockets.TcpClient]::new()
+    try {
+        $client.ReceiveTimeout = 5000
+        $client.Connect($TargetHost, $TargetPort)
+        $stream = $client.GetStream()
+        $buffer = New-Object byte[] 64
+        $read = $stream.Read($buffer, 0, 64)
+        if ($read -lt 6 -or $buffer[0] -ne 10) {
+            return $null
+        }
+        $version = [Text.Encoding]::ASCII.GetString($buffer, 1, [Math]::Min(30, $read - 1))
+        return $version.Trim([char]0)
+    }
+    catch {
+        return $null
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 function Invoke-MySqlQuery {
     param([Parameter(Mandatory = $true)][string]$Sql)
 
@@ -170,24 +200,38 @@ function Stop-Backend {
             Stop-Process -Id $script:backendProcess.Id -Force -ErrorAction SilentlyContinue
         }
     }
+    if (-not $onWindows) {
+        # spring-boot:run 会 fork 出应用 JVM，单独杀掉 Maven 进程会留下占用端口的孤儿进程。
+        & pkill -f -- "--server.port=$BackendPort" | Out-Null
+    }
     $script:backendProcess = $null
 }
 
 function Start-Backend {
-    $maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
-    if (-not $maven) {
-        $maven = Get-Command mvn -ErrorAction Stop
-    }
-
     $arguments = @(
         "-f", (Join-Path $repoRoot "backend\pom.xml"),
         "spring-boot:run",
         "-Dspring-boot.run.profiles=local",
         "-Dspring-boot.run.arguments=--server.port=$BackendPort"
     )
-    $script:backendProcess = Start-Process -FilePath $maven.Source -ArgumentList $arguments `
-        -WorkingDirectory $repoRoot -RedirectStandardOutput $backendLog `
-        -RedirectStandardError $backendErrorLog -PassThru
+
+    if ($onWindows) {
+        $maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
+        if (-not $maven) {
+            $maven = Get-Command mvn -ErrorAction Stop
+        }
+        $script:backendProcess = Start-Process -FilePath $maven.Source -ArgumentList $arguments `
+            -WorkingDirectory $repoRoot -RedirectStandardOutput $backendLog `
+            -RedirectStandardError $backendErrorLog -PassThru
+        return
+    }
+
+    # Linux runner：不用 Start-Process 的输出重定向（PowerShell 7 在重定向子进程输出时
+    # 会在退出阶段抛出 ObjectDisposedException 并吞掉真实错误），改为由 bash 重定向到文件。
+    $quoted = ($arguments | ForEach-Object { "'" + ($_ -replace "'", "'\''") + "'" }) -join " "
+    $launch = "exec mvn $quoted > '$backendLog' 2> '$backendErrorLog'"
+    $script:backendProcess = Start-Process -FilePath "bash" -ArgumentList @("-c", $launch) `
+        -WorkingDirectory $repoRoot -PassThru
 }
 
 function Wait-ForBackend {
@@ -282,29 +326,46 @@ try {
     } while ((Get-Date) -lt $deadline)
     Assert-Equal $healthStatus "healthy" "MySQL container did not become healthy"
 
-    # 以 compose 实际发布的端口为准；宿主端口不可达时回退到容器 IP 直连。
+    # 选择后端可用的 MySQL 端点：以 MySQL 握手确认，避免把“端口可连”误判为“数据库可用”。
     $publishedPort = Resolve-PublishedPort
+    $containerAddress = Resolve-ContainerAddress
     if ($publishedPort) {
         Write-Output "Published MySQL port: $publishedPort"
-        $MySqlPort = $publishedPort
     }
-    $mysqlHost = "127.0.0.1"
-    $mysqlPortForApp = $MySqlPort
-    if (-not (Test-TcpPort -TargetHost $mysqlHost -TargetPort $mysqlPortForApp)) {
-        $containerAddress = Resolve-ContainerAddress
-        Write-Output "Host port $mysqlHost`:$mysqlPortForApp unreachable, container address: $containerAddress"
-        if ($containerAddress -and (Test-TcpPort -TargetHost $containerAddress -TargetPort 3306)) {
-            $mysqlHost = $containerAddress
-            $mysqlPortForApp = 3306
+    Write-Output "MySQL container address: $containerAddress"
+
+    $candidates = @()
+    if ($onWindows) {
+        # Docker Desktop 下容器 IP 不可达，优先使用 compose 发布的宿主端口。
+        $candidates += , @("127.0.0.1", $publishedPort)
+        $candidates += , @($containerAddress, 3306)
+    }
+    else {
+        # Linux runner 上优先直连容器 IP，避免宿主发布端口被占用或不可达。
+        $candidates += , @($containerAddress, 3306)
+        $candidates += , @("127.0.0.1", $publishedPort)
+    }
+
+    $mysqlHost = $null
+    $mysqlPortForApp = $null
+    foreach ($candidate in $candidates) {
+        if (-not $candidate[0] -or -not $candidate[1]) { continue }
+        $version = Get-MySqlServerVersion -TargetHost $candidate[0] -TargetPort $candidate[1]
+        if ($version) {
+            $mysqlHost = $candidate[0]
+            $mysqlPortForApp = $candidate[1]
+            Write-Output "MySQL endpoint selected: ${mysqlHost}:${mysqlPortForApp} (server $version)"
+            break
         }
-        else {
-            throw "MySQL is not reachable from the host on port $MySqlPort nor via container address $containerAddress"
-        }
+        Write-Output "MySQL handshake failed on ${candidate[0]}:${candidate[1]}"
+    }
+    if (-not $mysqlHost) {
+        throw "MySQL handshake failed on all candidate endpoints"
     }
     $env:MYSQL_HOST = $mysqlHost
     $env:MYSQL_PORT = "$mysqlPortForApp"
     $env:DB_URL = "jdbc:mysql://${mysqlHost}:${mysqlPortForApp}/$databaseName"
-    Write-Output "Backend will connect to ${mysqlHost}:${mysqlPortForApp}"
+    Write-Output "Backend datasource: MYSQL_HOST=$env:MYSQL_HOST MYSQL_PORT=$env:MYSQL_PORT DB_URL=$env:DB_URL"
 
     $initialTableCount = [int](Invoke-MySqlQuery "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();" | Select-Object -First 1)
     Assert-Equal $initialTableCount 0 "Initial database is not empty"
