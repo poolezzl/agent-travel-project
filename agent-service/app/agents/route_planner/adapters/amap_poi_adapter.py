@@ -19,7 +19,12 @@ from typing import Literal, cast
 
 import httpx
 
-from app.agents.route_planner.adapters._amap import parse_lnglat
+from app.agents.route_planner.adapters._amap import (
+    AMAP_CITY_ADCODE,
+    amap_city_code,
+    parse_lnglat,
+    standard_city_for_adcode,
+)
 from app.agents.route_planner.models import UNKNOWN_CATEGORY, PoiRecord
 from app.knowledge.internal_client import (
     ERROR_HTTP,
@@ -57,12 +62,17 @@ class AmapPoiAdapter:
         self.last_degradation: str | None = None
 
     def lookup(self, name: str, city_id: str) -> list[PoiRecord]:
+        # Callers pass standard city ids (``beijing``); 高德 expects a name/adcode. Without the
+        # mapping the supplier ignores the filter and returns out-of-city hits. Records are then
+        # attributed back to the standard id only when their adcode is provably in that city.
+        request_city = amap_city_code(city_id) or city_id
+        expected_city = city_id if city_id in AMAP_CITY_ADCODE else None
         try:
             response = self._client.get(
                 "/v5/place/text",
                 params={
                     "keywords": name,
-                    "city": city_id,
+                    "city": request_city,
                     "city_limit": "true",
                     "page_size": 20,
                     "key": self._api_key,
@@ -90,7 +100,7 @@ class AmapPoiAdapter:
         now = self._now()
         records: list[PoiRecord] = []
         for poi in pois:
-            record = self._parse(poi, city_id, now)
+            record = self._parse(poi, city_id, now, expected_city=expected_city)
             if record is not None:
                 self._remember(record)
                 records.append(record)
@@ -218,6 +228,8 @@ class AmapPoiAdapter:
         poi: object,
         city_id: str,
         retrieved_at: datetime | None = None,
+        *,
+        expected_city: str | None = None,
     ) -> PoiRecord | None:
         if not isinstance(poi, dict):
             return None
@@ -226,6 +238,9 @@ class AmapPoiAdapter:
         adcode = _text(poi.get("adcode"))
         if poi_id is None or name is None or adcode is None:
             return None
+        if expected_city is not None and standard_city_for_adcode(adcode) != expected_city:
+            # The supplier ignored/blurred the city filter; never re-attribute a foreign point.
+            return None
         lnglat = parse_lnglat(poi.get("location"))
         if lnglat is None:
             return None
@@ -233,7 +248,7 @@ class AmapPoiAdapter:
         return PoiRecord(
             poi_id=poi_id,
             name=name,
-            city_id=adcode,
+            city_id=expected_city or adcode,
             latitude=latitude,
             longitude=longitude,
             coordinate_system=_COORDINATE_SYSTEM,

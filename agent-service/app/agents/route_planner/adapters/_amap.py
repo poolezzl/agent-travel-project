@@ -42,6 +42,23 @@ def amap_city_code(city_id: str) -> str | None:
     return AMAP_CITY_ADCODE.get(city_id.strip().lower())
 
 
+def standard_city_for_adcode(adcode: str) -> str | None:
+    """Map a 高德 district adcode back to the standard city id used by callers.
+
+    Used only to attribute a returned POI to the city that was searched. Unknown adcodes
+    return ``None``; callers must keep the raw adcode rather than guess a city.
+    """
+    if not (adcode.isdigit() and len(adcode) == 6):
+        return None
+    for city_id, city_adcode in AMAP_CITY_ADCODE.items():
+        # Municipalities (110000/310000/500000) are identified by the first two digits;
+        # prefecture-level cities share a two-digit province prefix, so match four.
+        prefix = city_adcode[:2] if city_adcode.endswith("0000") else city_adcode[:4]
+        if adcode.startswith(prefix):
+            return city_id
+    return None
+
+
 # transport preference -> 高德 direction endpoint path. Transit covers bus/subway and the
 # mixed preference; driving/walking stay separate.
 ROUTE_PATH_BY_TRANSPORT: dict[str, str] = {

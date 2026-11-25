@@ -318,6 +318,68 @@ def test_poi_empty_response_is_not_guessed() -> None:
     assert result.error_code == "SOURCE_UNAVAILABLE"
 
 
+def test_lookup_maps_standard_city_id_to_adcode_and_attributes_records() -> None:
+    seen: dict[str, str | None] = {}
+    foreign = {
+        "id": "B0FOREIGN",
+        "name": "故宫博物院",
+        "location": "116.414425,39.510525",
+        "adcode": "131003",
+    }
+    local = {
+        "id": "B000A8UIN8",
+        "name": "故宫博物院",
+        "location": "116.397029,39.917839",
+        "adcode": "110101",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["city"] = request.url.params.get("city")
+        return httpx.Response(200, json={"status": "1", "pois": [foreign, local]})
+
+    client = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handler))
+    poi = AmapPoiAdapter(client, "test-key")
+
+    records = poi.lookup("故宫博物院", "beijing")
+
+    assert seen["city"] == "110000"
+    assert [record.city_id for record in records] == ["beijing"]
+    assert records[0].poi_id == "B000A8UIN8"
+
+
+def test_lookup_with_standard_city_id_resolves_without_cross_city() -> None:
+    local = {
+        "id": "B000A8UIN8",
+        "name": "故宫博物院",
+        "location": "116.397029,39.917839",
+        "adcode": "110101",
+    }
+    poi, provider = _stack(_handler(pois=[local, POI_HOTEL]))
+    request = _request(["故宫博物院"]).model_copy(update={"city_id": "beijing"})
+
+    result = plan_route(request, poi, provider)
+
+    assert result.status == "ok"
+    assert result.route is not None
+    assert "B000A8UIN8" in result.route.ordered_points
+
+
+def test_lookup_keeps_raw_city_when_no_standard_mapping_exists() -> None:
+    seen: dict[str, str | None] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["city"] = request.url.params.get("city")
+        return httpx.Response(200, json={"status": "1", "pois": [POI_TIANANMEN]})
+
+    client = httpx.Client(base_url=BASE_URL, transport=httpx.MockTransport(handler))
+    poi = AmapPoiAdapter(client, "test-key")
+
+    records = poi.lookup("天安门", "shenzhen")
+
+    assert seen["city"] == "shenzhen"
+    assert [record.city_id for record in records] == [CITY]
+
+
 # ------------------------------------------------------- Route responses (ALG-06)
 
 
