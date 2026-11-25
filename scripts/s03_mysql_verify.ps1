@@ -123,11 +123,15 @@ function Get-MySqlServerVersion {
         $stream = $client.GetStream()
         $buffer = New-Object byte[] 64
         $read = $stream.Read($buffer, 0, 64)
-        if ($read -lt 6 -or $buffer[0] -ne 10) {
+        # MySQL 初始握手包：4 字节包头 + 1 字节协议版本（10）+ 版本号字符串
+        if ($read -lt 6 -or $buffer[4] -ne 10) {
             return $null
         }
-        $version = [Text.Encoding]::ASCII.GetString($buffer, 1, [Math]::Min(30, $read - 1))
-        return $version.Trim([char]0)
+        $version = [Text.Encoding]::ASCII.GetString($buffer, 5, [Math]::Min(30, $read - 5))
+        if ($version -match '^([0-9]+\.[0-9]+\.[0-9]+)') {
+            return $Matches[1]
+        }
+        return ($version -split "`0")[0]
     }
     catch {
         return $null
@@ -357,7 +361,7 @@ try {
             Write-Output "MySQL endpoint selected: ${mysqlHost}:${mysqlPortForApp} (server $version)"
             break
         }
-        Write-Output "MySQL handshake failed on ${candidate[0]}:${candidate[1]}"
+        Write-Output "MySQL handshake failed on $($candidate[0]):$($candidate[1])"
     }
     if (-not $mysqlHost) {
         throw "MySQL handshake failed on all candidate endpoints"
