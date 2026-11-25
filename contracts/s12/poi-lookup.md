@@ -50,6 +50,11 @@ GET /internal/v1/knowledge/pois/{poiId}
 | `source_metadata` | array | 是（至少 1 项） | 统一来源元数据，见第 4 节；来自当前快照的 `source_snapshot` |
 | `retrieved_at` | string(date-time) | 是 | 后端组装本次响应的 UTC 时间 |
 
+`category` 是**来源原值**：知识库路径下为 `poi.category`（如 `attraction`），供应商回退路径
+下为高德 `type` 文本（如 `风景名胜`）。它不是跨来源统一枚举，消费方不得据此推断事实；
+需要 `attraction` 等知识库分类的调用方必须只使用知识库 POI（UUID），不得把供应商分类值
+当枚举使用。
+
 ## 4. 统一来源元数据（`source_metadata[]`）
 
 沿用 `KnowledgeModels.SourceMetadata` 与 Agent Schema 的 `source_metadata` 结构：
