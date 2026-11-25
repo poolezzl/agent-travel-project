@@ -280,6 +280,58 @@ def test_invalid_response_does_not_poison_cache() -> None:
     assert backend_calls == [POI_PATH, POI_PATH]
 
 
+def test_supplier_style_id_skips_backend_and_uses_detail() -> None:
+    backend_calls: list[str] = []
+    amap_calls: list[str] = []
+    clock = Clock()
+    detail = {
+        "id": "B000A1",
+        "name": "天安门",
+        "location": "116.391200,39.904200",
+        "adcode": "110101",
+        "type": "风景名胜",
+    }
+    adapter = _adapter(_backend_client({}, backend_calls), amap_calls, clock, detail=detail)
+
+    record = adapter.get("B000A1")
+
+    assert record is not None
+    assert record.poi_id == "B000A1"
+    assert record.category == "风景名胜"
+    assert backend_calls == []
+    assert amap_calls == [AMAP_DETAIL]
+
+
+def test_backend_400_for_uuid_falls_back_to_supplier_detail() -> None:
+    backend_calls: list[str] = []
+    amap_calls: list[str] = []
+    clock = Clock()
+    detail = {
+        "id": POI_ID,
+        "name": "外部点位",
+        "location": "116.400000,39.900000",
+        "adcode": "110101",
+        "type": "风景名胜",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        backend_calls.append(request.url.path)
+        return httpx.Response(400, json={"code": "POI_ID_INVALID"})
+
+    backend = InternalKnowledgeClient(
+        base_url=BACKEND_BASE,
+        client=httpx.Client(base_url=BACKEND_BASE, transport=httpx.MockTransport(handler)),
+    )
+    adapter = _adapter(backend, amap_calls, clock, detail=detail)
+
+    record = adapter.get(POI_ID)
+
+    assert record is not None
+    assert record.name == "外部点位"
+    assert backend_calls == [POI_PATH]
+    assert amap_calls == [AMAP_DETAIL]
+
+
 def test_wiring_uses_injected_backend_client(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ROUTE_PROVIDER", "amap")
     get_route_settings.cache_clear()

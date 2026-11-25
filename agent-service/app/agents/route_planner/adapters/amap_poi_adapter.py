@@ -11,6 +11,7 @@ disambiguation — never auto-merged.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from threading import Lock
@@ -20,13 +21,20 @@ import httpx
 
 from app.agents.route_planner.adapters._amap import parse_lnglat
 from app.agents.route_planner.models import UNKNOWN_CATEGORY, PoiRecord
-from app.knowledge.internal_client import InternalKnowledgeClient, InternalKnowledgeError
+from app.knowledge.internal_client import (
+    ERROR_HTTP,
+    InternalKnowledgeClient,
+    InternalKnowledgeError,
+)
 
 _COORDINATE_SYSTEM = "GCJ02"
 _COORDINATE_SYSTEMS = frozenset({"GCJ02", "WGS84"})
 _FRESHNESS = frozenset({"fresh", "stale", "unknown"})
 Freshness = Literal["fresh", "stale", "unknown"]
 _MAX_CACHE_ENTRIES = 4096
+_UUID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 class AmapPoiAdapter:
@@ -91,18 +99,19 @@ class AmapPoiAdapter:
     def get(self, poi_id: str) -> PoiRecord | None:
         """Return a fresh authoritative record, re-reading the backend after expiry.
 
-        With an authoritative client configured, the backend is the source of truth. Cache is
-        only a cache: an expired entry is dropped, never replayed. Backend transport/shape
-        failures set ``last_degradation`` and return ``None`` so upper layers emit a structured
-        "missing authoritative coordinates" error. A backend 404 falls back to the supplier's
-        by-id detail because the POI may legitimately be an external point.
+        Only knowledge-base POI IDs are UUIDs; supplier IDs returned by ``lookup`` (e.g.
+        ``B000A1``) are resolved directly through the supplier by-id detail so they are not
+        misread as invalid backend input. For UUIDs the backend is the source of truth; cache is
+        only a cache (expired entries are dropped, never replayed). Backend transport/shape
+        failures set ``last_degradation`` and return ``None``; 400/404 mean the backend does not
+        own the ID, so the supplier detail is tried.
         """
         self.last_degradation = None
         cached = self._cached(poi_id)
         if cached is not None:
             return cached
 
-        if self._authoritative is not None:
+        if self._authoritative is not None and _looks_like_uuid(poi_id):
             return self._get_from_backend(poi_id)
         return self._get_from_detail(poi_id)
 
@@ -119,6 +128,9 @@ class AmapPoiAdapter:
         try:
             payload = authoritative.lookup_poi(poi_id)
         except InternalKnowledgeError as exc:
+            if exc.code == ERROR_HTTP and exc.status_code in (400, 404):
+                # Not a knowledge-base POI (or a race between catalog and DB): try the supplier.
+                return self._get_from_detail(poi_id)
             self.last_degradation = exc.code
             self._forget(poi_id)
             return None
@@ -272,6 +284,10 @@ def _text(value: object) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _looks_like_uuid(value: str) -> bool:
+    return _UUID_PATTERN.match(value) is not None
 
 
 def _number(value: object) -> float | None:
