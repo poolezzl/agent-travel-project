@@ -178,16 +178,34 @@ function Assert-Health {
     Write-Output "Health: HTTP 200, status=UP, databaseMode=mysql, db.status=UP"
 }
 
-function Assert-EmptyDatabase {
+function Get-ExpectedMigrationCount {
+    # S04 起仓库已有正式 Flyway 迁移，启动后的库不再为空表；
+    # 这里按仓库实际迁移文件数量校验 Flyway 执行结果。
+    $migrationDir = Join-Path $repoRoot "backend\src\main\resources\db\migration"
+    if (-not (Test-Path -LiteralPath $migrationDir)) {
+        return 0
+    }
+    return @(Get-ChildItem -LiteralPath $migrationDir -Filter "V*.sql" -File).Count
+}
+
+function Assert-MigrationState {
     param([Parameter(Mandatory = $true)][string]$Phase)
 
-    $tableNames = @(Invoke-MySqlQuery "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name;")
-    Assert-Equal $tableNames.Count 1 "$Phase table count is not one"
-    Assert-Equal $tableNames[0] "flyway_schema_history" "$Phase contains an unexpected table"
+    $expected = $script:expectedMigrationCount
+    $applied = [int](Invoke-MySqlQuery "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1;" | Select-Object -First 1)
+    $failed = [int](Invoke-MySqlQuery "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0;" | Select-Object -First 1)
+    Assert-Equal $failed 0 "$Phase has failed Flyway migrations"
+    Assert-Equal $applied $expected "$Phase applied migration count does not match repository migrations"
 
-    $flywayRows = [int](Invoke-MySqlQuery "SELECT COUNT(*) FROM flyway_schema_history;" | Select-Object -First 1)
-    Assert-Equal $flywayRows 0 "$Phase Flyway history is not empty"
-    Write-Output "$Phase tables: $($tableNames -join ', '); flyway_rows=$flywayRows"
+    $tableNames = @(Invoke-MySqlQuery "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY table_name;")
+    if ($expected -eq 0) {
+        Assert-Equal $tableNames.Count 1 "$Phase table count is not one"
+        Assert-Equal $tableNames[0] "flyway_schema_history" "$Phase contains an unexpected table"
+    }
+    elseif ($tableNames.Count -lt 2) {
+        throw "$Phase expected the migrated schema, but only found $($tableNames.Count) table(s)"
+    }
+    Write-Output "$Phase tables=$($tableNames.Count); flyway_applied=$applied; flyway_failed=$failed"
 }
 
 function Stop-Backend {
@@ -218,12 +236,12 @@ function Start-Backend {
         "-Dspring-boot.run.profiles=local",
         "-Dspring-boot.run.arguments=--server.port=$BackendPort"
     )
+    $maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
+    if (-not $maven) {
+        $maven = Get-Command mvn -ErrorAction Stop
+    }
 
     if ($onWindows) {
-        $maven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
-        if (-not $maven) {
-            $maven = Get-Command mvn -ErrorAction Stop
-        }
         $script:backendProcess = Start-Process -FilePath $maven.Source -ArgumentList $arguments `
             -WorkingDirectory $repoRoot -RedirectStandardOutput $backendLog `
             -RedirectStandardError $backendErrorLog -PassThru
@@ -232,9 +250,13 @@ function Start-Backend {
 
     # Linux runner：不用 Start-Process 的输出重定向（PowerShell 7 在重定向子进程输出时
     # 会在退出阶段抛出 ObjectDisposedException 并吞掉真实错误），改为由 bash 重定向到文件。
+    # 命令写入独立 .sh 文件后再执行：Start-Process 会把 ArgumentList 按空格拼接，
+    # 直接传 bash -c "<命令>" 会被拆成多个参数，bash 只执行第一个词就退出。
     $quoted = ($arguments | ForEach-Object { "'" + ($_ -replace "'", "'\''") + "'" }) -join " "
-    $launch = "exec mvn $quoted > '$backendLog' 2> '$backendErrorLog'"
-    $script:backendProcess = Start-Process -FilePath "bash" -ArgumentList @("-c", $launch) `
+    $launch = "exec '" + $maven.Source + "' $quoted > '$backendLog' 2> '$backendErrorLog'"
+    $script:launchScript = Join-Path ([IO.Path]::GetTempPath()) "s03-backend-$PID.sh"
+    Set-Content -LiteralPath $script:launchScript -Value $launch -Encoding utf8
+    $script:backendProcess = Start-Process -FilePath "bash" -ArgumentList @($script:launchScript) `
         -WorkingDirectory $repoRoot -PassThru
 }
 
@@ -313,6 +335,8 @@ try {
     $env:JWT_SECRET = $jwtSecret
 
     $script:composeArguments = @("compose", "-p", $composeProject, "-f", $composeFile)
+    $script:expectedMigrationCount = Get-ExpectedMigrationCount
+    Write-Output "Repository Flyway migrations: $script:expectedMigrationCount"
     $composeStarted = $true
     Invoke-Checked "docker" ($script:composeArguments + @("up", "-d"))
 
@@ -379,12 +403,12 @@ try {
 
     Start-Backend
     Wait-ForBackend
-    Assert-EmptyDatabase "First startup"
+    Assert-MigrationState "First startup"
     Stop-Backend
 
     Start-Backend
     Wait-ForBackend
-    Assert-EmptyDatabase "Repeat startup"
+    Assert-MigrationState "Repeat startup"
     Stop-Backend
 
     Write-Output "S03 D-04 checks completed successfully for this isolated run; independent acceptance and the S03 Gate remain pending."
@@ -429,6 +453,9 @@ finally {
         }
     }
     Remove-Item -LiteralPath $backendLog, $backendErrorLog -Force -ErrorAction SilentlyContinue
+    if ($script:launchScript) {
+        Remove-Item -LiteralPath $script:launchScript -Force -ErrorAction SilentlyContinue
+    }
 }
 
 if ($exitCode -ne 0) {
