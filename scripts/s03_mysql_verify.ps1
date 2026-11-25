@@ -67,6 +67,46 @@ function New-TemporaryJwtSecret {
     return "$([Guid]::NewGuid().ToString('N'))$([Guid]::NewGuid().ToString('N'))"
 }
 
+function Resolve-PublishedPort {
+    # 以 compose 实际发布的端口为准，避免脚本假设的端口与 compose 解析结果不一致。
+    $output = (& docker @($script:composeArguments + @("port", "mysql", "3306")) | Out-String)
+    foreach ($line in ($output -split "`n")) {
+        $trimmed = $line.Trim()
+        if ($trimmed -match ':(\d+)$') {
+            return [int]$Matches[1]
+        }
+    }
+    return $null
+}
+
+function Resolve-ContainerAddress {
+    $output = (& docker inspect --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $script:containerId | Out-String).Trim()
+    if ($output) { return $output }
+    return $null
+}
+
+function Test-TcpPort {
+    param(
+        [Parameter(Mandatory = $true)][string]$TargetHost,
+        [Parameter(Mandatory = $true)][int]$TargetPort
+    )
+
+    $client = [Net.Sockets.TcpClient]::new()
+    try {
+        $task = $client.ConnectAsync($TargetHost, $TargetPort)
+        if (-not $task.Wait(3000)) {
+            return $false
+        }
+        return $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 function Invoke-MySqlQuery {
     param([Parameter(Mandatory = $true)][string]$Sql)
 
@@ -232,6 +272,7 @@ try {
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
         throw "Could not resolve the MySQL container"
     }
+    $script:containerId = $containerId
     $deadline = (Get-Date).AddSeconds(120)
     do {
         $healthStatus = (& docker inspect --format "{{.State.Health.Status}}" $containerId).Trim()
@@ -240,6 +281,30 @@ try {
         Start-Sleep -Seconds 2
     } while ((Get-Date) -lt $deadline)
     Assert-Equal $healthStatus "healthy" "MySQL container did not become healthy"
+
+    # 以 compose 实际发布的端口为准；宿主端口不可达时回退到容器 IP 直连。
+    $publishedPort = Resolve-PublishedPort
+    if ($publishedPort) {
+        Write-Output "Published MySQL port: $publishedPort"
+        $MySqlPort = $publishedPort
+    }
+    $mysqlHost = "127.0.0.1"
+    $mysqlPortForApp = $MySqlPort
+    if (-not (Test-TcpPort -TargetHost $mysqlHost -TargetPort $mysqlPortForApp)) {
+        $containerAddress = Resolve-ContainerAddress
+        Write-Output "Host port $mysqlHost`:$mysqlPortForApp unreachable, container address: $containerAddress"
+        if ($containerAddress -and (Test-TcpPort -TargetHost $containerAddress -TargetPort 3306)) {
+            $mysqlHost = $containerAddress
+            $mysqlPortForApp = 3306
+        }
+        else {
+            throw "MySQL is not reachable from the host on port $MySqlPort nor via container address $containerAddress"
+        }
+    }
+    $env:MYSQL_HOST = $mysqlHost
+    $env:MYSQL_PORT = "$mysqlPortForApp"
+    $env:DB_URL = "jdbc:mysql://${mysqlHost}:${mysqlPortForApp}/$databaseName"
+    Write-Output "Backend will connect to ${mysqlHost}:${mysqlPortForApp}"
 
     $initialTableCount = [int](Invoke-MySqlQuery "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();" | Select-Object -First 1)
     Assert-Equal $initialTableCount 0 "Initial database is not empty"
@@ -262,6 +327,20 @@ try {
 catch {
     $exitCode = 1
     Write-Error $_
+    # 失败诊断：把容器发布端口与状态一并输出，便于定位环境差异。
+    if ($composeStarted) {
+        try {
+            Write-Output "---- diagnostics: docker compose ps ----"
+            & docker @($script:composeArguments + @("ps"))
+            Write-Output "---- diagnostics: docker port mysql 3306 ----"
+            & docker @($script:composeArguments + @("port", "mysql", "3306"))
+            Write-Output "---- diagnostics: container address ----"
+            & docker inspect --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $script:containerId
+        }
+        catch {
+            Write-Output "diagnostics failed: $($_.Exception.Message)"
+        }
+    }
 }
 finally {
     Stop-Backend
