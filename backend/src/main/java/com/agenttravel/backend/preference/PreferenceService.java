@@ -271,66 +271,119 @@ public class PreferenceService {
             if (!cities.isEmpty()) {
                 List<String> names = cities.stream().map(PreferenceRepository.CityCount::city).toList();
                 result.add(item("city", names, cities.get(0).count(), now));
+                Map<String, List<PreferenceRepository.CityRef>> refs = new java.util.LinkedHashMap<>();
+                for (PreferenceRepository.CityRef ref : repository.cityRefs(user, names)) {
+                    refs.computeIfAbsent(ref.city(), key -> new ArrayList<>()).add(ref);
+                }
                 for (PreferenceRepository.CityCount city : cities) {
-                    repository.upsertPreference(user, "city." + city.city(),
-                            "{\"count\":" + city.count() + "}", "HISTORY_ANALYSIS",
-                            properties.confidenceOf("city"), weightOf(city.count()), now);
+                    List<Hit> hits = refs.getOrDefault(city.city(), List.of()).stream()
+                            .map(ref -> new Hit(ref.tripId(), ref.observedAt(), 1))
+                            .toList();
+                    writePreference(user, "city." + city.city(),
+                            "{\"count\":" + city.count() + "}", properties.confidenceOf("city"),
+                            city.count(), hits, now);
                 }
             }
         }
 
-        Map<String, Map<String, Integer>> counters = new java.util.LinkedHashMap<>();
+        Map<String, Map<String, List<Hit>>> hits = new java.util.LinkedHashMap<>();
         for (String key : dimensions) {
             if (!"city".equals(key)) {
-                counters.put(key, new java.util.LinkedHashMap<>());
+                hits.put(key, new java.util.LinkedHashMap<>());
             }
         }
         List<PreferenceRepository.PlanFact> facts = repository.findLatestPlanFacts(user);
         for (PreferenceRepository.PlanFact fact : facts) {
             JsonNode plan = parsePlanLenient(fact.planJson());
-            if (counters.containsKey("theme")) {
+            if (hits.containsKey("theme")) {
+                Map<String, Integer> occurrences = new java.util.LinkedHashMap<>();
                 for (String theme : extractStrings(plan.at("/trip/preferences"))) {
-                    bump(counters.get("theme"), theme);
+                    occurrences.merge(theme, 1, Integer::sum);
                 }
+                occurrences.forEach((theme, times) -> addHit(hits.get("theme"), theme,
+                        new Hit(fact.snapshotId(), fact.observedAt(), times)));
             }
-            if (counters.containsKey("pace")) {
+            if (hits.containsKey("pace")) {
                 String pace = extractPace(plan);
                 if (pace != null) {
-                    bump(counters.get("pace"), pace);
+                    addHit(hits.get("pace"), pace, new Hit(fact.snapshotId(), fact.observedAt(), 1));
                 }
             }
-            if (counters.containsKey("budget")) {
+            if (hits.containsKey("budget")) {
                 String budget = extractBudgetTier(plan);
                 if (budget != null) {
-                    bump(counters.get("budget"), budget);
+                    addHit(hits.get("budget"), budget, new Hit(fact.snapshotId(), fact.observedAt(), 1));
                 }
             }
-            if (counters.containsKey("season")) {
+            if (hits.containsKey("season")) {
                 String season = extractSeason(fact.startDate());
                 if (season != null) {
-                    bump(counters.get("season"), season);
+                    addHit(hits.get("season"), season, new Hit(fact.snapshotId(), fact.observedAt(), 1));
                 }
             }
         }
-        for (Map.Entry<String, Map<String, Integer>> entry : counters.entrySet()) {
-            Map<String, Integer> counts = entry.getValue();
-            if (counts.isEmpty()) {
+        for (Map.Entry<String, Map<String, List<Hit>>> entry : hits.entrySet()) {
+            Map<String, List<Hit>> values = entry.getValue();
+            if (values.isEmpty()) {
                 continue;
             }
+            Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+            values.forEach((value, list) -> counts.put(value, list.stream().mapToInt(Hit::occurrences).sum()));
             String top = counts.entrySet().stream()
                     .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElseThrow();
             result.add(item(entry.getKey(), counts, counts.get(top), now));
-            counts.forEach((value, count) -> repository.upsertPreference(user,
-                    entry.getKey() + "." + value, "{\"count\":" + count + "}", "HISTORY_ANALYSIS",
-                    properties.confidenceOf(entry.getKey()), weightOf(count), now));
+            values.forEach((value, list) -> writePreference(user, entry.getKey() + "." + value,
+                    "{\"count\":" + counts.get(value) + "}", properties.confidenceOf(entry.getKey()),
+                    counts.get(value), list, now));
         }
 
+        List<PreferenceRepository.TripRef> tripRefs = repository.statusRefs(user);
         for (PreferenceRepository.StatusCount item : repository.statusCounts(user)) {
-            repository.upsertPreference(user, "status." + item.status(),
-                    "{\"count\":" + item.count() + "}", "HISTORY_ANALYSIS",
-                    properties.getDefaultConfidence(), weightOf(item.count()), now);
+            List<Hit> list = tripRefs.stream()
+                    .filter(ref -> item.status().equals(ref.status()))
+                    .map(ref -> new Hit(ref.tripId(), ref.observedAt(), 1))
+                    .toList();
+            writePreference(user, "status." + item.status(),
+                    "{\"count\":" + item.count() + "}", properties.getDefaultConfidence(),
+                    item.count(), list, now);
         }
         return result;
+    }
+
+    private static void addHit(Map<String, List<Hit>> values, String value, Hit hit) {
+        values.computeIfAbsent(value, key -> new ArrayList<>()).add(hit);
+    }
+
+    /** 一次偏好命中：来源标识、观测时间与命中次数。 */
+    private record Hit(UUID sourceRefId, Instant observedAt, int occurrences) {
+    }
+
+    /**
+     * 写入偏好版本与其证据流水。偏好只追加不原地改写，证据以 {@code (preference_id, evidence_hash)}
+     * 唯一保证重复提取幂等。
+     */
+    private void writePreference(UUID user, String key, String valueJson, double confidence,
+            int count, List<Hit> hits, Instant now) {
+        String preferenceId = repository.upsertPreference(user, key, valueJson, "HISTORY_ANALYSIS",
+                confidence, weightOf(count), now);
+        int increment = properties.getWeightIncrement();
+        for (Hit hit : hits) {
+            repository.insertEvidence(UUID.fromString(preferenceId), "HISTORY_ANALYSIS", hit.sourceRefId(),
+                    evidenceHash(user, key, valueJson, hit.sourceRefId()), hit.observedAt(),
+                    increment * hit.occurrences(),
+                    writeJson(java.util.Map.of("occurrences", hit.occurrences(),
+                            "sourceRefId", hit.sourceRefId().toString())), now);
+        }
+    }
+
+    private byte[] evidenceHash(UUID user, String key, String valueJson, UUID sourceRefId) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String material = user + "|" + key + "|" + valueJson + "|" + sourceRefId;
+            return digest.digest(material.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     private PreferenceModels.PreferenceItem item(String key, Object value, int hitCount, Instant now) {
@@ -342,11 +395,6 @@ public class PreferenceService {
     private int weightOf(int hitCount) {
         long weight = (long) hitCount * properties.getWeightIncrement();
         return (int) Math.min(weight, properties.getWeightCap());
-    }
-
-    /** 命中计数：同一取值每出现一次只加 1（merge 的重映射函数只做累加，不再叠加旧值）。 */
-    private static void bump(Map<String, Integer> counts, String value) {
-        counts.merge(value, 1, Integer::sum);
     }
 
     private JsonNode parsePlanLenient(String planJson) {
@@ -453,7 +501,8 @@ public class PreferenceService {
     public List<PreferenceModels.PreferenceItem> recalledPreferences(UUID user, Integer requestedTopK) {
         int limit = resolveLimit(requestedTopK);
         Instant now = clock.instant();
-        return repository.findActivePreferences(user).stream()
+        return repository.findActivePreferences(user, properties.getDecayHalfLifeDays(),
+                properties.isDecayEnabled()).stream()
                 .filter(row -> row.confidence() == null || row.confidence() >= properties.getMinConfidence())
                 .map(row -> toRecalledItem(row, now))
                 .sorted(Comparator.comparingInt(PreferenceModels.PreferenceItem::weight).reversed()
@@ -474,12 +523,24 @@ public class PreferenceService {
 
     private PreferenceModels.PreferenceItem toRecalledItem(PreferenceRepository.PreferenceItemRow row, Instant now) {
         return new PreferenceModels.PreferenceItem(row.key(), row.valueJson(),
-                row.sourceType(), row.confidence(), effectiveWeight(row.weight(), row.lastUsedAt(), now),
+                row.sourceType(), row.confidence(), effectiveWeight(row, now),
                 row.lastUsedAt(), reasonOf(row.key()));
     }
 
-    /** 遗忘折算：有效权重 = 原始权重 × 0.5^(距上次使用天数 / 半衰期)，并以保底权重截断。 */
-    private int effectiveWeight(int rawWeight, Instant lastUsedAt, Instant now) {
+    /**
+     * 有效权重：有证据流水时按证据的观测时间逐条折算（可由证据重放复现）；
+     * 没有证据行的历史数据回落到存储权重按 {@code last_used_at} 折算。
+     */
+    private int effectiveWeight(PreferenceRepository.PreferenceItemRow row, Instant now) {
+        double weight = row.evidenceWeight() > 0
+                ? row.evidenceWeight()
+                : decayedWeight(row.weight(), row.lastUsedAt(), now);
+        int capped = (int) Math.min(Math.round(weight), properties.getWeightCap());
+        return Math.max(properties.getDecayFloor(), capped);
+    }
+
+    /** 遗忘折算：权重 × 0.5^(距上次观测天数 / 半衰期)。 */
+    private double decayedWeight(int rawWeight, Instant lastUsedAt, Instant now) {
         if (rawWeight <= 0) {
             return 0;
         }
@@ -488,8 +549,7 @@ public class PreferenceService {
         }
         double ageDays = Math.max(0d, Duration.between(lastUsedAt, now).toMillis() / 86_400_000d);
         double halfLife = properties.getDecayHalfLifeDays();
-        double decayed = rawWeight * Math.pow(0.5, ageDays / halfLife);
-        return Math.max(properties.getDecayFloor(), (int) Math.round(decayed));
+        return rawWeight * Math.pow(0.5, ageDays / halfLife);
     }
 
     private static String reasonOf(String key) {

@@ -39,7 +39,13 @@ class PreferenceParameterTests {
 
     private void seedPreference(String key, double confidence, int weight, Instant lastUsedAt) {
         repository.activePreferences.add(new PreferenceRepository.PreferenceItemRow(key,
-                "{\"value\":1}", "HISTORY_ANALYSIS", confidence, weight, lastUsedAt));
+                "{\"value\":1}", "HISTORY_ANALYSIS", confidence, weight, lastUsedAt, 0d));
+    }
+
+    private void seedPreferenceWithEvidence(String key, double confidence, int weight, Instant lastUsedAt,
+            double evidenceWeight) {
+        repository.activePreferences.add(new PreferenceRepository.PreferenceItemRow(key,
+                "{\"value\":1}", "HISTORY_ANALYSIS", confidence, weight, lastUsedAt, evidenceWeight));
     }
 
     @Test
@@ -134,7 +140,8 @@ class PreferenceParameterTests {
         repository.planFacts.add(new PreferenceRepository.PlanFact("""
                 {"trip":{"preferences":["亲子","亲子","美食"],"day_count":2,"budget":{"amount_minor":200000}},
                  "summary":{"point_count":3}}
-                """, LocalDate.of(2026, 5, 1)));
+                """, LocalDate.of(2026, 5, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-05-01T00:00:00Z")));
 
         PreferenceModels.PreferenceItem theme = service(properties()).summary(user).dimensions().stream()
                 .filter(item -> "theme".equals(item.key())).findFirst().orElseThrow();
@@ -160,7 +167,8 @@ class PreferenceParameterTests {
         repository.planFacts.add(new PreferenceRepository.PlanFact("""
                 {"trip":{"preferences":["亲子","亲子","美食"],"day_count":2,"budget":{"amount_minor":200000}},
                  "summary":{"point_count":3}}
-                """, LocalDate.of(2026, 5, 1)));
+                """, LocalDate.of(2026, 5, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-05-01T00:00:00Z")));
 
         PreferenceModels.PreferenceItem theme = service(properties()).summary(user).dimensions().stream()
                 .filter(item -> "theme".equals(item.key())).findFirst().orElseThrow();
@@ -174,7 +182,8 @@ class PreferenceParameterTests {
         repository.planFacts.add(new PreferenceRepository.PlanFact("""
                 {"trip":{"preferences":["亲子"],"day_count":2,"budget":{"amount_minor":200000}},
                  "summary":{"point_count":3}}
-                """, LocalDate.of(2026, 5, 1)));
+                """, LocalDate.of(2026, 5, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-05-01T00:00:00Z")));
         repository.cityCounts.add(new PreferenceRepository.CityCount("青岛", 3));
 
         assertThat(service(properties()).summary(user).dimensions())
@@ -212,7 +221,8 @@ class PreferenceParameterTests {
         repository.planFacts.add(new PreferenceRepository.PlanFact("""
                 {"trip":{"preferences":[],"day_count":1,"budget":{"amount_minor":90000}},
                  "summary":{"point_count":2}}
-                """, LocalDate.of(2026, 5, 1)));
+                """, LocalDate.of(2026, 5, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-05-01T00:00:00Z")));
 
         assertThat(service(properties()).summary(user).dimensions())
                 .extracting(PreferenceModels.PreferenceItem::key)
@@ -229,11 +239,43 @@ class PreferenceParameterTests {
     @Test
     void recalledItemKeepsStoredSourceType() {
         repository.activePreferences.add(new PreferenceRepository.PreferenceItemRow("pace.轻松",
-                "{\"level\":\"relaxed\"}", "EXPLICIT", 0.95, 12, NOW));
+                "{\"level\":\"relaxed\"}", "EXPLICIT", 0.95, 12, NOW, 0d));
 
         PreferenceModels.PreferenceItem item = service(properties()).recalledPreferences(user, null).get(0);
         assertThat(item.sourceType()).isEqualTo("EXPLICIT");
         assertThat(item.reason()).contains("节奏");
+    }
+
+    @Test
+    void extractionWritesEvidenceLedgerWithConfiguredIncrement() {
+        repository.historyCount = 3;
+        repository.planFacts.add(new PreferenceRepository.PlanFact("""
+                {"trip":{"preferences":["亲子","亲子","美食"],"day_count":2,"budget":{"amount_minor":200000}},
+                 "summary":{"point_count":3}}
+                """, LocalDate.of(2026, 5, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-05-01T00:00:00Z")));
+
+        service(properties()).summary(user);
+
+        assertThat(repository.upsertedKeys).contains("theme.亲子", "theme.美食");
+        assertThat(repository.evidenceDeltas).contains(6, 3);
+
+        PreferenceProperties bigger = properties();
+        bigger.setWeightIncrement(5);
+        repository.evidenceDeltas.clear();
+        service(bigger).summary(user);
+        assertThat(repository.evidenceDeltas).contains(10, 5);
+    }
+
+    @Test
+    void effectiveWeightPrefersEvidenceLedgerAndRespectsCap() {
+        seedPreferenceWithEvidence("theme.亲子", 0.9, 30, NOW, 12.6);
+
+        assertThat(service(properties()).recalledPreferences(user, null).get(0).weight()).isEqualTo(13);
+
+        PreferenceProperties capped = properties();
+        capped.setWeightCap(10);
+        assertThat(service(capped).recalledPreferences(user, null).get(0).weight()).isEqualTo(10);
     }
 
     @Test
@@ -284,6 +326,8 @@ class PreferenceParameterTests {
         List<PreferenceRepository.CityCount> cityCounts = new ArrayList<>();
         List<PreferenceRepository.PlanFact> planFacts = new ArrayList<>();
         List<PreferenceRepository.PreferenceItemRow> activePreferences = new ArrayList<>();
+        List<String> upsertedKeys = new ArrayList<>();
+        List<Integer> evidenceDeltas = new ArrayList<>();
 
         FakePreferenceRepository() {
             super(null);
@@ -320,12 +364,32 @@ class PreferenceParameterTests {
         }
 
         @Override
-        void upsertPreference(UUID user, String key, String valueJson, String sourceType,
+        String upsertPreference(UUID user, String key, String valueJson, String sourceType,
                 double confidence, int weight, Instant now) {
+            String id = UUID.randomUUID().toString();
+            upsertedKeys.add(key);
+            return id;
         }
 
         @Override
-        List<PreferenceRepository.PreferenceItemRow> findActivePreferences(UUID user) {
+        void insertEvidence(UUID preferenceId, String sourceType, UUID sourceRefId, byte[] evidenceHash,
+                Instant observedAt, int weightDelta, String evidenceJson, Instant now) {
+            evidenceDeltas.add(weightDelta);
+        }
+
+        @Override
+        List<PreferenceRepository.CityRef> cityRefs(UUID user, List<String> cities) {
+            return List.of();
+        }
+
+        @Override
+        List<PreferenceRepository.TripRef> statusRefs(UUID user) {
+            return List.of();
+        }
+
+        @Override
+        List<PreferenceRepository.PreferenceItemRow> findActivePreferences(UUID user, int halfLifeDays,
+                boolean decayEnabled) {
             return activePreferences;
         }
     }

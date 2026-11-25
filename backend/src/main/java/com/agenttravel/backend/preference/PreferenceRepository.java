@@ -121,17 +121,19 @@ public class PreferenceRepository {
         return count == null ? 0 : count;
     }
 
-    record PlanFact(String planJson, LocalDate startDate) {
+    record PlanFact(String planJson, LocalDate startDate, UUID snapshotId, UUID tripId, Instant observedAt) {
     }
 
     List<PlanFact> findLatestPlanFacts(UUID user) {
         return jdbc.query("""
-                SELECT s.plan_json, t.start_date
+                SELECT s.plan_json, t.start_date, BIN_TO_UUID(s.id), BIN_TO_UUID(t.id), s.created_at
                 FROM trip t JOIN trip_version v ON v.id = t.current_version_id
                 JOIN plan_snapshot s ON s.trip_version_id = v.id
                 WHERE t.owner_id = UUID_TO_BIN(?) AND t.deleted_at IS NULL
                   AND t.status IN ('ACTIVE','ARCHIVED') AND s.plan_json IS NOT NULL
-                """, (rs, index) -> new PlanFact(rs.getString(1), rs.getDate(2).toLocalDate()),
+                """, (rs, index) -> new PlanFact(rs.getString(1), rs.getDate(2).toLocalDate(),
+                        UUID.fromString(rs.getString(3)), UUID.fromString(rs.getString(4)),
+                        rs.getTimestamp(5).toInstant()),
                 user.toString());
     }
 
@@ -150,6 +152,29 @@ public class PreferenceRepository {
                 """, (rs, index) -> new CityCount(rs.getString(1), rs.getInt(2)), user.toString(), topK);
     }
 
+    /** 城市维度的证据来源行程（用于写 preference_evidence）。 */
+    record CityRef(String city, UUID tripId, Instant observedAt) {
+    }
+
+    List<CityRef> cityRefs(UUID user, List<String> cities) {
+        if (cities == null || cities.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(cities.size(), "?"));
+        List<Object> args = new java.util.ArrayList<>();
+        args.add(user.toString());
+        args.addAll(cities);
+        return jdbc.query("""
+                SELECT c.name, BIN_TO_UUID(t.id), t.created_at
+                FROM trip t
+                JOIN trip_city tc ON tc.trip_id = t.id
+                JOIN city c ON c.id = tc.city_id
+                WHERE t.owner_id = UUID_TO_BIN(?) AND t.deleted_at IS NULL
+                  AND t.status IN ('ACTIVE','ARCHIVED') AND c.name IN (%s)
+                """.formatted(placeholders), (rs, index) -> new CityRef(rs.getString(1),
+                UUID.fromString(rs.getString(2)), rs.getTimestamp(3).toInstant()), args.toArray());
+    }
+
     record StatusCount(String status, int count) {
     }
 
@@ -160,6 +185,19 @@ public class PreferenceRepository {
                   AND status IN ('ACTIVE','ARCHIVED')
                 GROUP BY status
                 """, (rs, index) -> new StatusCount(rs.getString(1), rs.getInt(2)), user.toString());
+    }
+
+    /** 状态维度的证据来源行程（用于写 preference_evidence）。 */
+    record TripRef(String status, UUID tripId, Instant observedAt) {
+    }
+
+    List<TripRef> statusRefs(UUID user) {
+        return jdbc.query("""
+                SELECT status, BIN_TO_UUID(id), created_at FROM trip
+                WHERE owner_id = UUID_TO_BIN(?) AND deleted_at IS NULL
+                  AND status IN ('ACTIVE','ARCHIVED')
+                """, (rs, index) -> new TripRef(rs.getString(1), UUID.fromString(rs.getString(2)),
+                rs.getTimestamp(3).toInstant()), user.toString());
     }
 
     record DateRange(java.time.LocalDate earliest, java.time.LocalDate latest) {
@@ -278,40 +316,86 @@ public class PreferenceRepository {
     }
 
     /**
-     * 读取用户全部生效中的偏好。召回排序、置信度过滤与遗忘折算都在服务层完成，
-     * 便于参数集中配置与审计（app.preferences.*）。
+     * 读取用户当前生效的偏好（每个偏好键只取最新版本），并按证据流水的观测时间折算出有效权重。
+     *
+     * <p>有效权重 = Σ(weight_delta × 0.5^(距观测天数 / 半衰期))；没有证据行的历史数据回落到
+     * 存储权重，由服务层按 {@code last_used_at} 折算。有效权重可直接由证据重放复现。
      */
-    List<PreferenceItemRow> findActivePreferences(UUID user) {
+    List<PreferenceItemRow> findActivePreferences(UUID user, int halfLifeDays, boolean decayEnabled) {
+        String delta = decayEnabled
+                ? "e.weight_delta * POW(0.5, GREATEST(0, TIMESTAMPDIFF(SECOND, e.observed_at, "
+                        + "UTC_TIMESTAMP(6))) / 86400.0 / ?)"
+                : "e.weight_delta";
+        List<Object> args = new java.util.ArrayList<>();
+        if (decayEnabled) {
+            args.add(halfLifeDays);
+        }
+        args.add(user.toString());
+        args.add(user.toString());
         return jdbc.query("""
-                SELECT preference_key, value_json, source_type, confidence, weight, last_used_at
-                FROM user_preference
-                WHERE user_id = UUID_TO_BIN(?) AND status = 'ACTIVE'
-                ORDER BY weight DESC, last_used_at DESC, preference_key ASC
-                """, (rs, index) -> new PreferenceItemRow(rs.getString(1), rs.getString(2),
-                        rs.getString(3),
-                        rs.getBigDecimal(4) == null ? null : rs.getBigDecimal(4).doubleValue(),
-                        rs.getInt(5), rs.getTimestamp(6) == null ? null : rs.getTimestamp(6).toInstant()),
-                user.toString());
+                SELECT p.preference_key, p.value_json, p.source_type, p.confidence, p.weight, p.last_used_at,
+                       COALESCE(SUM(%s), 0) AS evidence_weight
+                FROM user_preference p
+                LEFT JOIN preference_evidence e ON e.preference_id = p.id
+                JOIN (SELECT preference_key, MAX(version_no) AS version_no
+                        FROM user_preference
+                        WHERE user_id = UUID_TO_BIN(?) AND status = 'ACTIVE'
+                        GROUP BY preference_key) latest
+                  ON latest.preference_key = p.preference_key AND latest.version_no = p.version_no
+                WHERE p.user_id = UUID_TO_BIN(?) AND p.status = 'ACTIVE'
+                GROUP BY p.id, p.preference_key, p.value_json, p.source_type, p.confidence,
+                         p.weight, p.last_used_at
+                ORDER BY p.weight DESC, p.last_used_at DESC, p.preference_key ASC
+                """.formatted(delta), (rs, index) -> new PreferenceItemRow(rs.getString(1), rs.getString(2),
+                rs.getString(3),
+                rs.getBigDecimal(4) == null ? null : rs.getBigDecimal(4).doubleValue(),
+                rs.getInt(5), rs.getTimestamp(6) == null ? null : rs.getTimestamp(6).toInstant(),
+                rs.getBigDecimal(7) == null ? 0d : rs.getBigDecimal(7).doubleValue()),
+                args.toArray());
     }
 
     record PreferenceItemRow(String key, String valueJson, String sourceType, Double confidence,
-            int weight, Instant lastUsedAt) {
+            int weight, Instant lastUsedAt, double evidenceWeight) {
     }
 
-    void upsertPreference(UUID user, String key, String valueJson, String sourceType,
+    /**
+     * 追加一条偏好版本，返回新版本 ID。历史版本保留不删，召回时只取每个键的最新版本。
+     */
+    String upsertPreference(UUID user, String key, String valueJson, String sourceType,
             double confidence, int weight, Instant now) {
         Integer current = jdbc.queryForObject("""
                 SELECT COALESCE(MAX(version_no), 0) FROM user_preference
                 WHERE user_id = UUID_TO_BIN(?) AND preference_key = ?
                 """, Integer.class, user.toString(), key);
         int next = current == null ? 1 : current + 1;
+        String id = UUID.randomUUID().toString();
         jdbc.update("""
                 INSERT INTO user_preference
                   (id, user_id, preference_key, version_no, value_json, source_type,
                    confidence, weight, last_used_at, status)
                 VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
-                """, UUID.randomUUID().toString(), user.toString(), key, next, valueJson, sourceType,
+                """, id, user.toString(), key, next, valueJson, sourceType,
                 confidence, weight, Timestamp.from(now));
+        return id;
+    }
+
+    /**
+     * 追加一条偏好证据。{@code (preference_id, evidence_hash)} 唯一，重复证据按幂等忽略。
+     */
+    void insertEvidence(UUID preferenceId, String sourceType, UUID sourceRefId, byte[] evidenceHash,
+            Instant observedAt, int weightDelta, String evidenceJson, Instant now) {
+        try {
+            jdbc.update("""
+                    INSERT INTO preference_evidence
+                      (id, preference_id, source_type, source_ref_id, evidence_hash, observed_at,
+                       weight_delta, evidence_json, created_at)
+                    VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, UUID_TO_BIN(?), ?, ?, ?, CAST(? AS JSON), ?)
+                    """, UUID.randomUUID().toString(), preferenceId.toString(), sourceType,
+                    sourceRefId.toString(), evidenceHash, Timestamp.from(observedAt), weightDelta,
+                    evidenceJson, Timestamp.from(now));
+        } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+            // 同一偏好版本内重复证据：幂等忽略
+        }
     }
 
     void clearPreferences(UUID user, Instant now) {

@@ -59,11 +59,13 @@ class PreferenceServiceTests {
         repository.planFacts.add(new PreferenceRepository.PlanFact("""
                 {"trip":{"preferences":["亲子","美食"],"day_count":2,"budget":{"amount_minor":200000}},
                  "summary":{"point_count":3}}
-                """, LocalDate.of(2026, 5, 1)));
+                """, LocalDate.of(2026, 5, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-05-01T00:00:00Z")));
         repository.planFacts.add(new PreferenceRepository.PlanFact("""
                 {"trip":{"preferences":["亲子","徒步"],"day_count":3,"budget":{"amount_minor":800000}},
                  "summary":{"point_count":15}}
-                """, LocalDate.of(2026, 8, 1)));
+                """, LocalDate.of(2026, 8, 1), UUID.randomUUID(), UUID.randomUUID(),
+                Instant.parse("2026-08-01T00:00:00Z")));
 
         PreferenceModels.PreferenceSummary result = service.summary(user);
 
@@ -268,8 +270,24 @@ class PreferenceServiceTests {
         }
 
         @Override
-        void upsertPreference(UUID user, String key, String valueJson, String sourceType,
+        String upsertPreference(UUID user, String key, String valueJson, String sourceType,
                 double confidence, int weight, Instant now) {
+            return UUID.randomUUID().toString();
+        }
+
+        @Override
+        void insertEvidence(UUID preferenceId, String sourceType, UUID sourceRefId, byte[] evidenceHash,
+                Instant observedAt, int weightDelta, String evidenceJson, Instant now) {
+        }
+
+        @Override
+        List<PreferenceRepository.CityRef> cityRefs(UUID user, List<String> cities) {
+            return List.of();
+        }
+
+        @Override
+        List<PreferenceRepository.TripRef> statusRefs(UUID user) {
+            return List.of();
         }
 
         @Override

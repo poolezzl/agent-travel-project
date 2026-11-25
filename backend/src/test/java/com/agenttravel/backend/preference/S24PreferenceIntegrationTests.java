@@ -1,6 +1,9 @@
 package com.agenttravel.backend.preference;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -11,18 +14,23 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import com.agenttravel.backend.auth.JwtTokenService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * S24 偏好召回的真实 MySQL 集成验证。
+ * S24 偏好召回与偏好提取的真实 MySQL 集成验证。
  *
- * <p>仅在 {@code S24_IT=true} 且配置一次性数据库时运行；写入合成账号与偏好行，验证召回接口的
- * TOP-K 截断、低置信度过滤、遗忘折算、来源透传、归属隔离与清空态过滤，结束后清理自身数据。
+ * <p>仅在 {@code S24_IT=true} 且配置一次性数据库时运行；写入合成账号、行程、快照与偏好行，验证
+ * TOP-K 截断、低置信度过滤、遗忘折算排序、来源类型透传、归属隔离、清空态过滤、证据流水落库、
+ * 重复提取幂等与「同一偏好键只取最新版本」，结束后清理自身数据。
  */
 @EnabledIfEnvironmentVariable(named = "S24_IT", matches = "true")
 @SpringBootTest(properties = {
@@ -36,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class S24PreferenceIntegrationTests {
 
     private static final String PREFIX = "/api/v1/preferences/recall";
+    private static final String SUMMARY = "/api/v1/preferences/summary";
 
     @Autowired MockMvc http;
     @Autowired JdbcTemplate jdbc;
@@ -45,12 +54,40 @@ class S24PreferenceIntegrationTests {
 
     @AfterEach
     void cleanUp() {
-        if (userId != null) {
-            jdbc.update("DELETE FROM user_preference WHERE user_id = UUID_TO_BIN(?)", userId.toString());
-            jdbc.update("DELETE FROM user_session WHERE user_id = UUID_TO_BIN(?)", userId.toString());
-            jdbc.update("DELETE FROM user_account WHERE id = UUID_TO_BIN(?)", userId.toString());
-            userId = null;
+        if (userId == null) {
+            return;
         }
+        List<String> tripIds = jdbc.queryForList(
+                "SELECT BIN_TO_UUID(id) FROM trip WHERE owner_id = UUID_TO_BIN(?)",
+                String.class, userId.toString());
+        jdbc.update("DELETE FROM preference_evidence WHERE preference_id IN "
+                + "(SELECT id FROM user_preference WHERE user_id = UUID_TO_BIN(?))", userId.toString());
+        jdbc.update("DELETE FROM user_preference WHERE user_id = UUID_TO_BIN(?)", userId.toString());
+        jdbc.update("DELETE FROM preference_summary WHERE user_id = UUID_TO_BIN(?)", userId.toString());
+        jdbc.update("UPDATE trip SET current_version_id = NULL WHERE owner_id = UUID_TO_BIN(?)",
+                userId.toString());
+        if (!tripIds.isEmpty()) {
+            List<Object> args = new java.util.ArrayList<>();
+            StringBuilder ids = new StringBuilder();
+            for (String tripId : tripIds) {
+                if (ids.length() > 0) {
+                    ids.append(",");
+                }
+                ids.append("UUID_TO_BIN(?)");
+                args.add(tripId);
+            }
+            jdbc.update("DELETE FROM plan_snapshot WHERE trip_version_id IN "
+                    + "(SELECT id FROM trip_version WHERE trip_id IN (" + ids + "))", args.toArray());
+            jdbc.update("DELETE FROM trip_city WHERE trip_id IN (" + ids + ")", args.toArray());
+            jdbc.update("DELETE FROM trip_version WHERE trip_id IN (" + ids + ")", args.toArray());
+        }
+        jdbc.update("DELETE FROM trip WHERE owner_id = UUID_TO_BIN(?)", userId.toString());
+        jdbc.update("DELETE FROM trip_city WHERE city_id IN "
+                + "(SELECT id FROM city WHERE city_code LIKE 'alg12-%')");
+        jdbc.update("DELETE FROM city WHERE city_code LIKE 'alg12-%'");
+        jdbc.update("DELETE FROM user_session WHERE user_id = UUID_TO_BIN(?)", userId.toString());
+        jdbc.update("DELETE FROM user_account WHERE id = UUID_TO_BIN(?)", userId.toString());
+        userId = null;
     }
 
     @Test
@@ -128,6 +165,80 @@ class S24PreferenceIntegrationTests {
     }
 
     @Test
+    void recallReturnsOnlyLatestVersionOfEachKey() throws Exception {
+        String bearer = account("USER");
+        seedVersion("theme.meishi", 1, 20);
+        seedVersion("theme.meishi", 2, 33);
+
+        http.perform(get(PREFIX).header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].key").value("theme.meishi"))
+                .andExpect(jsonPath("$[0].weight").value(33));
+    }
+
+    @Test
+    void summaryWritesEvidenceLedgerAndRecallUsesEvidenceWeight() throws Exception {
+        String bearer = account("USER");
+        for (int index = 0; index < 3; index++) {
+            seedTripWithPlan("主题行程 " + index,
+                    "{\"trip\":{\"preferences\":[\"亲子\"],\"day_count\":2,\"budget\":{\"amount_minor\":200000}},"
+                            + "\"summary\":{\"point_count\":3}}", "测试市");
+        }
+
+        http.perform(get(SUMMARY).header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eligible").value(true))
+                .andExpect(jsonPath("$.dimensions[?(@.key=='theme')].weight").value(9));
+
+        Integer evidenceRows = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM preference_evidence e
+                JOIN user_preference p ON p.id = e.preference_id
+                WHERE p.user_id = UUID_TO_BIN(?) AND p.preference_key = 'theme.亲子'
+                """, Integer.class, userId.toString());
+        Integer evidenceDelta = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(e.weight_delta), 0) FROM preference_evidence e
+                JOIN user_preference p ON p.id = e.preference_id
+                WHERE p.user_id = UUID_TO_BIN(?) AND p.preference_key = 'theme.亲子'
+                """, Integer.class, userId.toString());
+        assertThat(evidenceRows).isEqualTo(3);
+        assertThat(evidenceDelta).isEqualTo(9);
+
+        List<JsonNode> recalled = recall(bearer, 20);
+        assertThat(recalled).anySatisfy(item -> {
+            assertThat(item.get("key").asText()).isEqualTo("theme.亲子");
+            assertThat(item.get("weight").asInt()).isEqualTo(9);
+        });
+    }
+
+    @Test
+    void repeatedSummaryKeepsOneRecalledRowPerKey() throws Exception {
+        String bearer = account("USER");
+        for (int index = 0; index < 3; index++) {
+            seedTripWithPlan("主题行程 " + index,
+                    "{\"trip\":{\"preferences\":[\"亲子\"],\"day_count\":2,\"budget\":{\"amount_minor\":200000}},"
+                            + "\"summary\":{\"point_count\":3}}", "测试市");
+        }
+
+        http.perform(get(SUMMARY).header("Authorization", bearer)).andExpect(status().isOk());
+        http.perform(get(SUMMARY).header("Authorization", bearer)).andExpect(status().isOk());
+
+        List<String> keys = recall(bearer, 20).stream().map(item -> item.get("key").asText()).toList();
+        assertThat(keys).contains("theme.亲子");
+        assertThat(keys).doesNotHaveDuplicates();
+    }
+
+    private List<JsonNode> recall(String bearer, int topK) throws Exception {
+        MvcResult result = http.perform(get(PREFIX + "?top_k=" + topK).header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode body = new ObjectMapper().readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        List<JsonNode> items = new ArrayList<>();
+        body.forEach(items::add);
+        return items;
+    }
+
+    @Test
     void unauthenticatedRecallIsRejected() throws Exception {
         http.perform(get(PREFIX)).andExpect(status().isUnauthorized());
     }
@@ -159,6 +270,16 @@ class S24PreferenceIntegrationTests {
                 sourceType, confidence, weight);
     }
 
+    private void seedVersion(String key, int versionNo, int weight) {
+        jdbc.update("""
+                INSERT INTO user_preference
+                  (id, user_id, preference_key, version_no, value_json, source_type,
+                   confidence, weight, last_used_at, status, created_at, updated_at)
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, CAST('{"count":1}' AS JSON),
+                  'HISTORY_ANALYSIS', 0.90, ?, UTC_TIMESTAMP(6), 'ACTIVE', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                """, UUID.randomUUID().toString(), userId.toString(), key, versionNo, weight);
+    }
+
     private void seedCleared(String key, String sourceType, double confidence, int weight) {
         jdbc.update("""
                 INSERT INTO user_preference
@@ -167,5 +288,42 @@ class S24PreferenceIntegrationTests {
                 VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, 1, CAST('{"count":1}' AS JSON), ?, ?, ?,
                   UTC_TIMESTAMP(6), 'CLEARED', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
                 """, UUID.randomUUID().toString(), userId.toString(), key, sourceType, confidence, weight);
+    }
+
+    private void seedTripWithPlan(String title, String planJson, String cityName) {
+        UUID trip = UUID.randomUUID();
+        UUID version = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO trip (id, owner_id, title, start_date, end_date, status, created_at, updated_at)
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, '2026-12-01', '2026-12-02', 'ACTIVE',
+                        UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                """, trip.toString(), userId.toString(), title);
+        jdbc.update("""
+                INSERT INTO trip_version
+                  (id, trip_id, version_no, etag, content_hash, version_status,
+                   schema_version, model_version, prompt_version, created_by, created_at)
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), 1, UNHEX(SHA2(?, 256)), UNHEX(SHA2(?, 256)),
+                        'PUBLISHED', 's19-plan-v1', 'orchestrator-v1', 's19-prompt-v1', UUID_TO_BIN(?),
+                        UTC_TIMESTAMP(6))
+                """, version.toString(), trip.toString(), trip.toString(), trip.toString(),
+                userId.toString());
+        jdbc.update("""
+                INSERT INTO plan_snapshot (id, trip_version_id, plan_json, created_at)
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), CAST(? AS JSON), UTC_TIMESTAMP(6))
+                """, UUID.randomUUID().toString(), version.toString(), planJson);
+        jdbc.update("UPDATE trip SET current_version_id = UUID_TO_BIN(?) WHERE id = UUID_TO_BIN(?)",
+                version.toString(), trip.toString());
+        if (cityName != null) {
+            jdbc.update("""
+                    INSERT INTO city (id, city_code, name, timezone, status, created_at, updated_at)
+                    VALUES (UUID_TO_BIN(?), ?, ?, 'Asia/Shanghai', 'ACTIVE', UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))
+                    ON DUPLICATE KEY UPDATE name = VALUES(name)
+                    """, UUID.randomUUID().toString(), "alg12-" + cityName, cityName);
+            jdbc.update("""
+                    INSERT INTO trip_city (id, trip_id, city_id, sequence_no, created_at)
+                    VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?),
+                            (SELECT id FROM city WHERE city_code = ?), 1, UTC_TIMESTAMP(6))
+                    """, UUID.randomUUID().toString(), trip.toString(), "alg12-" + cityName);
+        }
     }
 }
