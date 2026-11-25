@@ -1,8 +1,7 @@
 """Health check endpoint."""
 
-from typing_extensions import TypedDict
-
 from fastapi import APIRouter
+from typing_extensions import TypedDict
 
 from app.core.config import get_settings
 
