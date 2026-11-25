@@ -13,7 +13,12 @@ from app.agents.route_planner.models import PoiRecord, RouteData, RoutePortResul
 
 
 class PoiPort(Protocol):
-    """POI lookup port (S10): resolve names/ids to authoritative records."""
+    """POI lookup port (S10): resolve names/ids to authoritative records.
+
+    ``get`` must treat any in-process index as a cache only: on a miss or after expiry it
+    re-reads the Java internal POI-by-ID contract (``contracts/s12/poi-lookup.md``). A record
+    without coordinates is never authoritative; explicit unavailability is reported as ``None``.
+    """
 
     def lookup(self, name: str, city_id: str) -> list[PoiRecord]: ...
 

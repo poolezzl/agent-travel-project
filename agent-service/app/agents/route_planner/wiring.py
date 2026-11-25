@@ -17,16 +17,19 @@ from app.agents.route_planner.mocks import MockPoiPort, MockRouteCache, MockRout
 from app.agents.route_planner.ports import PoiPort, RouteCache
 from app.agents.route_planner.route_provider import RouteProvider
 from app.core.config import get_route_settings
+from app.knowledge.internal_client import InternalKnowledgeClient
 
 
 def build_route_deps(
     store: KeyValueStore | None = None,
     client: httpx.Client | None = None,
+    internal_client: InternalKnowledgeClient | None = None,
 ) -> tuple[PoiPort, RouteProvider, RouteCache]:
     """Build (poi_port, route_provider, cache) for the configured ``ROUTE_PROVIDER``.
 
     ``store``/``client`` are injection points for tests (Redis double, MockTransport client);
-    in production both are omitted and created from :class:`RouteAdapterSettings`.
+    ``internal_client`` injects the Java POI-by-ID client. In production all are omitted and
+    created from :class:`RouteAdapterSettings`; the in-process POI index is only a TTL cache.
     """
     settings = get_route_settings()
 
@@ -42,7 +45,18 @@ def build_route_deps(
             base_url=settings.amap_base_url,
             timeout=settings.amap_timeout_ms / 1000.0,
         )
-    poi_port = AmapPoiAdapter(client, settings.amap_api_key)
+    authoritative = internal_client
+    if authoritative is None and settings.poi_lookup_backend_enabled:
+        authoritative = InternalKnowledgeClient(
+            base_url=settings.internal_knowledge_base_url,
+            timeout=settings.poi_lookup_timeout_seconds,
+        )
+    poi_port = AmapPoiAdapter(
+        client,
+        settings.amap_api_key,
+        authoritative=authoritative,
+        cache_ttl_seconds=settings.poi_lookup_cache_ttl_seconds,
+    )
     route_port = AmapRouteAdapter(poi_port, client, settings.amap_api_key)
 
     if settings.route_cache_enabled and store is not None:

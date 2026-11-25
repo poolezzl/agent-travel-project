@@ -6,7 +6,6 @@ from datetime import date
 
 import httpx
 import pytest
-
 from app.knowledge.internal_client import (
     ERROR_HTTP,
     ERROR_INVALID_RESPONSE,
@@ -19,7 +18,9 @@ from app.knowledge.internal_client import (
 def _client(handler) -> InternalKnowledgeClient:
     return InternalKnowledgeClient(
         base_url="http://java.internal",
-        client=httpx.Client(base_url="http://java.internal", transport=httpx.MockTransport(handler)),
+        client=httpx.Client(
+            base_url="http://java.internal", transport=httpx.MockTransport(handler)
+        ),
     )
 
 
@@ -72,7 +73,9 @@ def test_attractions_success_maps_request_and_returns_payload() -> None:
         )
 
     with _client(handler) as client:
-        result = client.query_attractions(city="beijing", points=[_point()], preference_tags=["避坑"])
+        result = client.query_attractions(
+            city="beijing", points=[_point()], preference_tags=["避坑"]
+        )
     assert result["cards"][0]["point_id"] == "POI-BJ-001"
 
 
@@ -92,8 +95,65 @@ def test_reservations_success_maps_date() -> None:
         )
 
     with _client(handler) as client:
-        result = client.query_reservations(city="beijing", points=[_point()], day=date(2026, 11, 20))
+        result = client.query_reservations(
+            city="beijing", points=[_point()], day=date(2026, 11, 20)
+        )
     assert result["reservations"][0]["point_id"] == "POI-BJ-001"
+
+
+def test_poi_lookup_success_maps_path_and_optional_city() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/internal/v1/knowledge/pois/poi-uuid"
+        assert request.url.params["city"] == "beijing"
+        return httpx.Response(
+            200,
+            json={
+                "poi_id": "poi-uuid",
+                "city_id": "beijing",
+                "name": "故宫博物院",
+                "category": "attraction",
+                "latitude": 39.916,
+                "longitude": 116.397,
+                "coordinate_system": "GCJ02",
+                "data_at": "2026-11-24T04:00:00Z",
+                "source_metadata": [
+                    {
+                        "source_type": "knowledge_base",
+                        "source_record_id": "source-uuid",
+                        "retrieved_at": "2026-11-24T03:59:00Z",
+                        "freshness_status": "fresh",
+                        "is_estimated": False,
+                    }
+                ],
+                "retrieved_at": "2026-11-24T05:00:00Z",
+            },
+        )
+
+    with _client(handler) as client:
+        poi = client.lookup_poi("poi-uuid", city="beijing")
+    assert poi is not None
+    assert poi["category"] == "attraction"
+
+
+def test_poi_lookup_not_found_returns_none() -> None:
+    with _client(lambda request: httpx.Response(404, json={"code": "POI_NOT_FOUND"})) as client:
+        assert client.lookup_poi("missing") is None
+
+
+def test_poi_lookup_missing_fields_is_invalid_response() -> None:
+    with _client(lambda request: httpx.Response(200, json={"poi_id": "p1"})) as client:
+        with pytest.raises(InternalKnowledgeError) as error:
+            client.lookup_poi("p1")
+    assert error.value.code == ERROR_INVALID_RESPONSE
+
+
+def test_poi_lookup_server_error_is_http_error() -> None:
+    with _client(lambda request: httpx.Response(503, text="down")) as client:
+        with pytest.raises(InternalKnowledgeError) as error:
+            client.lookup_poi("p1")
+    assert error.value.code == ERROR_HTTP
+    assert error.value.status_code == 503
 
 
 def test_http_error_has_stable_code_and_status() -> None:

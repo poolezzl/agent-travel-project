@@ -139,6 +139,24 @@ class RouteAdapterSettings(BaseSettings):
         le=3,
         validation_alias="AMAP_MAX_RETRIES",
     )
+    internal_knowledge_base_url: str = Field(
+        default="http://127.0.0.1:8080",
+        validation_alias="AGENT_INTERNAL_KNOWLEDGE_URL",
+    )
+    poi_lookup_backend_enabled: bool = Field(
+        default=True,
+        validation_alias="POI_LOOKUP_BACKEND_ENABLED",
+    )
+    poi_lookup_cache_ttl_seconds: int = Field(
+        default=300,
+        ge=1,
+        validation_alias="POI_LOOKUP_CACHE_TTL_SECONDS",
+    )
+    poi_lookup_timeout_seconds: float = Field(
+        default=3.0,
+        gt=0.0,
+        validation_alias="POI_LOOKUP_TIMEOUT_SECONDS",
+    )
 
 
 @lru_cache

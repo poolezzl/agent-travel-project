@@ -25,6 +25,10 @@ from app.agents.route_planner.errors import RouteErrorKind
 
 CoordinateSystem = Literal["GCJ02"]
 
+# Explicit "absence" marker for POI fields the source does not provide. It is copied as-is from
+# the authoritative boundary; adapters must never substitute a category taxonomy or a timestamp.
+UNKNOWN_CATEGORY = "unknown"
+
 
 class TimeWindow(BaseModel):
     """Day-level time window, HH:MM 24-hour."""
@@ -52,7 +56,12 @@ class PointCandidate(BaseModel):
 
 
 class PoiRecord(BaseModel):
-    """Authoritative POI entity returned by the POI port (S10)."""
+    """Authoritative POI entity returned by the POI port (S10).
+
+    ``category`` and ``data_at`` are provided by the authoritative boundary. When the source
+    has no category, the literal ``"unknown"`` is used; when it has no data timestamp,
+    ``data_at`` stays ``None``. Neither is ever filled with a guessed value on the Python side.
+    """
 
     poi_id: str
     name: str
@@ -60,7 +69,11 @@ class PoiRecord(BaseModel):
     latitude: float | None
     longitude: float | None
     coordinate_system: str | None
-    category: str | None = None
+    category: str = UNKNOWN_CATEGORY
+    data_at: datetime | None = None
+    source_record_id: str | None = None
+    retrieved_at: datetime | None = None
+    freshness_status: Literal["fresh", "stale", "unknown"] = "unknown"
 
 
 class ResolvedPoint(BaseModel):

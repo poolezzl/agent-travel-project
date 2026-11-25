@@ -1,20 +1,30 @@
 """Internal data models for the weather agent (S13).
 
 ``DailyWeather`` is the superset of the frozen ``agents/03-weather/output.schema.json``
-``daily[]`` item; ``WeatherDaily`` is the exact output projection. The ``travel_advice``
-structure is not frozen, so ``TravelAdvice`` is a documented internal model (PENDING-R2/R1).
+``daily[]`` item; ``WeatherDaily`` is the exact output projection. ``TravelAdvice`` is frozen
+by 2026-11-24's S12/S13 contract-gap closure: all four fields are required, unknown keys are
+rejected, and risk codes are restricted to the same pattern as the JSON Schema.
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.agents.weather.errors import WeatherErrorKind
 
 DataType = Literal["forecast", "climate_statistics"]
+RiskCode = Annotated[
+    str,
+    Field(
+        pattern=(
+            r"^(HEAVY_RAIN|EXTREME_TEMP|NON_FORECAST|DATA_MISSING):"
+            r"\d{4}-\d{2}-\d{2}(,\d{4}-\d{2}-\d{2})*$"
+        )
+    ),
+]
 
 
 class DateRange(BaseModel):
@@ -88,18 +98,22 @@ class WeatherDaily(BaseModel):
 class SensitivePointAdvice(BaseModel):
     """Feasibility judgement for one weather-sensitive point."""
 
+    model_config = ConfigDict(extra="forbid")
+
     point: str
     feasible: bool
-    risks: list[str] = Field(default_factory=list)
+    risks: list[RiskCode]
 
 
 class TravelAdvice(BaseModel):
-    """Documented internal advice model (structure is PENDING-R2/R1)."""
+    """Frozen advice structure: derived from ``daily[]`` only, with no independent source."""
 
-    sensitive_points: list[SensitivePointAdvice] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
-    alternatives: list[date] = Field(default_factory=list)
-    clothing: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    sensitive_points: list[SensitivePointAdvice]
+    risks: list[RiskCode]
+    alternatives: list[date]
+    clothing: str | None
 
 
 class WeatherAgentResult(BaseModel):

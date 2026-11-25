@@ -7,8 +7,10 @@ stable error codes for the Python agent boundary.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date
-from typing import Any, Iterable
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -47,7 +49,7 @@ class InternalKnowledgeClient:
         if self._owns_client:
             self._client.close()
 
-    def __enter__(self) -> "InternalKnowledgeClient":
+    def __enter__(self) -> InternalKnowledgeClient:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -58,6 +60,41 @@ class InternalKnowledgeClient:
         for key in ("pois", "entries", "rules"):
             if not isinstance(body.get(key), list):
                 raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, f"catalog 响应缺少 {key} 数组")
+        return body
+
+    def lookup_poi(self, poi_id: str, *, city: str | None = None) -> dict[str, Any] | None:
+        """Fetch one authoritative POI by id (``contracts/s12/poi-lookup.md``, DRAFT).
+
+        A 404 is a normal "backend does not own this POI" result and returns ``None``; every
+        other transport/shape failure stays a typed :class:`InternalKnowledgeError` so callers
+        can degrade explicitly instead of inventing coordinates.
+        """
+        params = {"city": city} if city else None
+        try:
+            body = self._send(
+                "GET", f"/internal/v1/knowledge/pois/{quote(poi_id, safe='')}", params=params
+            )
+        except InternalKnowledgeError as exc:
+            if exc.code == ERROR_HTTP and exc.status_code == 404:
+                return None
+            raise
+        required = (
+            "poi_id",
+            "city_id",
+            "name",
+            "category",
+            "latitude",
+            "longitude",
+            "coordinate_system",
+            "data_at",
+            "source_metadata",
+            "retrieved_at",
+        )
+        missing = [key for key in required if key not in body]
+        if missing:
+            raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, f"poi 响应缺少 {missing}")
+        if not isinstance(body["source_metadata"], list):
+            raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, "poi.source_metadata 不是数组")
         return body
 
     def query_attractions(
@@ -97,7 +134,9 @@ class InternalKnowledgeClient:
         body = self._send("POST", "/internal/v1/knowledge/reservations/query", json=payload)
         reservations = body.get("reservations")
         if not isinstance(reservations, list):
-            raise InternalKnowledgeError(ERROR_INVALID_RESPONSE, "reservations 响应缺少 reservations 数组")
+            raise InternalKnowledgeError(
+                ERROR_INVALID_RESPONSE, "reservations 响应缺少 reservations 数组"
+            )
         return body
 
     def _send(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
