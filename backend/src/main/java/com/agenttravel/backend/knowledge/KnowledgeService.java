@@ -33,6 +33,7 @@ import com.agenttravel.backend.knowledge.KnowledgeModels.KnowledgeView;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiConflictResolveRequest;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiConflictView;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiDraftRequest;
+import com.agenttravel.backend.knowledge.KnowledgeModels.PoiLookupResponse;
 import com.agenttravel.backend.knowledge.KnowledgeModels.PoiView;
 import com.agenttravel.backend.knowledge.KnowledgeModels.QueryPoint;
 import com.agenttravel.backend.knowledge.KnowledgeModels.ReservationItem;
@@ -52,6 +53,7 @@ import com.agenttravel.backend.knowledge.KnowledgeRepository.PoiConflictDraft;
 import com.agenttravel.backend.knowledge.KnowledgeRepository.PoiConflictRow;
 import com.agenttravel.backend.knowledge.KnowledgeRepository.PoiDraft;
 import com.agenttravel.backend.knowledge.KnowledgeRepository.PoiRow;
+import com.agenttravel.backend.knowledge.KnowledgeRepository.PoiSnapshotRow;
 import com.agenttravel.backend.knowledge.KnowledgeRepository.RuleDraft;
 import com.agenttravel.backend.knowledge.KnowledgeRepository.RuleRow;
 import com.agenttravel.backend.knowledge.KnowledgeRepository.SourceRegistration;
@@ -718,6 +720,73 @@ public class KnowledgeService {
     }
 
     // ---------------------------------------------------------------- queries
+
+    /**
+     * Internal POI-by-ID lookup for the Python route planner (contracts/s12/poi-lookup.md).
+     *
+     * <p>Only an existing POI belonging to a registered city, backed by a current POI snapshot
+     * with coordinates and a source snapshot, is authoritative. Missing/unowned records map to
+     * 404 so cross-city existence is not disclosed. Category stays the literal {@code unknown}
+     * when the source has none; {@code data_at} is the snapshot time and is never replaced with
+     * the response time.
+     */
+    @Transactional(readOnly = true)
+    public PoiLookupResponse lookupPoi(String poiId, String city) {
+        UUID id = parsePoiId(poiId);
+        PoiRow poi = repository.findPoi(id);
+        if (poi == null || blank(poi.cityCode())) {
+            throw poiLookupNotFound();
+        }
+        if (!blank(city)) {
+            UUID cityId = repository.findCityId(city);
+            if (cityId == null || !cityId.equals(poi.cityId())) {
+                throw poiLookupNotFound();
+            }
+        }
+        if ("DISABLED".equals(poi.status()) || poi.currentSnapshotId() == null
+                || poi.latitude() == null || poi.longitude() == null
+                || blank(poi.coordinateSystem())) {
+            throw poiLookupNotFound();
+        }
+        PoiSnapshotRow snapshot = repository.findPoiSnapshot(poi.currentSnapshotId());
+        if (snapshot == null || snapshot.sourceSnapshotId() == null) {
+            throw poiLookupNotFound();
+        }
+        SourceRow source = repository.findSourceSnapshot(snapshot.sourceSnapshotId());
+        if (source == null) {
+            throw poiLookupNotFound();
+        }
+        Instant now = Instant.now();
+        String freshness = source.validUntil() != null && !now.isBefore(source.validUntil())
+                ? "stale" : normalizeFreshness(source.freshnessStatus());
+        SourceMetadata metadata = new SourceMetadata(
+                source.sourceType().toLowerCase(Locale.ROOT), source.sourceRecordId(),
+                source.retrievedAt(), source.validUntil(), freshness, false);
+        String category = blank(poi.category()) ? "unknown" : poi.category();
+        return new PoiLookupResponse(poi.poiId(), poi.cityCode(), poi.name(), category,
+                poi.latitude(), poi.longitude(), poi.coordinateSystem(), snapshot.createdAt(),
+                List.of(metadata), now);
+    }
+
+    private UUID parsePoiId(String poiId) {
+        try {
+            return UUID.fromString(poiId);
+        } catch (RuntimeException exception) {
+            throw badRequest("POI_ID_INVALID", "POI ID 不合法");
+        }
+    }
+
+    private static String normalizeFreshness(String value) {
+        if (blank(value)) {
+            return "unknown";
+        }
+        String lower = value.toLowerCase(Locale.ROOT);
+        return Set.of("fresh", "stale", "unknown").contains(lower) ? lower : "unknown";
+    }
+
+    private static ApiException poiLookupNotFound() {
+        return notFound("POI_NOT_FOUND", "POI 不存在或缺少权威坐标");
+    }
 
     public AttractionQueryResponse queryAttractions(AttractionQueryRequest request) {
         Instant now = Instant.now();

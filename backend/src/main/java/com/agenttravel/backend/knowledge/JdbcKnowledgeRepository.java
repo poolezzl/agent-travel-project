@@ -162,6 +162,17 @@ public class JdbcKnowledgeRepository implements KnowledgeRepository {
     }
 
     @Override
+    public PoiSnapshotRow findPoiSnapshot(UUID snapshotId) {
+        List<PoiSnapshotRow> rows = jdbc.query("""
+                SELECT BIN_TO_UUID(id),BIN_TO_UUID(source_snapshot_id),created_at
+                FROM poi_snapshot WHERE id=UUID_TO_BIN(?)
+                """, (rs, rowNum) -> new PoiSnapshotRow(UUID.fromString(rs.getString(1)),
+                        UUID.fromString(rs.getString(2)), instant(rs.getTimestamp(3))),
+                snapshotId.toString());
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    @Override
     public List<PoiRow> findPoisByName(UUID cityId, String name) {
         return jdbc.query(POI_COLUMNS + " WHERE p.city_id=UUID_TO_BIN(?) AND p.name=? ORDER BY p.created_at",
                 this::poiRow, cityId.toString(), name);

@@ -27,6 +27,8 @@ public interface KnowledgeRepository {
 
     PoiRow findPoi(UUID poiId);
 
+    PoiSnapshotRow findPoiSnapshot(UUID snapshotId);
+
     List<PoiRow> findPoisByName(UUID cityId, String name);
 
     List<PoiRow> findPoisNear(UUID cityId, double latitude, double longitude, double tolerance);
@@ -136,6 +138,9 @@ public interface KnowledgeRepository {
     record PoiRow(UUID poiId, UUID cityId, String cityCode, String externalPoiId, String name, String category,
             String status, String district, UUID mergeGroupId, Double latitude, Double longitude,
             String coordinateSystem, UUID currentSnapshotId) {
+    }
+
+    record PoiSnapshotRow(UUID snapshotId, UUID sourceSnapshotId, Instant createdAt) {
     }
 
     record PoiConflictRow(UUID candidateId, String cityCode, UUID candidatePoiId, String candidateName,

@@ -328,6 +328,19 @@ public final class KnowledgeModels {
             @JsonProperty("is_estimated") boolean isEstimated) {
     }
 
+    public record PoiLookupResponse(
+            @JsonProperty("poi_id") UUID poiId,
+            @JsonProperty("city_id") String cityId,
+            @JsonProperty("name") String name,
+            @JsonProperty("category") String category,
+            @JsonProperty("latitude") Double latitude,
+            @JsonProperty("longitude") Double longitude,
+            @JsonProperty("coordinate_system") String coordinateSystem,
+            @JsonProperty("data_at") Instant dataAt,
+            @JsonProperty("source_metadata") List<SourceMetadata> sourceMetadata,
+            @JsonProperty("retrieved_at") Instant retrievedAt) {
+    }
+
     public record AttractionCard(
             @JsonProperty("point_id") String pointId,
             @JsonProperty("poi_id") UUID poiId,

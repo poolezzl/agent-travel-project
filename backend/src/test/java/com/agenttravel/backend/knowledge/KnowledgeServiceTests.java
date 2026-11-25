@@ -284,7 +284,8 @@ class KnowledgeServiceTests {
     @Test
     void internalQueryDoesNotTrustExternalRole() {
         RequestContext.set("req-1", "trace-1", UUID.randomUUID(), "USER");
-        InternalKnowledgeController controller = new InternalKnowledgeController(service);
+        InternalKnowledgeController controller = new InternalKnowledgeController(service,
+                new PoiLookupRateLimiter(20));
 
         KnowledgeModels.AttractionQueryResponse response = controller.queryAttractions(attractionQuery(null));
 
@@ -380,6 +381,124 @@ class KnowledgeServiceTests {
         assertThat(auditActions).contains("RESERVATION_RULE_CREATE:SUCCESS");
     }
 
+    // ------------------------------------------------- POI by ID (S12 closure)
+
+    @Test
+    void poiLookupReturnsAuthoritativeSnapshotAndSource() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView created = service.createPoi(ADMIN,
+                poiRequest("故宫", 116.397, 39.918, sourceId));
+
+        KnowledgeModels.PoiLookupResponse response = service.lookupPoi(
+                created.poiId().toString(), "北京");
+
+        assertThat(response.poiId()).isEqualTo(created.poiId());
+        assertThat(response.cityId()).isEqualTo("BJ");
+        assertThat(response.name()).isEqualTo("故宫");
+        assertThat(response.category()).isEqualTo("MUSEUM");
+        assertThat(response.latitude()).isEqualTo(39.918);
+        assertThat(response.longitude()).isEqualTo(116.397);
+        assertThat(response.coordinateSystem()).isEqualTo("WGS84");
+        assertThat(response.dataAt()).isNotNull();
+        assertThat(response.retrievedAt()).isNotNull();
+        assertThat(response.sourceMetadata()).hasSize(1);
+        assertThat(response.sourceMetadata().get(0).sourceType()).isEqualTo("knowledge_base");
+        assertThat(response.sourceMetadata().get(0).isEstimated()).isFalse();
+        assertThat(response.sourceMetadata().get(0).freshnessStatus()).isIn("fresh", "stale");
+    }
+
+    @Test
+    void poiLookupUnknownCategoryStaysExplicit() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView created = service.createPoi(ADMIN,
+                new KnowledgeModels.PoiDraftRequest("北京", "ext-unknown", "无分类点", null, "东城",
+                        116.397, 39.918, "WGS84", sourceId, null, List.of()));
+
+        KnowledgeModels.PoiLookupResponse response = service.lookupPoi(
+                created.poiId().toString(), null);
+
+        assertThat(response.category()).isEqualTo("unknown");
+    }
+
+    @Test
+    void poiLookupMissingDataAtStaysNull() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView created = service.createPoi(ADMIN,
+                poiRequest("故宫", 116.397, 39.918, sourceId));
+        KnowledgeRepository.PoiRow poi = repository.pois.get(created.poiId());
+        repository.poiSnapshots.put(poi.currentSnapshotId(), new KnowledgeRepository.PoiSnapshotRow(
+                poi.currentSnapshotId(), sourceId, null));
+
+        KnowledgeModels.PoiLookupResponse response = service.lookupPoi(
+                created.poiId().toString(), null);
+
+        assertThat(response.dataAt()).isNull();
+    }
+
+    @Test
+    void poiLookupCityMismatchAndUnknownCityAreNotFound() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView created = service.createPoi(ADMIN,
+                poiRequest("故宫", 116.397, 39.918, sourceId));
+
+        assertThatThrownByLookup(created, "上海");
+        assertThatThrownByLookup(created, "不存在的城市");
+    }
+
+    @Test
+    void poiLookupMissingSnapshotOrSourceIsNotFound() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView created = service.createPoi(ADMIN,
+                poiRequest("故宫", 116.397, 39.918, sourceId));
+        KnowledgeRepository.PoiRow poi = repository.pois.get(created.poiId());
+        repository.poiSnapshots.clear();
+
+        ApiException missingSnapshot = assertThrows(ApiException.class,
+                () -> service.lookupPoi(created.poiId().toString(), null));
+        assertThat(missingSnapshot.code()).isEqualTo("POI_NOT_FOUND");
+
+        repository.poiSnapshots.put(poi.currentSnapshotId(),
+                new KnowledgeRepository.PoiSnapshotRow(poi.currentSnapshotId(), sourceId,
+                        Instant.now()));
+        repository.sources.clear();
+        ApiException missingSource = assertThrows(ApiException.class,
+                () -> service.lookupPoi(created.poiId().toString(), null));
+        assertThat(missingSource.code()).isEqualTo("POI_NOT_FOUND");
+    }
+
+    @Test
+    void poiLookupDisabledPoiIsNotFound() {
+        UUID sourceId = source();
+        KnowledgeModels.PoiView created = service.createPoi(ADMIN,
+                poiRequest("故宫", 116.397, 39.918, sourceId));
+        KnowledgeRepository.PoiRow poi = repository.pois.get(created.poiId());
+        repository.pois.put(poi.poiId(), new KnowledgeRepository.PoiRow(poi.poiId(), poi.cityId(),
+                poi.cityCode(), poi.externalPoiId(), poi.name(), poi.category(), "DISABLED",
+                poi.district(), poi.mergeGroupId(), poi.latitude(), poi.longitude(),
+                poi.coordinateSystem(), poi.currentSnapshotId()));
+
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.lookupPoi(created.poiId().toString(), null));
+
+        assertThat(error.code()).isEqualTo("POI_NOT_FOUND");
+    }
+
+    @Test
+    void poiLookupInvalidIdIsBadRequest() {
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.lookupPoi("not-a-uuid", "北京"));
+
+        assertThat(error.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(error.code()).isEqualTo("POI_ID_INVALID");
+    }
+
+    private void assertThatThrownByLookup(KnowledgeModels.PoiView poi, String city) {
+        ApiException error = assertThrows(ApiException.class,
+                () -> service.lookupPoi(poi.poiId().toString(), city));
+        assertThat(error.status()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(error.code()).isEqualTo("POI_NOT_FOUND");
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private UUID source() {
@@ -453,6 +572,7 @@ class KnowledgeServiceTests {
         final Map<UUID, String> cityNames = new LinkedHashMap<>();
         final Map<UUID, SourceRow> sources = new LinkedHashMap<>();
         final Map<UUID, PoiRow> pois = new LinkedHashMap<>();
+        final Map<UUID, PoiSnapshotRow> poiSnapshots = new LinkedHashMap<>();
         final Map<UUID, PoiRow> poiByExternal = new LinkedHashMap<>();
         final List<StoredAlias> aliases = new ArrayList<>();
         final Map<String, PoiConflictRow> conflicts = new LinkedHashMap<>();
@@ -499,6 +619,11 @@ class KnowledgeServiceTests {
         }
 
         @Override
+        public PoiSnapshotRow findPoiSnapshot(UUID snapshotId) {
+            return poiSnapshots.get(snapshotId);
+        }
+
+        @Override
         public List<PoiRow> findPoisByName(UUID cityId, String name) {
             return pois.values().stream()
                     .filter(poi -> poi.cityId().equals(cityId) && poi.name().equals(name)).toList();
@@ -533,9 +658,13 @@ class KnowledgeServiceTests {
         @Override
         public PoiRow insertPoi(PoiDraft draft) {
             UUID poiId = UUID.randomUUID();
-            PoiRow row = new PoiRow(poiId, draft.cityId(), cityCodes.get(draft.cityId()), draft.externalPoiId(),
-                    draft.name(), draft.category(), "DRAFT", draft.district(), draft.mergeGroupId(),
-                    draft.latitude(), draft.longitude(), draft.coordinateSystem(), draft.sourceSnapshotId());
+            UUID snapshotId = UUID.randomUUID();
+            poiSnapshots.put(snapshotId,
+                    new PoiSnapshotRow(snapshotId, draft.sourceSnapshotId(), Instant.now()));
+            PoiRow row = new PoiRow(poiId, draft.cityId(), cityCodes.get(draft.cityId()),
+                    draft.externalPoiId(), draft.name(), draft.category(), "DRAFT", draft.district(),
+                    draft.mergeGroupId(), draft.latitude(), draft.longitude(),
+                    draft.coordinateSystem(), snapshotId);
             pois.put(poiId, row);
             poiByExternal.put(draft.cityId(), row);
             return row;
