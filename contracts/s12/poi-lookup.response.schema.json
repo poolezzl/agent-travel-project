@@ -1,8 +1,8 @@
 {
   "$id": "contracts/s12/poi-lookup.response.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "PoiLookupResponse (DRAFT)",
-  "description": "DRAFT internal POI-by-ID response for the Python route planner (2026-11-24). Authoritative coordinates only come from the Java knowledge-base POI snapshot.",
+  "title": "PoiLookupResponse",
+  "description": "Frozen 2026-11-25 internal POI-by-ID response for the Python route planner. Authoritative coordinates only come from the Java knowledge-base POI snapshot.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -88,7 +88,8 @@
           },
           "source_record_id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "source_snapshot.source_record_id (registered source record ID), not the source_snapshot row id."
           },
           "retrieved_at": {
             "type": "string",

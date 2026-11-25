@@ -1,6 +1,7 @@
-# DRAFT — POI 按 ID 查询内部契约（S12/S13 缺口关闭）
+# POI 按 ID 查询内部契约（S12/S13 缺口关闭）
 
-- 状态：**DRAFT（2026-11-24）**，待项目负责人评审后冻结。
+- 状态：**已冻结（2026-11-25，项目负责人授权评审）**。冻结前修正了三处实现与文档不一致：
+  `source_record_id` 语义、非法 `city` 的错误码、限流窗口作用域。
 - 适用范围：`agent-service` 路线适配器按 `poi_id` 回查权威 POI；不对外网暴露。
 - 事实来源：Java 业务后端知识库（MySQL）中的 POI 当前快照（`poi` + `poi_snapshot` +
   `source_snapshot`）。Python 只读，不写库、不共享数据库连接。
@@ -18,6 +19,7 @@ GET /internal/v1/knowledge/pois/{poiId}
 ```
 
 - `poiId`：UUID（知识库 `poi.id` 的字符串形式）。
+- 可用前提：仅在 `app.database.mode=mysql` 时注册；其他模式（如 mock）下该路径不存在。
 - 调用方：仅限后端内网/同机 Agent 服务；沿用 `InternalKnowledgeController` 的“内网可信”
   边界，不读取外部 `user/role` 头，也不接受请求体。
 - 只读：不产生审计写操作、不修改 POI/知识/来源状态。
@@ -26,14 +28,16 @@ GET /internal/v1/knowledge/pois/{poiId}
 ## 2. 归属与限流约束
 
 - **归属**：只返回归属于已登记城市（`city` 表）的 POI；提供 `city` 时，城市必须与 POI 的
-  归属城市一致。城市未登记或与 POI 不匹配一律返回 `404 POI_NOT_FOUND`，不区分“不存在”与
-  “无权/跨城”，避免暴露其他城市 POI 的存在性。
+  归属城市一致（空串视为未提供）。城市未登记或与 POI 不匹配一律返回 `404 POI_NOT_FOUND`，
+  不区分“不存在”与“无权/跨城”，避免暴露其他城市 POI 的存在性。
 - **权威性前置条件**：POI 必须存在、状态不是 `DISABLED`、有 `current_snapshot_id`，快照
   必须有经纬度与坐标系，且快照能回溯到 `source_snapshot`。任一条件不满足都返回
   `404 POI_NOT_FOUND`；**绝不**用请求时间、名称或默认值补齐坐标/来源。
 - **限流**：进程内固定窗口限流，默认 `20 次/秒`，可用
   `INTERNAL_POI_LOOKUP_MAX_PER_SECOND`（后端配置项
   `app.internal.poi-lookup.max-per-second`）调整；超限返回 `429 RATE_LIMITED`。
+  整个进程共享一个窗口（不区分调用方/IP），多实例部署时各自计数；跨实例总配额由
+  部署层承担，不在本契约内。
 
 ## 3. 响应字段
 
@@ -62,7 +66,7 @@ GET /internal/v1/knowledge/pois/{poiId}
 | 字段 | 说明 |
 |---|---|
 | `source_type` | 来源快照的实际类型小写值；POI 通常为 `poi` 或 `knowledge_base` |
-| `source_record_id` | `source_snapshot.id`（来源快照 ID，字符串 UUID） |
+| `source_record_id` | `source_snapshot.source_record_id`（已登记的来源记录 ID，字符串 UUID；不是 `source_snapshot.id` 快照行 ID） |
 | `retrieved_at` | `source_snapshot.retrieved_at`（来源取得时间） |
 | `valid_until` | `source_snapshot.valid_until`，可为 null |
 | `freshness_status` | `fresh` / `stale` / `unknown`；`valid_until` 已过则强制 `stale` |
@@ -78,8 +82,8 @@ GET /internal/v1/knowledge/pois/{poiId}
 
 | HTTP | `code` | 触发条件 | Python 侧处理 |
 |---|---|---|---|
-| 400 | `INVALID_INPUT` | `poiId` 不是合法 UUID；`city` 空串以外的非法绑定 | 非 UUID 的供应商 ID（如 `B000A1`）不请求本接口，直接回退地图详情；UUID 收到 400 与 404 同义（本端不认该 ID），可回退地图详情；仍不得伪造坐标 |
-| 404 | `POI_NOT_FOUND` | POI 不存在、城市不匹配、`DISABLED`、缺当前快照、缺坐标/坐标系、缺来源快照 | 视为“后端无此权威 POI”，可回退地图详情；不回退进程缓存 |
+| 400 | `INVALID_INPUT` | `poiId` 不是合法 UUID | 非 UUID 的供应商 ID（如 `B000A1`）不请求本接口，直接回退地图详情；UUID 收到 400 与 404 同义（本端不认该 ID），可回退地图详情；仍不得伪造坐标 |
+| 404 | `POI_NOT_FOUND` | POI 不存在、`city` 未知/不匹配、`DISABLED`、缺当前快照、缺坐标/坐标系、缺来源快照 | 视为“后端无此权威 POI”，可回退地图详情；不回退进程缓存 |
 | 429 | `RATE_LIMITED` | 超过进程内限流 | 显式降级，`get` 返回 `None`，不重试风暴 |
 | 5xx | `INTERNAL_ERROR` | 后端未预期异常 | 显式降级，`get` 返回 `None` |
 
