@@ -3,10 +3,12 @@ package com.agenttravel.backend.preference;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +36,9 @@ public class PreferenceService {
             "budget", "按行程预算金额划分消费档位",
             "season", "按出行日期所属季节统计");
 
+    /** 已冻结：历史行程少于 3 条不出画像（契约与数据库 CHECK ck_summary_eligible 同口径）。 */
     private static final int MIN_SAMPLES = 3;
-    private static final int DEFAULT_TOP_K = 5;
+
     private static final int MAX_DIFF_PATHS = 200;
     private static final Duration IDEMPOTENCY_TTL = Duration.ofMinutes(5);
 
@@ -44,11 +47,21 @@ public class PreferenceService {
 
     private final PreferenceRepository repository;
     private final ObjectMapper json;
+    private final PreferenceProperties properties;
+    private final Clock clock;
     private final ConcurrentHashMap<String, IdempotencyEntry> idempotency = new ConcurrentHashMap<>();
 
-    public PreferenceService(PreferenceRepository repository, ObjectMapper json) {
+    public PreferenceService(PreferenceRepository repository, ObjectMapper json,
+            PreferenceProperties properties) {
+        this(repository, json, properties, Clock.systemUTC());
+    }
+
+    PreferenceService(PreferenceRepository repository, ObjectMapper json,
+            PreferenceProperties properties, Clock clock) {
         this.repository = repository;
         this.json = json;
+        this.properties = properties;
+        this.clock = clock;
     }
 
     public List<PreferenceModels.HistoricalTrip> listTrips(UUID owner, LocalDate from, LocalDate to,
@@ -65,7 +78,7 @@ public class PreferenceService {
     public synchronized PreferenceModels.ReuseResult reuse(UUID owner, UUID tripId, String key) {
         String keyHash = hashKey(key);
         String idempotencyKey = owner + ":" + keyHash;
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         IdempotencyEntry prior = idempotency.get(idempotencyKey);
         if (prior != null && !prior.createdAt().plus(IDEMPOTENCY_TTL).isBefore(now)) {
             return prior.result();
@@ -234,9 +247,10 @@ public class PreferenceService {
 
         List<PreferenceModels.PreferenceItem> dimensions = eligible ? buildDimensions(user) : List.of();
         String narrative = eligible ? buildNarrative(dimensions, sampleCount) : "";
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         String summaryJson = writeJson(java.util.Map.of(
+                "ruleVersion", properties.getRuleVersion(),
                 "dimensions", dimensions,
                 "narrative", narrative));
         repository.saveSummary(user, version, sampleCount, eligible, summaryJson, narrative, now);
@@ -247,40 +261,53 @@ public class PreferenceService {
 
     private List<PreferenceModels.PreferenceItem> buildDimensions(UUID user) {
         List<PreferenceModels.PreferenceItem> result = new ArrayList<>();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
+        List<String> dimensions = properties.getDimensions();
 
-        List<PreferenceRepository.CityCount> cities = repository.topCities(user, DEFAULT_TOP_K);
-        if (!cities.isEmpty()) {
-            List<String> names = cities.stream().map(PreferenceRepository.CityCount::city).toList();
-            result.add(item("city", names, cities.get(0).count(), now));
-            for (PreferenceRepository.CityCount city : cities) {
-                repository.upsertPreference(user, "city." + city.city(),
-                        "{\"count\":" + city.count() + "}", "HISTORY_ANALYSIS",
-                        0.8, city.count(), now);
+        if (dimensions.contains("city")) {
+            List<PreferenceRepository.CityCount> cities = repository.topCities(user, properties.getCityTopN());
+            if (!cities.isEmpty()) {
+                List<String> names = cities.stream().map(PreferenceRepository.CityCount::city).toList();
+                result.add(item("city", names, cities.get(0).count(), now));
+                for (PreferenceRepository.CityCount city : cities) {
+                    repository.upsertPreference(user, "city." + city.city(),
+                            "{\"count\":" + city.count() + "}", "HISTORY_ANALYSIS",
+                            properties.confidenceOf("city"), weightOf(city.count()), now);
+                }
             }
         }
 
-        List<PreferenceRepository.PlanFact> facts = repository.findLatestPlanFacts(user);
         Map<String, Map<String, Integer>> counters = new java.util.LinkedHashMap<>();
-        for (String key : new String[]{"theme", "pace", "budget", "season"}) {
-            counters.put(key, new java.util.LinkedHashMap<>());
+        for (String key : dimensions) {
+            if (!"city".equals(key)) {
+                counters.put(key, new java.util.LinkedHashMap<>());
+            }
         }
+        List<PreferenceRepository.PlanFact> facts = repository.findLatestPlanFacts(user);
         for (PreferenceRepository.PlanFact fact : facts) {
             JsonNode plan = parsePlanLenient(fact.planJson());
-            for (String theme : extractStrings(plan.at("/trip/preferences"))) {
-                bump(counters.get("theme"), theme);
+            if (counters.containsKey("theme")) {
+                for (String theme : extractStrings(plan.at("/trip/preferences"))) {
+                    bump(counters.get("theme"), theme);
+                }
             }
-            String pace = extractPace(plan);
-            if (pace != null) {
-                bump(counters.get("pace"), pace);
+            if (counters.containsKey("pace")) {
+                String pace = extractPace(plan);
+                if (pace != null) {
+                    bump(counters.get("pace"), pace);
+                }
             }
-            String budget = extractBudgetTier(plan);
-            if (budget != null) {
-                bump(counters.get("budget"), budget);
+            if (counters.containsKey("budget")) {
+                String budget = extractBudgetTier(plan);
+                if (budget != null) {
+                    bump(counters.get("budget"), budget);
+                }
             }
-            String season = extractSeason(fact.startDate());
-            if (season != null) {
-                bump(counters.get("season"), season);
+            if (counters.containsKey("season")) {
+                String season = extractSeason(fact.startDate());
+                if (season != null) {
+                    bump(counters.get("season"), season);
+                }
             }
         }
         for (Map.Entry<String, Map<String, Integer>> entry : counters.entrySet()) {
@@ -293,24 +320,31 @@ public class PreferenceService {
             result.add(item(entry.getKey(), counts, counts.get(top), now));
             counts.forEach((value, count) -> repository.upsertPreference(user,
                     entry.getKey() + "." + value, "{\"count\":" + count + "}", "HISTORY_ANALYSIS",
-                    0.7, count, now));
+                    properties.confidenceOf(entry.getKey()), weightOf(count), now));
         }
 
         for (PreferenceRepository.StatusCount item : repository.statusCounts(user)) {
             repository.upsertPreference(user, "status." + item.status(),
                     "{\"count\":" + item.count() + "}", "HISTORY_ANALYSIS",
-                    0.7, item.count(), now);
+                    properties.getDefaultConfidence(), weightOf(item.count()), now);
         }
         return result;
     }
 
-    private PreferenceModels.PreferenceItem item(String key, Object value, int weight, Instant now) {
+    private PreferenceModels.PreferenceItem item(String key, Object value, int hitCount, Instant now) {
         return new PreferenceModels.PreferenceItem(key, writeJson(value), "HISTORY_ANALYSIS",
-                null, weight, now, DIMENSION_REASONS.get(key));
+                properties.confidenceOf(key), weightOf(hitCount), now, DIMENSION_REASONS.get(key));
     }
 
+    /** 权重公式：命中条数 × 权重增幅，超过上限时截断。 */
+    private int weightOf(int hitCount) {
+        long weight = (long) hitCount * properties.getWeightIncrement();
+        return (int) Math.min(weight, properties.getWeightCap());
+    }
+
+    /** 命中计数：同一取值每出现一次只加 1（merge 的重映射函数只做累加，不再叠加旧值）。 */
     private static void bump(Map<String, Integer> counts, String value) {
-        counts.merge(value, counts.getOrDefault(value, 0) + 1, Integer::sum);
+        counts.merge(value, 1, Integer::sum);
     }
 
     private JsonNode parsePlanLenient(String planJson) {
@@ -334,25 +368,30 @@ public class PreferenceService {
         return values;
     }
 
-    private static String extractPace(JsonNode plan) {
+    private String extractPace(JsonNode plan) {
         JsonNode pointCount = plan.at("/summary/point_count");
         JsonNode dayCount = plan.at("/trip/day_count");
         if (pointCount.isNumber() && dayCount.isNumber() && dayCount.asInt() > 0) {
             double pointsPerDay = pointCount.asDouble() / dayCount.asInt();
-            return pointsPerDay < 2 ? "轻松" : pointsPerDay <= 4 ? "适中" : "紧凑";
+            double relaxed = properties.getPace().getRelaxedMaxPointsPerDay();
+            double moderate = properties.getPace().getModerateMaxPointsPerDay();
+            return pointsPerDay <= relaxed ? "轻松" : pointsPerDay <= moderate ? "适中" : "紧凑";
         }
         return null;
     }
 
-    private static String extractBudgetTier(JsonNode plan) {
+    private String extractBudgetTier(JsonNode plan) {
         JsonNode amount = plan.at("/trip/budget/amount_minor");
         if (!amount.isNumber()) {
             return null;
         }
         double yuan = amount.asDouble() / 100;
-        return yuan < 1000 ? "经济" : yuan <= 5000 ? "舒适" : "高端";
+        double economy = properties.getBudget().getEconomyMaxYuan();
+        double comfort = properties.getBudget().getComfortMaxYuan();
+        return yuan <= economy ? "经济" : yuan <= comfort ? "舒适" : "高端";
     }
 
+    /** 季节划分属于日历事实口径，不是可调参数。 */
     private static String extractSeason(LocalDate date) {
         if (date == null) {
             return null;
@@ -401,17 +440,58 @@ public class PreferenceService {
     @Transactional
     public void clear(UUID user, String key) {
         hashKey(key);
-        repository.clearPreferences(user, Instant.now());
+        repository.clearPreferences(user, clock.instant());
     }
 
-    public List<PreferenceModels.PreferenceItem> recalledPreferences(UUID user, int topK) {
-        int limit = topK <= 0 ? DEFAULT_TOP_K : Math.min(topK, 20);
-        return repository.findActivePreferences(user, limit).stream()
-                .map(row -> new PreferenceModels.PreferenceItem(row.key(), row.valueJson(),
-                        "HISTORY_ANALYSIS", row.confidence(), row.weight(), row.lastUsedAt(),
-                        DIMENSION_REASONS.getOrDefault(
-                                row.key().contains(".") ? row.key().substring(0, row.key().indexOf('.')) : row.key(),
-                                "由历史行程统计得出")))
+    /**
+     * TOP-K 召回：过滤低置信度条目，按遗忘折算后的有效权重倒序取前 K 条。
+     *
+     * @param requestedTopK 客户端传入的 K；为空时用配置 app.preferences.top-k。
+     */
+    public List<PreferenceModels.PreferenceItem> recalledPreferences(UUID user, Integer requestedTopK) {
+        int limit = resolveLimit(requestedTopK);
+        Instant now = clock.instant();
+        return repository.findActivePreferences(user).stream()
+                .filter(row -> row.confidence() == null || row.confidence() >= properties.getMinConfidence())
+                .map(row -> toRecalledItem(row, now))
+                .sorted(Comparator.comparingInt(PreferenceModels.PreferenceItem::weight).reversed()
+                        .thenComparing(PreferenceModels.PreferenceItem::lastUsedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(PreferenceModels.PreferenceItem::key))
+                .limit(limit)
                 .toList();
+    }
+
+    private int resolveLimit(Integer requestedTopK) {
+        if (requestedTopK == null) {
+            return properties.getTopK();
+        }
+        int max = Math.min(properties.getTopKMax(), PreferenceProperties.CONTRACT_TOP_K_MAX);
+        return Math.min(Math.max(requestedTopK, 1), max);
+    }
+
+    private PreferenceModels.PreferenceItem toRecalledItem(PreferenceRepository.PreferenceItemRow row, Instant now) {
+        return new PreferenceModels.PreferenceItem(row.key(), row.valueJson(),
+                row.sourceType(), row.confidence(), effectiveWeight(row.weight(), row.lastUsedAt(), now),
+                row.lastUsedAt(), reasonOf(row.key()));
+    }
+
+    /** 遗忘折算：有效权重 = 原始权重 × 0.5^(距上次使用天数 / 半衰期)，并以保底权重截断。 */
+    private int effectiveWeight(int rawWeight, Instant lastUsedAt, Instant now) {
+        if (rawWeight <= 0) {
+            return 0;
+        }
+        if (!properties.isDecayEnabled() || lastUsedAt == null) {
+            return rawWeight;
+        }
+        double ageDays = Math.max(0d, Duration.between(lastUsedAt, now).toMillis() / 86_400_000d);
+        double halfLife = properties.getDecayHalfLifeDays();
+        double decayed = rawWeight * Math.pow(0.5, ageDays / halfLife);
+        return Math.max(properties.getDecayFloor(), (int) Math.round(decayed));
+    }
+
+    private static String reasonOf(String key) {
+        String dimension = key.contains(".") ? key.substring(0, key.indexOf('.')) : key;
+        return DIMENSION_REASONS.getOrDefault(dimension, "由历史行程统计得出");
     }
 }

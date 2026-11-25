@@ -277,19 +277,25 @@ public class PreferenceRepository {
         }
     }
 
-    List<PreferenceItemRow> findActivePreferences(UUID user, int topK) {
+    /**
+     * 读取用户全部生效中的偏好。召回排序、置信度过滤与遗忘折算都在服务层完成，
+     * 便于参数集中配置与审计（app.preferences.*）。
+     */
+    List<PreferenceItemRow> findActivePreferences(UUID user) {
         return jdbc.query("""
-                SELECT preference_key, value_json, confidence, weight, last_used_at
+                SELECT preference_key, value_json, source_type, confidence, weight, last_used_at
                 FROM user_preference
                 WHERE user_id = UUID_TO_BIN(?) AND status = 'ACTIVE'
-                ORDER BY weight DESC, last_used_at DESC LIMIT ?
+                ORDER BY weight DESC, last_used_at DESC, preference_key ASC
                 """, (rs, index) -> new PreferenceItemRow(rs.getString(1), rs.getString(2),
-                        rs.getBigDecimal(3) == null ? null : rs.getBigDecimal(3).doubleValue(),
-                        rs.getInt(4), rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toInstant()),
-                user.toString(), topK);
+                        rs.getString(3),
+                        rs.getBigDecimal(4) == null ? null : rs.getBigDecimal(4).doubleValue(),
+                        rs.getInt(5), rs.getTimestamp(6) == null ? null : rs.getTimestamp(6).toInstant()),
+                user.toString());
     }
 
-    record PreferenceItemRow(String key, String valueJson, Double confidence, int weight, Instant lastUsedAt) {
+    record PreferenceItemRow(String key, String valueJson, String sourceType, Double confidence,
+            int weight, Instant lastUsedAt) {
     }
 
     void upsertPreference(UUID user, String key, String valueJson, String sourceType,

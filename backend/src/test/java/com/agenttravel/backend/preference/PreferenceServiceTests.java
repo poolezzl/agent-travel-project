@@ -19,7 +19,7 @@ class PreferenceServiceTests {
 
     private final FakeRepository repository = new FakeRepository();
     private final PreferenceService service = new PreferenceService(
-            repository, new ObjectMapper().findAndRegisterModules());
+            repository, new ObjectMapper().findAndRegisterModules(), new PreferenceProperties());
     private final UUID user = UUID.randomUUID();
 
     @Test

@@ -33,6 +33,28 @@ spring:
       connect-timeout: "${REDIS_CONNECT_TIMEOUT:2s}"
 
 app:
+  preferences:
+    top-k: "${PREFERENCES_TOP_K:5}"
+    top-k-max: "${PREFERENCES_TOP_K_MAX:20}"
+    city-top-n: "${PREFERENCES_CITY_TOP_N:5}"
+    min-confidence: "${PREFERENCES_MIN_CONFIDENCE:0.6}"
+    weight-increment: "${PREFERENCES_WEIGHT_INCREMENT:3}"
+    weight-cap: "${PREFERENCES_WEIGHT_CAP:100}"
+    decay-enabled: "${PREFERENCES_DECAY_ENABLED:true}"
+    decay-half-life-days: "${PREFERENCES_DECAY_HALF_LIFE_DAYS:180}"
+    decay-floor: "${PREFERENCES_DECAY_FLOOR:1}"
+    rule-version: "${PREFERENCES_RULE_VERSION:s24-alg12-v1}"
+    dimensions: "${PREFERENCES_DIMENSIONS:city,theme,pace,budget,season}"
+    default-confidence: "${PREFERENCES_DEFAULT_CONFIDENCE:0.7}"
+    dimension-confidence:
+      city: "${PREFERENCES_CITY_CONFIDENCE:0.8}"
+    classification:
+      pace:
+        relaxed-max-points-per-day: "${PREFERENCES_PACE_RELAXED_MAX_POINTS_PER_DAY:2}"
+        moderate-max-points-per-day: "${PREFERENCES_PACE_MODERATE_MAX_POINTS_PER_DAY:4}"
+      budget:
+        economy-max-yuan: "${PREFERENCES_BUDGET_ECONOMY_MAX_YUAN:1000}"
+        comfort-max-yuan: "${PREFERENCES_BUDGET_COMFORT_MAX_YUAN:5000}"
   s26:
     pdf-font: "${S26_PDF_FONT:}"
     export-directory: "${S26_EXPORT_DIRECTORY:${user.home}/.agent-travel/exports}"

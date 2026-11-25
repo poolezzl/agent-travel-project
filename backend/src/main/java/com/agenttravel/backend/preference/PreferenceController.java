@@ -76,7 +76,7 @@ public class PreferenceController {
 
     @GetMapping("/preferences/recall")
     public List<PreferenceModels.PreferenceItem> recall(
-            @RequestParam(defaultValue = "5") int topK) {
+            @RequestParam(name = "top_k", required = false) Integer topK) {
         return service.recalledPreferences(authenticated().userId(), topK);
     }
 
