@@ -40,7 +40,7 @@ jobs:
         run: mvn --batch-mode -DforkCount=0 verify
       - name: Check resolved dependencies
         run: mvn --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=text
-      - name: Verify isolated MySQL 8 empty database with local profile
+      - name: Verify isolated MySQL 8 and Redis with local profile
         working-directory: .
         shell: pwsh
         run: ./scripts/s03_mysql_verify.ps1

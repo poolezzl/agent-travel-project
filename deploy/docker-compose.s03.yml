@@ -24,5 +24,17 @@ services:
       retries: 30
       start_period: 15s
 
+  redis:
+    image: redis:7.4.2-alpine
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "${S03_REDIS_PORT:-16379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
 volumes:
   s03_mysql_data:

@@ -28,6 +28,10 @@ $environmentNames = @(
     "DB_PASSWORD",
     "FLYWAY_ENABLED",
     "JWT_SECRET",
+    "REDIS_HOST",
+    "REDIS_PORT",
+    "REDIS_PASSWORD",
+    "S03_REDIS_PORT",
     "S03_MYSQL_ROOT_PASSWORD",
     "S03_MYSQL_DATABASE",
     "S03_MYSQL_USER",
@@ -70,7 +74,12 @@ function New-TemporaryJwtSecret {
 
 function Resolve-PublishedPort {
     # 以 compose 实际发布的端口为准，避免脚本假设的端口与 compose 解析结果不一致。
-    $output = (& docker @($script:composeArguments + @("port", "mysql", "3306")) | Out-String)
+    param(
+        [Parameter(Mandatory = $true)][string]$Service,
+        [Parameter(Mandatory = $true)][int]$ContainerPort
+    )
+
+    $output = (& docker @($script:composeArguments + @("port", $Service, "$ContainerPort")) | Out-String)
     foreach ($line in ($output -split "`n")) {
         $trimmed = $line.Trim()
         if ($trimmed -match ':(\d+)$') {
@@ -81,9 +90,47 @@ function Resolve-PublishedPort {
 }
 
 function Resolve-ContainerAddress {
-    $output = (& docker inspect --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $script:containerId | Out-String).Trim()
+    param(
+        [Parameter(Mandatory = $true)][string]$Service
+    )
+
+    $containerId = (& docker @($script:composeArguments + @("ps", "-q", $Service)) | Out-String).Trim()
+    if (-not $containerId) {
+        return $null
+    }
+    $output = (& docker inspect --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $containerId | Out-String).Trim()
     if ($output) { return $output }
     return $null
+}
+
+function Get-RedisPong {
+    # Redis 探活：发送 PING，期望收到 +PONG，避免把“端口可连”误判为“Redis 可用”。
+    param(
+        [Parameter(Mandatory = $true)][string]$TargetHost,
+        [Parameter(Mandatory = $true)][int]$TargetPort
+    )
+
+    $client = [Net.Sockets.TcpClient]::new()
+    try {
+        $client.ReceiveTimeout = 5000
+        $client.SendTimeout = 5000
+        $client.Connect($TargetHost, $TargetPort)
+        $stream = $client.GetStream()
+        $ping = [Text.Encoding]::ASCII.GetBytes("PING`r`n")
+        $stream.Write($ping, 0, $ping.Length)
+        $buffer = New-Object byte[] 16
+        $read = $stream.Read($buffer, 0, 16)
+        if ($read -le 0) { return $null }
+        $reply = [Text.Encoding]::ASCII.GetString($buffer, 0, $read)
+        if ($reply -notmatch '\+PONG') { return $null }
+        return "PONG"
+    }
+    catch {
+        return $null
+    }
+    finally {
+        $client.Dispose()
+    }
 }
 
 function Test-TcpPort {
@@ -375,6 +422,15 @@ try {
     if (-not $jwtSecret) { $jwtSecret = New-TemporaryJwtSecret }
     $env:JWT_SECRET = $jwtSecret
 
+    # local profile 的健康检查包含 Redis，隔离环境必须同时提供 Redis 实例。
+    $redisPort = 0
+    $configuredRedisPort = [Environment]::GetEnvironmentVariable("S03_REDIS_PORT", "Process")
+    if ($configuredRedisPort) { $redisPort = [int]$configuredRedisPort } else { $redisPort = Get-FreeTcpPort }
+    $env:S03_REDIS_PORT = "$redisPort"
+    $env:REDIS_HOST = "127.0.0.1"
+    $env:REDIS_PORT = "$redisPort"
+    $env:REDIS_PASSWORD = ""
+
     $script:composeArguments = @("compose", "-p", $composeProject, "-f", $composeFile)
     $script:expectedMigrationCount = Get-ExpectedMigrationCount
     Write-Output "Repository Flyway migrations: $script:expectedMigrationCount"
@@ -396,8 +452,8 @@ try {
     Assert-Equal $healthStatus "healthy" "MySQL container did not become healthy"
 
     # 选择后端可用的 MySQL 端点：以 MySQL 握手确认，避免把“端口可连”误判为“数据库可用”。
-    $publishedPort = Resolve-PublishedPort
-    $containerAddress = Resolve-ContainerAddress
+    $publishedPort = Resolve-PublishedPort -Service "mysql" -ContainerPort 3306
+    $containerAddress = Resolve-ContainerAddress -Service "mysql"
     if ($publishedPort) {
         Write-Output "Published MySQL port: $publishedPort"
     }
@@ -435,6 +491,52 @@ try {
     $env:MYSQL_PORT = "$mysqlPortForApp"
     $env:DB_URL = "jdbc:mysql://${mysqlHost}:${mysqlPortForApp}/$databaseName"
     Write-Output "Backend datasource: MYSQL_HOST=$env:MYSQL_HOST MYSQL_PORT=$env:MYSQL_PORT DB_URL=$env:DB_URL"
+
+    # Redis 端点：同样以 PING 确认，避免健康检查因 Redis 不可用而整体 DOWN。
+    $redisContainerId = (& docker @($script:composeArguments + @("ps", "-q", "redis"))).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($redisContainerId)) {
+        throw "Could not resolve the Redis container"
+    }
+    $redisDeadline = (Get-Date).AddSeconds(120)
+    do {
+        $redisHealth = (& docker inspect --format "{{.State.Health.Status}}" $redisContainerId).Trim()
+        if ($redisHealth -eq "healthy") { break }
+        if ($redisHealth -eq "unhealthy") { throw "Redis container became unhealthy" }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $redisDeadline)
+    Assert-Equal $redisHealth "healthy" "Redis container did not become healthy"
+
+    $redisPublishedPort = Resolve-PublishedPort -Service "redis" -ContainerPort 6379
+    $redisAddress = Resolve-ContainerAddress -Service "redis"
+    Write-Output "Published Redis port: $redisPublishedPort; container address: $redisAddress"
+    $redisCandidates = @()
+    if ($onWindows) {
+        $redisCandidates += , @("127.0.0.1", $redisPublishedPort)
+        $redisCandidates += , @($redisAddress, 6379)
+    }
+    else {
+        $redisCandidates += , @($redisAddress, 6379)
+        $redisCandidates += , @("127.0.0.1", $redisPublishedPort)
+    }
+    $redisHost = $null
+    $redisPortForApp = $null
+    foreach ($candidate in $redisCandidates) {
+        if (-not $candidate[0] -or -not $candidate[1]) { continue }
+        $pong = Get-RedisPong -TargetHost $candidate[0] -TargetPort $candidate[1]
+        if ($pong) {
+            $redisHost = $candidate[0]
+            $redisPortForApp = $candidate[1]
+            Write-Output "Redis endpoint selected: ${redisHost}:${redisPortForApp} ($pong)"
+            break
+        }
+        Write-Output "Redis PING failed on $($candidate[0]):$($candidate[1])"
+    }
+    if (-not $redisHost) {
+        throw "Redis PING failed on all candidate endpoints"
+    }
+    $env:REDIS_HOST = $redisHost
+    $env:REDIS_PORT = "$redisPortForApp"
+    Write-Output "Backend Redis: REDIS_HOST=$env:REDIS_HOST REDIS_PORT=$env:REDIS_PORT"
 
     $initialTableCount = [int](Invoke-MySqlQuery "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE();" | Select-Object -First 1)
     Assert-Equal $initialTableCount 0 "Initial database is not empty"

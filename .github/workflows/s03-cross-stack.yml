@@ -68,7 +68,7 @@ jobs:
             exit 1
           fi
           mvn --batch-mode org.owasp:dependency-check-maven:13.0.0:check -DskipTestScope -DnvdApiKey="${NVD_API_KEY}"
-      - name: Verify isolated MySQL 8 empty database
+      - name: Verify isolated MySQL 8 and Redis with local profile
         working-directory: .
         shell: pwsh
         run: ./scripts/s03_mysql_verify.ps1
