@@ -56,18 +56,18 @@ jobs:
         # S11ContractTests 以 user.dir 解析 ../contracts，工作目录必须是 backend/。
         run: mvn --batch-mode -DforkCount=0 verify
       - name: Dependency vulnerability scan
-        # OWASP dependency-check 13 必须使用 NVD API Key（匿名访问已不可用）。
-        # 密钥从仓库 Secret 读取：Settings → Secrets and variables → Actions → NVD_API_KEY
-        # 申请地址：https://nvd.nist.gov/developers/request-an-api-key
+        # OWASP dependency-check 12.2.2 支持匿名访问 NVD（限速 5 次/30 秒），
+        # 首次同步 NVD 库耗时较长但无需任何凭据；若仓库配置了 Secret NVD_API_KEY 则用于加速。
+        # 不传空密钥：dependency-check 13 会因长度为 0 的密钥直接报错。
+        # failBuildOnCVSS=11 表示只出报告不改构建结论（沿用本门禁既有语义）。
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          if [ -z "${NVD_API_KEY}" ]; then
-            echo "::error::缺少仓库 Secret NVD_API_KEY，dependency-check 无法更新 NVD 数据"
-            echo "::error::请在 https://nvd.nist.gov/developers/request-an-api-key 申请后写入仓库 Secret"
-            exit 1
+          args=()
+          if [ -n "${NVD_API_KEY}" ]; then
+            args+=(-DnvdApiKey="${NVD_API_KEY}")
           fi
-          mvn --batch-mode org.owasp:dependency-check-maven:13.0.0:check -DskipTestScope -DnvdApiKey="${NVD_API_KEY}"
+          mvn --batch-mode org.owasp:dependency-check-maven:12.2.2:check -DskipTestScope -DfailBuildOnCVSS=11 "${args[@]}"
       - name: Verify isolated MySQL 8 and Redis with local profile
         working-directory: .
         shell: pwsh
