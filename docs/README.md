@@ -16,6 +16,7 @@
 |---|---|
 | [需求追踪矩阵.md](需求追踪矩阵.md) | 需求、优先级、负责人、依赖、接口、数据、测试与验收映射 |
 | [需求澄清与决策清单.md](需求澄清与决策清单.md) | 已冻结决策和待确认事项的唯一登记处 |
+| [alg-12-parameter-decision.md](alg-12-parameter-decision.md) | ALG-12 偏好参数决策单（权重、遗忘、TOP-K、置信阈值、统计维度）：候选值、建议默认值、依据、影响面、回滚与待会签字栏，状态为已配置化待 R1/R3 会签 |
 | [progress/README.md](progress/README.md) | Gate 证据规则和步骤状态索引 |
 | [architecture/README.md](architecture/README.md) | S01 起维护的架构与 ADR 索引 |
 
