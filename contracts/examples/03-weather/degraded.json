@@ -10,7 +10,7 @@
       "source_type": "weather",
       "source_record_id": "qweather:climate:20260921:beijing",
       "retrieved_at": "2026-09-21T07:55:00Z",
-      "valid_until": "2026-09-21T08:55:00Z",
+      "valid_until": "2026-09-21T07:00:00Z",
       "freshness_status": "stale",
       "is_estimated": false
     }
@@ -25,7 +25,7 @@
       "data_type": "climate_statistics",
       "source_record_id": "qweather:climate:20260921:beijing",
       "retrieved_at": "2026-09-21T07:55:00Z",
-      "valid_until": "2026-09-21T08:55:00Z"
+      "valid_until": "2026-09-21T07:00:00Z"
     }
   ],
   "travel_advice": {
