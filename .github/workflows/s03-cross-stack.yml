@@ -55,10 +55,17 @@ jobs:
         # 必须在 backend/ 目录内执行：-DforkCount=0 时测试跑在 Maven 进程内，
         # S11ContractTests 以 user.dir 解析 ../contracts，工作目录必须是 backend/。
         run: mvn --batch-mode -DforkCount=0 verify
+      - name: Cache NVD database
+        # NVD 数据库体积大且首次同步慢，缓存到 runner 的 Maven 数据目录，后续 run 走增量更新。
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-data-${{ hashFiles('backend/pom.xml') }}
+          restore-keys: nvd-data-
       - name: Dependency vulnerability scan
-        # OWASP dependency-check 12.2.2 支持匿名访问 NVD（限速 5 次/30 秒），
-        # 首次同步 NVD 库耗时较长但无需任何凭据；若仓库配置了 Secret NVD_API_KEY 则用于加速。
-        # 不传空密钥：dependency-check 13 会因长度为 0 的密钥直接报错。
+        # OWASP dependency-check 12.2.2 支持匿名访问 NVD，但匿名限速为 5 次/30 秒，
+        # 默认速率会被判 429。这里把请求速率压到限速以下（每 8 秒 1 次 ≈ 3.75 次/30 秒）。
+        # 配置了 Secret NVD_API_KEY 时自动改用密钥（限速 50 次/30 秒，同步更快）。
         # failBuildOnCVSS=11 表示只出报告不改构建结论（沿用本门禁既有语义）。
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
@@ -66,7 +73,10 @@ jobs:
           args=()
           if [ -n "${NVD_API_KEY}" ]; then
             args+=(-DnvdApiKey="${NVD_API_KEY}")
+          else
+            args+=(-Dnvd.api.delay=8000 -Dnvd.api.requestsperthirtyseconds=4)
           fi
+          args+=(-Dnvd.api.retry.maxAttempts=4 -Dnvd.api.retry.delay=30000)
           mvn --batch-mode org.owasp:dependency-check-maven:12.2.2:check -DskipTestScope -DfailBuildOnCVSS=11 "${args[@]}"
       - name: Verify isolated MySQL 8 and Redis with local profile
         working-directory: .
