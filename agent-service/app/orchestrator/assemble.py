@@ -191,7 +191,7 @@ def _dining_for_day(
             "itinerary_draft": draft,
             "taste_preference": constraints.get("preferences") or [],
             "budget": constraints.get("budget"),
-            "companion": {},
+            "companion": None,
         },
         context,
         poi_source=deps.poi_source,

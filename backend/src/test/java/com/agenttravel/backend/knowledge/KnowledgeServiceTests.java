@@ -176,6 +176,8 @@ class KnowledgeServiceTests {
         Map<String, Object> catalog = service.exportPublishedCatalog("北京");
 
         assertThat(catalog.get("pois")).asList().hasSize(1);
+        Map<String, Object> poi = (Map<String, Object>) ((List<?>) catalog.get("pois")).get(0);
+        assertThat(poi).containsEntry("latitude", 39.918).containsEntry("longitude", 116.397);
         assertThat(catalog.get("entries")).asList().hasSize(1);
         assertThat(catalog.get("rules")).asList().hasSize(1);
         Map<String, Object> entry = (Map<String, Object>) ((List<?>) catalog.get("entries")).get(0);

@@ -850,6 +850,9 @@ public class KnowledgeService {
         value.put("aliases", repository.findAliases(poi.poiId()));
         value.put("district", poi.district());
         value.put("category", poi.category());
+        value.put("latitude", poi.latitude());
+        value.put("longitude", poi.longitude());
+        value.put("coordinate_system", poi.coordinateSystem());
         return value;
     }
 

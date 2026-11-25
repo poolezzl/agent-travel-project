@@ -55,3 +55,6 @@ playwright-report/
 build/
 dist/
 /agent-service/resources/published_catalog.java.json
+/agent-service/resources/published_catalog.all.json
+/agent-service/resources/published_catalog.official.json
+/agent-service/resources/published_catalog.wangfujing.json

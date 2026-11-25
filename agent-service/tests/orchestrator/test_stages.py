@@ -89,6 +89,42 @@ def test_full_dag_plan_matches_the_frozen_contract(
     )
 
 
+def test_assembled_day_contains_meals_and_lodging_candidates(
+    deps: OrchestratorDeps, request_payload: dict[str, Any]
+) -> None:
+    # A single attraction keeps both meal anchors and the lodging anchor near the
+    # synthetic dining POIs; the three-attraction default can put the last anchor
+    # outside the 1.5 km/3 km search radii, which is a valid degradation but not
+    # what this regression test is about.
+    raw = json.loads(
+        (ROOT / "agent-service" / "resources" / "published_catalog.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    raw["pois"] = [item for item in raw["pois"] if item["poi_id"] == "POI-BJ-001"]
+    raw["entries"] = [item for item in raw["entries"] if item["poi_id"] == "POI-BJ-001"]
+    raw["rules"] = [item for item in raw["rules"] if item["poi_id"] == "POI-BJ-001"]
+    single = OrchestratorDeps(
+        catalog=PublishedCatalog.from_payload(raw),
+        poi_source=deps.poi_source,
+        weather_provider=deps.weather_provider,
+        now=deps.now,
+        forecast_horizon_days=deps.forecast_horizon_days,
+    )
+    payload = {
+        **request_payload,
+        "start_date": "2026-11-24",
+        "end_date": "2026-11-24",
+    }
+
+    prior = _dag(single, payload)
+    day = prior["assemble"]["plan"]["days"][0]
+
+    assert day["meals"]
+    assert all(meal["candidates"] for meal in day["meals"])
+    assert day["lodging"]["candidates"]
+
+
 def test_closed_must_visit_requires_confirmation_instead_of_removal(
     deps: OrchestratorDeps, request_payload: dict[str, Any]
 ) -> None:
