@@ -1,6 +1,6 @@
 """Health check endpoint."""
 
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 from fastapi import APIRouter
 
