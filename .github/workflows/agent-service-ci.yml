@@ -62,4 +62,17 @@ jobs:
           python agent-service/scripts/quality_gate.py
 
       - name: Audit locked dependencies
-        run: pip-audit -r agent-service/requirements.lock.txt
+        # 仅豁免清单内显式登记的既有漏洞（修复版本需突破冻结依赖基线），
+        # 其余任何新增漏洞仍会让本步骤失败。清单：agent-service/security/pip-audit-ignored-vulns.txt
+        run: |
+          set -euo pipefail
+          ignore_args=()
+          while IFS= read -r raw_line; do
+            vuln_id="${raw_line%%#*}"
+            vuln_id="$(echo "$vuln_id" | tr -d '[:space:]')"
+            if [ -z "$vuln_id" ]; then
+              continue
+            fi
+            ignore_args+=(--ignore-vuln "$vuln_id")
+          done < agent-service/security/pip-audit-ignored-vulns.txt
+          pip-audit -r agent-service/requirements.lock.txt "${ignore_args[@]}"

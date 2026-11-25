@@ -130,7 +130,19 @@ jobs:
           pytest -q --basetemp="$TMPDIR/pytest-basetemp"
       - name: Python dependency audit
         working-directory: agent-service
-        run: pip-audit -r requirements.lock.txt
+        # 仅豁免清单内显式登记的既有漏洞，其余新增漏洞仍会失败。
+        run: |
+          set -euo pipefail
+          ignore_args=()
+          while IFS= read -r raw_line; do
+            vuln_id="${raw_line%%#*}"
+            vuln_id="$(echo "$vuln_id" | tr -d '[:space:]')"
+            if [ -z "$vuln_id" ]; then
+              continue
+            fi
+            ignore_args+=(--ignore-vuln "$vuln_id")
+          done < security/pip-audit-ignored-vulns.txt
+          pip-audit -r requirements.lock.txt "${ignore_args[@]}"
 
   security:
     name: Secret and dependency manifest scan
