@@ -154,10 +154,12 @@ paths:
       summary: 按权重召回本人 TOP-K 偏好
       description: >-
         按遗忘后的有效权重倒序返回，作为 Agent 上下文的软约束来源；仅本人可见，不参与公共榜单。
-        有效权重 = 原始权重 × 0.5^(距 lastUsedAt 的天数 / 半衰期)，并以保底权重截断；
-        置信度低于阈值（app.preferences.min-confidence，默认 0.6）的偏好被过滤；
+        有效权重 = Σ(证据 weight_delta × 0.5^(距 evidence.observed_at 的天数 / 半衰期))，
+        并以保底权重 app.preferences.decay-floor 与上限 app.preferences.weight-cap 截断；
+        无证据流水的历史数据回落到「存储权重 × 0.5^(距 lastUsedAt 的天数 / 半衰期)」。
+        同一偏好键只返回最新版本；置信度低于 app.preferences.min-confidence（默认 0.6）的条目被过滤；
         召回条数 K 取 app.preferences.top-k（默认 5），上限取 app.preferences.top-k-max（默认 20）。
-        上述默认值见 docs/alg-12-parameter-decision.md，状态为“已配置化，待 R1/R3 会签”，尚未定稿。
+        上述默认值见 docs/alg-12-parameter-decision.md，R1 已会签，R3/R8 复核待补。
       parameters:
         - {"name":"top_k","in":"query","required":false,"description":"可选。不传时使用服务端配置 app.preferences.top-k；传入时按 app.preferences.top-k-max 截断，且不得超过契约上限 20。","schema":{"type":"integer","minimum":1,"maximum":20,"default":5}}
       responses:
@@ -229,8 +231,8 @@ components:
         key: {type: string, maxLength: 64, description: 偏好键，如 city/theme/pace/budget}
         valueJson: {type: object, description: 偏好值，结构随 key 而定}
         sourceType: {type: string, enum: [EXPLICIT, HISTORY_ANALYSIS, SYSTEM]}
-        confidence: {type: number, minimum: 0, maximum: 1, description: 置信度；维度基准值取 app.preferences.dimension-confidence / default-confidence，召回时低于 app.preferences.min-confidence（默认 0.6）的条目被过滤。默认值待 R1/R3 会签"}
-        weight: {type: integer, description: 权重 = 统计命中条数 × app.preferences.weight-increment（默认 3），上限 app.preferences.weight-cap（默认 100）；召回接口返回遗忘折算后的有效权重，半衰期 app.preferences.decay-half-life-days（默认 180 天）。默认值待 R1/R3 会签"}
+        confidence: {type: number, minimum: 0, maximum: 1, description: 置信度；维度基准值取 app.preferences.dimension-confidence / default-confidence，召回时低于 app.preferences.min-confidence（默认 0.6）的条目被过滤，为空表示未知且保留。R1 已会签，R3/R8 复核待补"}
+        weight: {type: integer, description: 权重 = 统计命中条数 × app.preferences.weight-increment（默认 3），上限 app.preferences.weight-cap（默认 100）；召回接口返回遗忘折算后的有效权重（按证据 weight_delta 与 observed_at 逐条折算，半衰期 app.preferences.decay-half-life-days 默认 180 天）。R1 已会签，R3/R8 复核待补"}
         lastUsedAt: {type: string, format: date-time}
         reason: {type: string, description: 可解释理由，说明该维度由何种历史数据统计得出"}
     PreferenceSummary:
