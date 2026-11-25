@@ -56,7 +56,18 @@ jobs:
         # S11ContractTests 以 user.dir 解析 ../contracts，工作目录必须是 backend/。
         run: mvn --batch-mode -DforkCount=0 verify
       - name: Dependency vulnerability scan
-        run: mvn --batch-mode org.owasp:dependency-check-maven:13.0.0:check -DskipTestScope
+        # OWASP dependency-check 13 必须使用 NVD API Key（匿名访问已不可用）。
+        # 密钥从仓库 Secret 读取：Settings → Secrets and variables → Actions → NVD_API_KEY
+        # 申请地址：https://nvd.nist.gov/developers/request-an-api-key
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "${NVD_API_KEY}" ]; then
+            echo "::error::缺少仓库 Secret NVD_API_KEY，dependency-check 无法更新 NVD 数据"
+            echo "::error::请在 https://nvd.nist.gov/developers/request-an-api-key 申请后写入仓库 Secret"
+            exit 1
+          fi
+          mvn --batch-mode org.owasp:dependency-check-maven:13.0.0:check -DskipTestScope -DnvdApiKey="${NVD_API_KEY}"
       - name: Verify isolated MySQL 8 empty database
         working-directory: .
         shell: pwsh

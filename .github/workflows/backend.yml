@@ -13,6 +13,8 @@ on:
       - "deploy/docker-compose.s03.yml"
       - "scripts/s03_mysql_verify.ps1"
       - ".github/workflows/backend.yml"
+  # 允许在路径过滤未命中时手工触发（例如改动只在 frontend/ 或 docs/）。
+  workflow_dispatch:
 
 permissions:
   contents: read
