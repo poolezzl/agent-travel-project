@@ -15,7 +15,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--city", default="北京")
     parser.add_argument(
         "--output",
-        default=str(Path(__file__).resolve().parents[1] / "resources" / "published_catalog.java.json"),
+        default=str(
+            Path(__file__).resolve().parents[1] / "resources" / "published_catalog.java.json"
+        ),
     )
     args = parser.parse_args(argv)
 

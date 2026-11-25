@@ -1,14 +1,15 @@
 """Tests for the published catalog and retrieval filters."""
+
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.knowledge.catalog import PublishedCatalog
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "resources" / "published_catalog.json"
-MOMENT = datetime(2026, 10, 29, tzinfo=timezone.utc)
+MOMENT = datetime(2026, 10, 29, tzinfo=UTC)
 
 
 class PublishedCatalogTests(unittest.TestCase):

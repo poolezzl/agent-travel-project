@@ -61,7 +61,9 @@ class EstimateOnlyRoutePort:
         return RoutePortError(kind=RouteErrorKind.EMPTY, message="route provider not configured")
 
 
-def build_route_provider(mode: str = "estimate", now: Callable[[], Any] | None = None) -> RouteProvider:
+def build_route_provider(
+    mode: str = "estimate", now: Callable[[], Any] | None = None
+) -> RouteProvider:
     """Estimate-only provider. ``now`` keeps estimated legs on the orchestrator clock."""
     return RouteProvider(EstimateOnlyRoutePort(), MockRouteCache(), now=now)
 

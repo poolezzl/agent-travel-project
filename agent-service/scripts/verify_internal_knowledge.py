@@ -40,14 +40,22 @@ def main(argv: list[str] | None = None) -> int:
         reservations = client.query_reservations(
             city=args.city, points=[point], day=date.fromisoformat(args.date)
         )
-    print(
-        f"catalog pois={len(catalog['pois'])} entries={len(catalog['entries'])} rules={len(catalog['rules'])}"
-    )
-    print(f"attractions cards={len(attractions['cards'])} sources={len(attractions['source_metadata'])}")
+    poi_count = len(catalog["pois"])
+    entry_count = len(catalog["entries"])
+    rule_count = len(catalog["rules"])
+    print(f"catalog pois={poi_count} entries={entry_count} rules={rule_count}")
+    card_count = len(attractions["cards"])
+    attraction_sources = len(attractions["source_metadata"])
+    print(f"attractions cards={card_count} sources={attraction_sources}")
     if attractions["cards"]:
         card = attractions["cards"][0]
-        print(f"first point={card.get('point_id')} fact_type={card.get('fact_type')} source={card.get('source')}")
-    print(f"reservations={len(reservations['reservations'])} sources={len(reservations['source_metadata'])}")
+        print(
+            f"first point={card.get('point_id')} "
+            f"fact_type={card.get('fact_type')} source={card.get('source')}"
+        )
+    reservation_count = len(reservations["reservations"])
+    reservation_sources = len(reservations["source_metadata"])
+    print(f"reservations={reservation_count} sources={reservation_sources}")
     return 0
 
 

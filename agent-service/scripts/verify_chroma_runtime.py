@@ -16,7 +16,7 @@ import argparse
 import hashlib
 import math
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.knowledge.catalog import PublishedCatalog
@@ -35,7 +35,7 @@ class HashEmbedding:
         return {}
 
     @staticmethod
-    def build_from_config(config: dict) -> "HashEmbedding":
+    def build_from_config(config: dict) -> HashEmbedding:
         return HashEmbedding()
 
     def embed_query(self, input):  # noqa: A002 - Chroma protocol name
@@ -56,8 +56,10 @@ class HashEmbedding:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--catalog", default=str(Path(__file__).resolve().parents[1]
-                                                / "resources" / "published_catalog.json"))
+    parser.add_argument(
+        "--catalog",
+        default=str(Path(__file__).resolve().parents[1] / "resources" / "published_catalog.json"),
+    )
     parser.add_argument("--persist-dir", default=None)
     args = parser.parse_args(argv)
 
@@ -68,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     catalog = PublishedCatalog.load(args.catalog)
-    moment = datetime(2026, 10, 29, tzinfo=timezone.utc)
+    moment = datetime(2026, 10, 29, tzinfo=UTC)
     records = index_records(catalog, moment=moment)
     with tempfile.TemporaryDirectory(prefix="r3-chroma-", ignore_cleanup_errors=True) as temp_dir:
         persist_dir = args.persist_dir or temp_dir

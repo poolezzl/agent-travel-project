@@ -108,9 +108,9 @@ def run_collect(
         timeline = [item for item in result.get("timeline", []) if isinstance(item, dict)]
         by_point = {card.get("point_id"): card for card in card_list}
         for point in points:
-            card = by_point.get(point["poi_id"])
-            if card is not None:
-                point.setdefault("reservations", {})[day.isoformat()] = card
+            reservation_card = by_point.get(point["poi_id"])
+            if reservation_card is not None:
+                point.setdefault("reservations", {})[day.isoformat()] = reservation_card
         for point in points:
             items = [item for item in timeline if item.get("point_id") == point["poi_id"]]
             if items:
@@ -238,7 +238,7 @@ def _weather_slice(constraints: dict[str, Any], deps: OrchestratorDeps) -> dict[
             or (valid_until is not None and valid_until < now)
             or (valid_until is None and parsed.data_type == "forecast")
         )
-        row = {
+        row: dict[str, Any] = {
             "status": "degraded" if stale else "ok",
             "date": parsed.date.isoformat(),
             "condition": parsed.condition,

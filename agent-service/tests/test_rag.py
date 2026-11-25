@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.knowledge.catalog import PublishedCatalog
@@ -11,7 +11,7 @@ from app.knowledge.index import index_records
 from app.knowledge.rag import DEFAULT_MIN_SCORE, LexicalRag
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "resources" / "published_catalog.json"
-MOMENT = datetime(2026, 10, 29, tzinfo=timezone.utc)
+MOMENT = datetime(2026, 10, 29, tzinfo=UTC)
 
 
 class LexicalRagTests(unittest.TestCase):

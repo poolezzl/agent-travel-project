@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from app.agents.route_planner.ports import PoiPort
 from app.agents.route_planner.route_provider import RouteProvider
+from app.agents.weather.models import WeatherPortResult
 from app.knowledge.catalog import PublishedCatalog
 from app.knowledge.dining_lodging import PoiSource
 
@@ -15,7 +16,7 @@ from app.knowledge.dining_lodging import PoiSource
 class UnavailableWeatherPort:
     """Explicit no-provider weather port: never invents weather facts."""
 
-    def forecast(self, city_id: str, day: object) -> object:
+    def forecast(self, city_id: str, day: date) -> WeatherPortResult:
         from app.agents.weather.errors import WeatherErrorKind
         from app.agents.weather.models import WeatherPortError
 
@@ -23,7 +24,7 @@ class UnavailableWeatherPort:
             kind=WeatherErrorKind.UNREACHABLE, message="weather provider not configured"
         )
 
-    def climate(self, city_id: str, day: object) -> object:
+    def climate(self, city_id: str, day: date) -> WeatherPortResult:
         return self.forecast(city_id, day)
 
 

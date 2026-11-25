@@ -50,7 +50,7 @@ def run(
     dinner = _anchor_for(segments, _MEAL_ANCHOR_MINUTES["dinner"])
     last = segments[-1]
 
-    slots = [
+    slots: list[dict[str, Any]] = [
         {
             "kind": "meal",
             "meal": "lunch",

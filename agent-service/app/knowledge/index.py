@@ -9,7 +9,7 @@ stale index cannot leak expired text.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from app.knowledge.catalog import PublishedCatalog, parse_datetime
@@ -23,9 +23,11 @@ def _epoch(value: str | None, default: float) -> float:
     return parsed.timestamp() if parsed is not None else default
 
 
-def index_records(catalog: PublishedCatalog, *, moment: datetime | None = None) -> list[dict[str, Any]]:
+def index_records(
+    catalog: PublishedCatalog, *, moment: datetime | None = None
+) -> list[dict[str, Any]]:
     """Build Chroma ``(id, document, metadata)`` rows from published entries."""
-    now = moment or datetime.now(timezone.utc)
+    now = moment or datetime.now(UTC)
     now_epoch = now.timestamp()
     records: list[dict[str, Any]] = []
     for entry in catalog.entries:

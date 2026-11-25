@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.knowledge.catalog import KnowledgeEntry, PublishedCatalog, tokens
 
@@ -111,9 +111,7 @@ class ChromaRag:
         ]
         if city_id:
             conditions.append({"city_id": city_id})
-        where: dict[str, object] = (
-            conditions[0] if len(conditions) == 1 else {"$and": conditions}
-        )
+        where: dict[str, object] = conditions[0] if len(conditions) == 1 else {"$and": conditions}
         result = self.collection.query(  # type: ignore[attr-defined]
             query_texts=[query],
             n_results=top_k,
@@ -141,17 +139,26 @@ def _score(query_tokens: set[str], text: str) -> float:
     return len(query_tokens & tokens(text)) / len(query_tokens)
 
 
+def _first_row(value: object) -> list[Any]:
+    """Return the first Chroma result row, or an empty row for any unexpected shape."""
+    if isinstance(value, list) and value and isinstance(value[0], list):
+        return value[0]
+    return []
+
+
 def _hits_from_chroma(result: dict[str, object], point_id: str) -> list[RagHit]:
     """Convert a raw Chroma response without trusting unsupported payloads."""
-    documents = result.get("documents") or [[]]
-    metadatas = result.get("metadatas") or [[]]
-    distances = result.get("distances") or [[]]
-    ids = result.get("ids") or [[]]
+    documents = _first_row(result.get("documents"))
+    metadatas = _first_row(result.get("metadatas"))
+    distances = _first_row(result.get("distances"))
+    ids = _first_row(result.get("ids"))
     hits: list[RagHit] = []
-    for index, text in enumerate(documents[0] if documents else []):
-        metadata = metadatas[0][index] if metadatas and metadatas[0] else {}
-        chunk_id = ids[0][index] if ids and ids[0] else ""
-        distance = distances[0][index] if distances and distances[0] else 1.0
+    for index, text in enumerate(documents):
+        metadata = metadatas[index] if index < len(metadatas) else {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        chunk_id = ids[index] if index < len(ids) else ""
+        distance = distances[index] if index < len(distances) else 1.0
         hits.append(
             RagHit(
                 point_id=point_id,

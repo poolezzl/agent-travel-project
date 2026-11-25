@@ -80,7 +80,9 @@ def run(
         stale_seen = stale_seen or stale
         if stale:
             degraded.append(f"reservations[{index}].stale")
-            messages.append(f"{point['name']}：预约规则超过 {rule.stale_after_days} 天未核验，请以官方渠道为准")
+            messages.append(
+                f"{point['name']}：预约规则超过 {rule.stale_after_days} 天未核验，请以官方渠道为准"
+            )
 
         closure_weekdays = _closed_weekdays(rule.holiday_exception)
         if day.weekday() in closure_weekdays:
@@ -98,7 +100,9 @@ def run(
             schedule_problem = True
             if outcome.reason == "invalid_timezone":
                 degraded.append(f"timeline[{index}].timezone")
-                messages.append(f"{point['name']}：预约规则时区无效，无法生成提醒，请以官方渠道为准")
+                messages.append(
+                    f"{point['name']}：预约规则时区无效，无法生成提醒，请以官方渠道为准"
+                )
             elif outcome.reason in {"missing_schedule", "invalid_time"}:
                 degraded.append(f"timeline[{index}].release_time")
                 messages.append(f"{point['name']}：预约规则缺少可解析的放票时间，请以官方渠道为准")
@@ -257,11 +261,7 @@ def _closed_weekdays(holiday_exception: str | None) -> set[int]:
     """
     if not holiday_exception:
         return set()
-    return {
-        weekday
-        for text, weekday in _WEEKDAY_TEXT.items()
-        if text in holiday_exception
-    }
+    return {weekday for text, weekday in _WEEKDAY_TEXT.items() if text in holiday_exception}
 
 
 def _unique(values: list[str]) -> list[str]:

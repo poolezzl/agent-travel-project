@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         import chromadb
         from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
     except ImportError as exc:
-        print("缺少 Chroma/bge 依赖，请先安装：pip install -e \".[rag]\"", file=sys.stderr)
+        print('缺少 Chroma/bge 依赖，请先安装：pip install -e ".[rag]"', file=sys.stderr)
         print(f"原始错误：{exc}", file=sys.stderr)
         return 2
 

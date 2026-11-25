@@ -162,7 +162,12 @@ def _dining_for_day(
     deps: OrchestratorDeps,
     context: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any], list[str]]:
-    empty_lodging = {"date": day_date, "area": None, "anchor_point_id": None, "candidates": []}
+    empty_lodging: dict[str, Any] = {
+        "date": day_date,
+        "area": None,
+        "anchor_point_id": None,
+        "candidates": [],
+    }
     if not segments:
         return [], empty_lodging, ["meals", "lodging"]
     draft = {

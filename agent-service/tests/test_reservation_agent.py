@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.agents import reservation_rules
 from app.knowledge.catalog import PublishedCatalog
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "resources" / "published_catalog.json"
-MOMENT = datetime(2026, 10, 29, tzinfo=timezone.utc)
+MOMENT = datetime(2026, 10, 29, tzinfo=UTC)
 CONTEXT = {
     "schema_version": "agent-contract-v1",
     "task_id": "task-test",
@@ -88,14 +88,16 @@ class ReservationAgentTests(unittest.TestCase):
     def test_missed_release_is_not_a_reminder(self) -> None:
         result = self._run(
             {"points": [_point("POI-BJ-001", "故宫博物院")], "date": "2026-11-03"},
-            moment=datetime(2026, 10, 28, tzinfo=timezone.utc),
+            moment=datetime(2026, 10, 28, tzinfo=UTC),
         )
         self.assertEqual(result["status"], "partial")
         self.assertEqual(result["timeline"], [])
         self.assertIn("timeline[0]", result["degraded_fields"])
 
     def test_stale_rule_is_visible(self) -> None:
-        result = self._run({"points": [_point("POI-BJ-002", "中国国家博物馆")], "date": "2026-11-10"})
+        result = self._run(
+            {"points": [_point("POI-BJ-002", "中国国家博物馆")], "date": "2026-11-10"}
+        )
         self.assertEqual(result["status"], "partial")
         self.assertTrue(result["reservations"][0]["stale"])
         self.assertIn("reservations[0].stale", result["degraded_fields"])

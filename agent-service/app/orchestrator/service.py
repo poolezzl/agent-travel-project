@@ -30,7 +30,8 @@ def run_stage(
         return failure(ctx, "INVALID_STEP", f"未知编排步骤 {step!r}")
 
     raw_request = body.get("request")
-    prior = body.get("prior") if isinstance(body.get("prior"), dict) else {}
+    raw_prior = body.get("prior")
+    prior: dict[str, Any] = raw_prior if isinstance(raw_prior, dict) else {}
 
     try:
         if step == "parse":
