@@ -219,6 +219,8 @@
 | 非法配置启动即失败 | `PreferenceParameterTests.invalidParametersAreRejected` | 通过（K、阈值、增幅、维度名、分档阈值 8 类） |
 | 命中计数缺陷回归 | `PreferenceParameterTests.repeatedThemeValueIsCountedOncePerOccurrence` | 通过（同值命中 2 次记 2，不再记 3） |
 | 真实 MySQL 召回 | `trip_planner_it` 临时探针（写入 4 条偏好后按 5 组配置召回并清理） | 通过：阈值过滤、遗忘折算（30→6、12→11）、K 截断、来源类型透传（EXPLICIT）均符合预期，探针数据已清零 |
+| 真实 MySQL 接口级回归 | `S24_IT=true` + 一次性库 `trip_planner_alg12`，`S24PreferenceIntegrationTests`（5 项）、`S24PreferenceConfigOverrideIntegrationTests`（1 项）、`S24VersionIntegrationTests`（6 项） | `Tests run: 12, Failures: 0, Errors: 0, Skipped: 0`；其中配置覆盖用例证明改 `app.preferences.*` 会直接改变接口召回结果 |
+| 前端与 Agent 侧基线 | `npm run test:unit`（156 通过）、`npx vue-tsc --noEmit`（退出码 0）、agent-service `pytest`（294 passed） | 通过，本次未改动前端与 `agent-service/` |
 | 契约校验 | `validate_s02_contracts.py` / `validate_s08_contracts.py` / `validate_s11_contracts.py` / `validate_s26_contract.py` | 全部通过 |
 
 后端全量测试与本次改动的详细命令输出见 `docs/progress/S24.md` 的「补充验证」小节。
