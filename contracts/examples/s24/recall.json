@@ -5,7 +5,8 @@
     "sourceType": "HISTORY_ANALYSIS",
     "confidence": 0.82,
     "weight": 12,
-    "lastUsedAt": "2026-11-24T12:30:00Z"
+    "lastUsedAt": "2026-11-24T12:30:00Z",
+    "reason": "统计历史行程中出现次数最多的城市"
   },
   {
     "key": "pace",
@@ -13,6 +14,7 @@
     "sourceType": "EXPLICIT",
     "confidence": 0.95,
     "weight": 9,
-    "lastUsedAt": "2026-11-20T08:00:00Z"
+    "lastUsedAt": "2026-11-20T08:00:00Z",
+    "reason": "按每日景点数量划分行程节奏"
   }
 ]
