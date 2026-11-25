@@ -188,6 +188,19 @@ function Get-ExpectedMigrationCount {
     return @(Get-ChildItem -LiteralPath $migrationDir -Filter "V*.sql" -File).Count
 }
 
+function Get-BackendJar {
+    # 若已有 spring-boot repackage 产出的可执行 jar，直接用它启动，避免 spring-boot:run 的重复构建。
+    $targetDir = Join-Path $repoRoot "backend\target"
+    if (-not (Test-Path -LiteralPath $targetDir)) {
+        return $null
+    }
+    $jar = Get-ChildItem -LiteralPath $targetDir -Filter "backend-*.jar" -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike "*.original" } |
+        Select-Object -First 1
+    if ($jar) { return $jar }
+    return $null
+}
+
 function Assert-MigrationState {
     param([Parameter(Mandatory = $true)][string]$Phase)
 
@@ -241,8 +254,24 @@ function Start-Backend {
         $maven = Get-Command mvn -ErrorAction Stop
     }
 
+    # 已有可执行 jar 时直接用 java -jar 启动：省去 spring-boot:run 的插件解析与重新编译，
+    # 托管 CI 上启动耗时从分钟级降到秒级。
+    $jar = Get-BackendJar
+    if ($jar) {
+        Write-Output "Starting backend from jar: $($jar.FullName)"
+        $arguments = @("-jar", $jar.FullName, "--spring.profiles.active=local", "--server.port=$BackendPort")
+    }
+    else {
+        Write-Output "Starting backend with spring-boot:run"
+    }
+
     if ($onWindows) {
-        $script:backendProcess = Start-Process -FilePath $maven.Source -ArgumentList $arguments `
+        $fileName = if ($jar) { "java" } else { $maven.Source }
+        $startArguments = $arguments
+        if ($jar) {
+            $startArguments = @("-jar", $jar.FullName, "--spring.profiles.active=local", "--server.port=$BackendPort")
+        }
+        $script:backendProcess = Start-Process -FilePath $fileName -ArgumentList $startArguments `
             -WorkingDirectory $repoRoot -RedirectStandardOutput $backendLog `
             -RedirectStandardError $backendErrorLog -PassThru
         return
@@ -253,7 +282,12 @@ function Start-Backend {
     # 命令写入独立 .sh 文件后再执行：Start-Process 会把 ArgumentList 按空格拼接，
     # 直接传 bash -c "<命令>" 会被拆成多个参数，bash 只执行第一个词就退出。
     $quoted = ($arguments | ForEach-Object { "'" + ($_ -replace "'", "'\''") + "'" }) -join " "
-    $launch = "exec '" + $maven.Source + "' $quoted > '$backendLog' 2> '$backendErrorLog'"
+    $launch = if ($jar) {
+        "exec java $quoted > '$backendLog' 2> '$backendErrorLog'"
+    }
+    else {
+        "exec '" + $maven.Source + "' $quoted > '$backendLog' 2> '$backendErrorLog'"
+    }
     $script:launchScript = Join-Path ([IO.Path]::GetTempPath()) "s03-backend-$PID.sh"
     Set-Content -LiteralPath $script:launchScript -Value $launch -Encoding utf8
     $script:backendProcess = Start-Process -FilePath "bash" -ArgumentList @($script:launchScript) `
@@ -261,7 +295,7 @@ function Start-Backend {
 }
 
 function Wait-ForBackend {
-    $deadline = (Get-Date).AddSeconds(90)
+    $deadline = (Get-Date).AddSeconds(240)
     do {
         if ($script:backendProcess.HasExited) {
             $diagnostic = @()
@@ -282,7 +316,14 @@ function Wait-ForBackend {
         }
     } while ((Get-Date) -lt $deadline)
 
-    throw "Backend did not become healthy within 90 seconds"
+    $diagnostic = @()
+    if (Test-Path -LiteralPath $backendLog) {
+        $diagnostic += Get-Content -LiteralPath $backendLog -Tail 60
+    }
+    if (Test-Path -LiteralPath $backendErrorLog) {
+        $diagnostic += Get-Content -LiteralPath $backendErrorLog -Tail 60
+    }
+    throw "Backend did not become healthy within 240 seconds. Last output:`n$($diagnostic -join [Environment]::NewLine)"
 }
 
 try {
