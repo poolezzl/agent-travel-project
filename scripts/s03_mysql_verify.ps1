@@ -26,6 +26,7 @@ $environmentNames = @(
     "DB_USERNAME",
     "DB_PASSWORD",
     "FLYWAY_ENABLED",
+    "JWT_SECRET",
     "S03_MYSQL_ROOT_PASSWORD",
     "S03_MYSQL_DATABASE",
     "S03_MYSQL_USER",
@@ -58,6 +59,12 @@ function Get-FreeTcpPort {
 
 function New-TemporaryPassword {
     return "$([Guid]::NewGuid().ToString('N'))A9"
+}
+
+function New-TemporaryJwtSecret {
+    # JwtTokenService 要求至少 32 个字符；这里为单次隔离校验生成临时密钥，
+    # 不落盘、不复用，校验结束后随进程环境变量一起恢复。
+    return "$([Guid]::NewGuid().ToString('N'))$([Guid]::NewGuid().ToString('N'))"
 }
 
 function Invoke-MySqlQuery {
@@ -213,6 +220,9 @@ try {
     $env:DB_PASSWORD = $env:S03_MYSQL_PASSWORD
     $env:FLYWAY_ENABLED = "true"
     $env:SPRING_PROFILES_ACTIVE = "local"
+    $jwtSecret = [Environment]::GetEnvironmentVariable("JWT_SECRET", "Process")
+    if (-not $jwtSecret) { $jwtSecret = New-TemporaryJwtSecret }
+    $env:JWT_SECRET = $jwtSecret
 
     $script:composeArguments = @("compose", "-p", $composeProject, "-f", $composeFile)
     $composeStarted = $true
