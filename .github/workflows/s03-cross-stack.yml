@@ -38,6 +38,9 @@ jobs:
   backend:
     name: Java build, tests, and Flyway check
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - name: Set up Java 21
@@ -48,10 +51,14 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
       - name: Verify backend
-        run: mvn --batch-mode -f backend/pom.xml verify
+        # 与 backend.yml 保持同一开关：fork 出的 JVM 与 jacoco agent 在 CI/沙箱内会互相冲突。
+        # 必须在 backend/ 目录内执行：-DforkCount=0 时测试跑在 Maven 进程内，
+        # S11ContractTests 以 user.dir 解析 ../contracts，工作目录必须是 backend/。
+        run: mvn --batch-mode -DforkCount=0 verify
       - name: Dependency vulnerability scan
-        run: mvn --batch-mode -f backend/pom.xml org.owasp:dependency-check-maven:13.0.0:check -DskipTestScope
+        run: mvn --batch-mode org.owasp:dependency-check-maven:13.0.0:check -DskipTestScope
       - name: Verify isolated MySQL 8 empty database
+        working-directory: .
         shell: pwsh
         run: ./scripts/s03_mysql_verify.ps1
 
@@ -102,7 +109,14 @@ jobs:
           ruff check .
       - name: Python tests
         working-directory: agent-service
-        run: pytest -q
+        # pytest 临时目录改用 runner 工作目录下的 TMPDIR，避免宿主临时目录权限导致的删除失败。
+        env:
+          TMPDIR: ${{ runner.temp }}/agent-service-tmp
+          TMP: ${{ runner.temp }}/agent-service-tmp
+          TEMP: ${{ runner.temp }}/agent-service-tmp
+        run: |
+          mkdir -p "$TMPDIR"
+          pytest -q --basetemp="$TMPDIR/pytest-basetemp"
       - name: Python dependency audit
         working-directory: agent-service
         run: pip-audit -r requirements.lock.txt

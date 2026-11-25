@@ -33,7 +33,9 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
       - name: Verify backend
-        run: mvn --batch-mode verify
+        # -DforkCount=0：在 CI/沙箱内 fork 出的 JVM 与 jacoco agent（写入 ${java.io.tmpdir}）会互相冲突，
+        # 改为进程内执行测试，保证同一套开关在本机与 CI 行为一致。
+        run: mvn --batch-mode -DforkCount=0 verify
       - name: Check resolved dependencies
         run: mvn --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=text
       - name: Verify isolated MySQL 8 empty database with local profile

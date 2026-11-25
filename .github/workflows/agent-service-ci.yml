@@ -49,7 +49,15 @@ jobs:
         run: python -m build agent-service
 
       - name: Run Agent Service quality gate
-        run: python agent-service/scripts/quality_gate.py
+        # pytest 的临时目录必须落在 runner 自有工作目录内：
+        # 宿主默认临时目录的权限模型会让 pytest 清理 tmp_path 时报 PermissionError。
+        env:
+          TMPDIR: ${{ runner.temp }}/agent-service-tmp
+          TMP: ${{ runner.temp }}/agent-service-tmp
+          TEMP: ${{ runner.temp }}/agent-service-tmp
+        run: |
+          mkdir -p "$TMPDIR"
+          python agent-service/scripts/quality_gate.py
 
       - name: Audit locked dependencies
         run: pip-audit -r agent-service/requirements.lock.txt
