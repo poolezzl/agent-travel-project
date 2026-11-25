@@ -5,7 +5,39 @@
   "request_id": "req-03-ok",
   "generated_at": "2026-09-21T08:00:00Z",
   "status": "ok",
-  "source_metadata": [],
-  "daily": [],
-  "travel_advice": {}
+  "source_metadata": [
+    {
+      "source_type": "weather",
+      "source_record_id": "qweather:20260921:beijing",
+      "retrieved_at": "2026-09-21T07:55:00Z",
+      "valid_until": "2026-09-21T08:55:00Z",
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-09-21",
+      "temp_min": 18.0,
+      "temp_max": 26.0,
+      "precip_prob": 0.1,
+      "condition": "多云",
+      "data_type": "forecast",
+      "source_record_id": "qweather:20260921:beijing",
+      "retrieved_at": "2026-09-21T07:55:00Z",
+      "valid_until": "2026-09-21T08:55:00Z"
+    }
+  ],
+  "travel_advice": {
+    "sensitive_points": [
+      {
+        "point": "故宫博物院",
+        "feasible": true,
+        "risks": []
+      }
+    ],
+    "risks": [],
+    "alternatives": [],
+    "clothing": null
+  }
 }

@@ -1,0 +1,9 @@
+{
+  "type": "https://agent-travel.local/problems/POI_NOT_FOUND",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "POI 不存在或缺少权威坐标",
+  "code": "POI_NOT_FOUND",
+  "traceId": "synthetic-trace-s12-404",
+  "timestamp": "2026-11-24T05:00:00Z"
+}

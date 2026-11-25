@@ -35,7 +35,7 @@ def harden_schema(data, agent, kind):
         props["route"] = {"type": "object", "additionalProperties": False, "required": ["ordered_points", "segments", "is_estimated"], "properties": {
             "ordered_points": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}, "segments": {"type": "array"}, "is_estimated": {"type": "boolean"}}}
     if kind == "output" and agent == "03-weather":
-        props["daily"] = {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["date", "temp_min", "temp_max", "precip_prob", "condition", "data_type", "source_record_id", "retrieved_at", "valid_until"], "properties": {"date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"}, "temp_min": {"type": "number"}, "temp_max": {"type": "number"}, "precip_prob": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "condition": {"type": "string"}, "data_type": {"type": "string", "enum": ["forecast", "climate_statistics"]}, "source_record_id": {"type": "string", "minLength": 1}, "retrieved_at": {"type": "string", "format": "date-time"}, "valid_until": {"type": ["string", "null"], "format": "date-time"}}}}
+        props["daily"] = {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["date", "temp_min", "temp_max", "precip_prob", "condition", "data_type", "source_record_id", "retrieved_at", "valid_until"], "properties": {"date": {"type": "string", "pattern": r"^\d{4}-\d{2}-\d{2}$"}, "temp_min": {"type": "number"}, "temp_max": {"type": "number"}, "precip_prob": {"type": ["number", "null"], "minimum": 0, "maximum": 1}, "condition": {"type": "string"}, "data_type": {"type": "string", "enum": ["forecast", "climate_statistics"]}, "source_record_id": {"type": "string", "minLength": 1}, "retrieved_at": {"type": "string", "format": "date-time"}, "valid_until": {"type": ["string", "null"], "format": "date-time"}, "forecast_published_at": {"type": ["string", "null"], "format": "date-time"}}}}
     if kind == "output" and agent == "06-reservation-rules":
         props["reservations"] = {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["point_id", "policy_id", "ticket_type", "effective_from", "effective_until", "timezone", "last_verified", "stale"], "properties": {"point_id": {"type": "string"}, "policy_id": {"type": "string"}, "ticket_type": {"type": "string"}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}, "amount_minor": {"type": "integer", "minimum": 0}, "effective_from": {"type": "string", "format": "date-time"}, "effective_until": {"type": ["string", "null"], "format": "date-time"}, "timezone": {"type": "string"}, "last_verified": {"type": "string", "format": "date-time"}, "stale": {"type": "boolean"}}}}
     return data
@@ -43,7 +43,16 @@ def harden_schema(data, agent, kind):
 def payload(agent):
     if agent == "01-orchestrator": return {"plan": {"days": []}}
     if agent == "02-route-planner": return {"route": {"ordered_points": ["poi-1"], "segments": [], "is_estimated": False}}
-    if agent == "03-weather": return {"daily": [], "travel_advice": {}}
+    if agent == "03-weather":
+        return {
+            "daily": [],
+            "travel_advice": {
+                "sensitive_points": [],
+                "risks": [],
+                "alternatives": [],
+                "clothing": None,
+            },
+        }
     if agent == "04-attractions": return {"cards": [{"point_id": "poi-1", "source": "unknown"}]}
     if agent == "05-dining-lodging": return {"meals": [], "lodging": []}
     if agent == "06-reservation-rules": return {"reservations": [], "timeline": []}

@@ -114,6 +114,60 @@ def main():
             errors.append(f"OpenAPI: PlanView missing {sorted(expected_fields - plan_view_fields)}")
     except Exception as exc:
         errors.append(f"S19 plan contract: {exc}")
+    try:
+        weather_schema = json.loads(
+            (root / "agents" / "03-weather" / "output.schema.json").read_text(encoding="utf-8")
+        )
+        weather_validator = Draft7Validator(weather_schema, format_checker=FormatChecker())
+        advice_path = root / "contracts" / "examples" / "03-weather" / "travel-advice-ok.json"
+        advice_item = json.loads(advice_path.read_text(encoding="utf-8"))
+        errors.extend(
+            f"{advice_path}: {e.message}"
+            for e in sorted(weather_validator.iter_errors(advice_item), key=lambda e: list(e.path))
+        )
+        if advice_item.get("status") != "ok":
+            errors.append(f"{advice_path}: status mismatch")
+        advice = advice_item.get("travel_advice", {})
+        if set(advice) != {"sensitive_points", "risks", "alternatives", "clothing"}:
+            errors.append(f"{advice_path}: travel_advice must freeze four fields")
+    except Exception as exc:
+        errors.append(f"S13 travel advice fixture: {exc}")
+    try:
+        poi_schema = json.loads(
+            (root / "contracts" / "s12" / "poi-lookup.response.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        Draft7Validator.check_schema(poi_schema)
+        poi_validator = Draft7Validator(poi_schema, format_checker=FormatChecker())
+        for name in ("poi-lookup-ok", "poi-lookup-unknown-category"):
+            path = root / "contracts" / "examples" / "s12" / f"{name}.json"
+            item = json.loads(path.read_text(encoding="utf-8"))
+            errors.extend(
+                f"{path}: {e.message}"
+                for e in sorted(poi_validator.iter_errors(item), key=lambda e: list(e.path))
+            )
+        for name, expected_code in (
+            ("problem-poi-not-found", "POI_NOT_FOUND"),
+            ("problem-rate-limited", "RATE_LIMITED"),
+        ):
+            path = root / "contracts" / "examples" / "s12" / f"{name}.json"
+            problem = json.loads(path.read_text(encoding="utf-8"))
+            missing = {
+                "type",
+                "title",
+                "status",
+                "detail",
+                "code",
+                "traceId",
+                "timestamp",
+            } - set(problem)
+            if missing:
+                errors.append(f"{path}: problem-detail missing {sorted(missing)}")
+            if problem.get("code") != expected_code:
+                errors.append(f"{path}: expected code {expected_code}")
+    except Exception as exc:
+        errors.append(f"S12 POI lookup contract: {exc}")
     if errors:
         print("\\n".join(errors))
         return 1

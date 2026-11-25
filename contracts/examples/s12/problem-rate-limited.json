@@ -1,0 +1,9 @@
+{
+  "type": "https://agent-travel.local/problems/RATE_LIMITED",
+  "title": "Too Many Requests",
+  "status": 429,
+  "detail": "请求过于频繁",
+  "code": "RATE_LIMITED",
+  "traceId": "synthetic-trace-s12-429",
+  "timestamp": "2026-11-24T05:00:00Z"
+}

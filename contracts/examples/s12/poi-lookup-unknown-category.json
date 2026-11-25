@@ -1,0 +1,21 @@
+{
+  "poi_id": "18d0b8a2-9749-454c-88d9-6767b3b6adf0",
+  "city_id": "beijing",
+  "name": "样例住宿点",
+  "category": "unknown",
+  "latitude": 39.919,
+  "longitude": 116.404,
+  "coordinate_system": "GCJ02",
+  "data_at": "2026-11-24T04:19:52.819730Z",
+  "source_metadata": [
+    {
+      "source_type": "poi",
+      "source_record_id": "daa42808-dc0a-4152-a88a-e03c4af15b09",
+      "retrieved_at": "2026-11-24T04:19:50Z",
+      "valid_until": null,
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "retrieved_at": "2026-11-24T05:00:00Z"
+}

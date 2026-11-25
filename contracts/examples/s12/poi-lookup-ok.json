@@ -1,0 +1,21 @@
+{
+  "poi_id": "8cdb7a2c-a88b-4529-99b2-9e74496c5bf4",
+  "city_id": "beijing",
+  "name": "故宫博物院",
+  "category": "attraction",
+  "latitude": 39.916,
+  "longitude": 116.397,
+  "coordinate_system": "GCJ02",
+  "data_at": "2026-11-24T04:19:52.754202Z",
+  "source_metadata": [
+    {
+      "source_type": "knowledge_base",
+      "source_record_id": "daa42808-dc0a-4152-a88a-e03c4af15b09",
+      "retrieved_at": "2026-11-24T04:19:50Z",
+      "valid_until": null,
+      "freshness_status": "fresh",
+      "is_estimated": false
+    }
+  ],
+  "retrieved_at": "2026-11-24T05:00:00Z"
+}

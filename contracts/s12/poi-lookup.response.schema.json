@@ -1,0 +1,124 @@
+{
+  "$id": "contracts/s12/poi-lookup.response.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PoiLookupResponse (DRAFT)",
+  "description": "DRAFT internal POI-by-ID response for the Python route planner (2026-11-24). Authoritative coordinates only come from the Java knowledge-base POI snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "poi_id",
+    "city_id",
+    "name",
+    "category",
+    "latitude",
+    "longitude",
+    "coordinate_system",
+    "data_at",
+    "source_metadata",
+    "retrieved_at"
+  ],
+  "properties": {
+    "poi_id": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "city_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "poi.category; the literal \"unknown\" is used when the source has no category. Never inferred."
+    },
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "coordinate_system": {
+      "type": "string",
+      "enum": [
+        "GCJ02",
+        "WGS84"
+      ]
+    },
+    "data_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time",
+      "description": "Current POI snapshot created_at. null means unknown; never substituted with the response time."
+    },
+    "source_metadata": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_type",
+          "source_record_id",
+          "retrieved_at",
+          "freshness_status",
+          "is_estimated"
+        ],
+        "properties": {
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "map",
+              "weather",
+              "knowledge_base",
+              "reservation_rule",
+              "poi",
+              "user_input",
+              "system"
+            ]
+          },
+          "source_record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "freshness_status": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "unknown"
+            ]
+          },
+          "is_estimated": {
+            "type": "boolean",
+            "const": false
+          }
+        }
+      }
+    },
+    "retrieved_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
