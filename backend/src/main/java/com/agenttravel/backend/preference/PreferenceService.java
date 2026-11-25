@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ public class PreferenceService {
     private final Clock clock;
     private final ConcurrentHashMap<String, IdempotencyEntry> idempotency = new ConcurrentHashMap<>();
 
+    @Autowired
     public PreferenceService(PreferenceRepository repository, ObjectMapper json,
             PreferenceProperties properties) {
         this(repository, json, properties, Clock.systemUTC());
